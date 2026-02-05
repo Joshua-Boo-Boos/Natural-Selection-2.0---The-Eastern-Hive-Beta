@@ -1,0 +1,8 @@
+name        = "NS2.0-EN Beta"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[This mod is the beta version of NS2.0-EN.]=]
+image       = "preview.jpg"
+tag_modtype = "Gameplay Tweak"
+tag_support = "Must be run on Server"
+publish_id = 3660704201
