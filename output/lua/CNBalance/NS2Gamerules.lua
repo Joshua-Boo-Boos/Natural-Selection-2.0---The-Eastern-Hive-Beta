@@ -4,9 +4,9 @@
         bountyActive = true,
         resourceEfficiency = true,
         recentWinsBalance = true,
-        deadlockInitialTime = 120,
+        deadlockInitialTime = 2700,
         deadlockRequireMinPlayers = true,
-        deadlockMinPlayers = 2
+        deadlockMinPlayers = 10
      }, true)
 
      NS2Gamerules.kRecentRoundStatus = LoadConfigFile("NS2.0RoundStatus.json",{

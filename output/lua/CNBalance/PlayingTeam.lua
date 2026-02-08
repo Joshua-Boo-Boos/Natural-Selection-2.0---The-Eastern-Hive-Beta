@@ -239,21 +239,8 @@ function PlayingTeam:OnGameStateChanged(_state)
 end
 
 function PlayingTeam:OnDeadlockExtend(techID)
-    local gameStarted = GetGamerules():GetGameStarted()
-    if not gameStarted then return end
-    
-    local extendTime = kDeadlockTimeExtend[techID]
-    if not extendTime then return end
-
-    local now = Shared.GetTime()
-    -- Do not allow extending/stopping deadlock once deadlock has started
-    if now > self.deadlockTime then
-        return
-    end
-
-    if now + extendTime > self.deadlockTime then
-        self.deadlockTime = self.deadlockTime + extendTime
-    end
+    -- Deadlock extensions disabled in Beta: do nothing.
+    return
 end
 
 function PlayingTeam:UpdateDeadlock()
