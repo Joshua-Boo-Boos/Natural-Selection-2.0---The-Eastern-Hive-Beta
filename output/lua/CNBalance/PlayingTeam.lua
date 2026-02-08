@@ -246,6 +246,11 @@ function PlayingTeam:OnDeadlockExtend(techID)
     if not extendTime then return end
 
     local now = Shared.GetTime()
+    -- Do not allow extending/stopping deadlock once deadlock has started
+    if now > self.deadlockTime then
+        return
+    end
+
     if now + extendTime > self.deadlockTime then
         self.deadlockTime = self.deadlockTime + extendTime
     end
@@ -278,22 +283,76 @@ function PlayingTeam:UpdateDeadlock()
             end
         end
         
-        -- Only apply deadlock damage if there are 10 or more human players
-        if humanPlayerCount < 10 then
+        -- Optionally require a minimum number of human players for deadlock damage
+        local requireMinPlayers = true
+        local minPlayers = 10
+        if NS2Gamerules and NS2Gamerules.kBalanceConfig then
+            if NS2Gamerules.kBalanceConfig.deadlockRequireMinPlayers ~= nil then
+                requireMinPlayers = NS2Gamerules.kBalanceConfig.deadlockRequireMinPlayers
+            end
+            if NS2Gamerules.kBalanceConfig.deadlockMinPlayers ~= nil then
+                minPlayers = NS2Gamerules.kBalanceConfig.deadlockMinPlayers
+            end
+        end
+        if requireMinPlayers and humanPlayerCount < minPlayers then
             return
         end
         
-        -- Fixed 2% damage per tick instead of exponential scaling
+        -- Fixed 2% of original EHP per tick applied to both teams' structures
         local kDamagePercentage = 0.02
+        local kDecayInterval = 5
+        local kMinScale = 0.25
         if now > self.deadlockDamageInterval then
-            self.deadlockDamageInterval = now + 5
-            for _, target in ipairs(GetEntitiesWithMixinForTeam("Construct", self:GetTeamNumber())) do
-                if not target.kIgnoreDeadlock and target.TakeDamage then
-                    if not target.CanTakeDamage or target:CanTakeDamage() then
-                        local maxHealth = target:GetMaxHealth()
-                        local maxArmor = target:GetMaxArmor()
-                        local damage = (maxHealth + maxArmor * kHealthPointsPerArmor)
-                        target:TakeDamage(damage, nil, nil, nil, nil, maxArmor * kDamagePercentage, maxHealth * kDamagePercentage, kDamageType.Normal, true)
+            self.deadlockDamageInterval = now + kDecayInterval
+
+            local gamerules = GetGamerules()
+            if gamerules and gamerules._lastDeadlockTick == now then
+                return
+            end
+            if gamerules then gamerules._lastDeadlockTick = now end
+
+            for teamNum = kTeam1Index, kTeam2Index do
+                for _, target in ipairs(GetEntitiesWithMixinForTeam("Construct", teamNum)) do
+                    if not target.kIgnoreDeadlock and target.SetMaxHealth then
+                        if not target.CanTakeDamage or target:CanTakeDamage() then
+
+                            -- store original max values on first application
+                            if not target.originalMaxHealth then
+                                target.originalMaxHealth = target:GetMaxHealth()
+                                target.originalMaxArmor = target:GetMaxArmor()
+                                target.originalEHP = target.originalMaxHealth + target.originalMaxArmor * kHealthPointsPerArmor
+                            end
+
+                            local origEHP = target.originalEHP or (target:GetMaxHealth() + target:GetMaxArmor() * kHealthPointsPerArmor)
+                            local currentMaxEHP = target:GetMaxHealth() + target:GetMaxArmor() * kHealthPointsPerArmor
+
+                            -- reduce current max EHP by fixed amount (2% of original EHP) but not below 25% of original
+                            local newMaxEHP = math.max(currentMaxEHP - origEHP * kDamagePercentage, origEHP * kMinScale)
+                            local scale = newMaxEHP / origEHP
+
+                            local newMaxHealth = math.max(1, math.floor((target.originalMaxHealth or target:GetMaxHealth()) * scale + 0.5))
+                            local newMaxArmor = math.max(0, math.floor((target.originalMaxArmor or target:GetMaxArmor()) * scale + 0.5))
+
+                            target:SetMaxHealth(newMaxHealth)
+                            target:SetMaxArmor(newMaxArmor)
+
+                            -- clamp current health/armor to new maxima (only reduce if above)
+                            if target.GetHealth and target:GetHealth() > newMaxHealth then
+                                if target.SetHealth then
+                                    target:SetHealth(newMaxHealth)
+                                else
+                                    target.health = newMaxHealth
+                                end
+                            end
+                            if target.GetArmor and target:GetArmor() > newMaxArmor then
+                                if target.SetArmor then
+                                    target:SetArmor(newMaxArmor)
+                                else
+                                    target.armor = newMaxArmor
+                                end
+                            end
+
+                        end
                     end
                 end
             end

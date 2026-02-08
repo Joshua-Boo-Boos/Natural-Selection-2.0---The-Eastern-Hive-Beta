@@ -11,23 +11,19 @@ if Client then
         if not self.balanceVoice then
             return
         end
-        if self.playing and self.soundEffectInstance then
+        if self.playing and self.soundEffectInstance and not self._soundHandleInvalid then
             local volume = OptionsDialogUI_GetSoundVolume() / 100
             volume = volume * (gMuteCustomVoices and 0 or 1)
             if self.volume ~= volume then
                 self.volume = volume
-                -- Defensive check: ensure method exists and trap native errors.
-                if self.soundEffectInstance and type(self.soundEffectInstance.SetVolume) == "function" then
-                    local ok, err = pcall(function() self.soundEffectInstance:SetVolume(volume) end)
-                    if not ok then
-                        -- Native handle likely invalid: clear references to avoid repeated errors.
-                        self.soundEffectInstance = nil
-                        self.playing = false
-                    end
-                else
-                    -- No callable SetVolume: clear the reference.
+                -- Try calling SetVolume directly inside pcall. If native call fails,
+                -- mark the handle invalid to avoid repeated native error spam.
+                local ok, err = pcall(function() self.soundEffectInstance:SetVolume(volume) end)
+                if not ok then
+                    -- Native handle likely invalid: clear references and mark invalid to stop further attempts.
                     self.soundEffectInstance = nil
                     self.playing = false
+                    self._soundHandleInvalid = true
                 end
             end
         end
@@ -55,13 +51,12 @@ if Client then
     local baseOnDestroy = SoundEffect.OnDestroy
     function SoundEffect:OnDestroy()
         if baseOnDestroy then baseOnDestroy(self) end
-        if self.soundEffectInstance then
-            -- Attempt a safe stop (best-effort).
-            pcall(function()
-                if type(self.soundEffectInstance.Stop) == "function" then
-                    self.soundEffectInstance:Stop()
-                end
-            end)
+        if self.soundEffectInstance and not self._soundHandleInvalid then
+            -- Attempt a safe stop (best-effort). If native Stop errors, mark handle invalid.
+            local ok = pcall(function() if type(self.soundEffectInstance.Stop) == "function" then self.soundEffectInstance:Stop() end end)
+            if not ok then
+                self._soundHandleInvalid = true
+            end
         end
         self.soundEffectInstance = nil
         self.playing = false

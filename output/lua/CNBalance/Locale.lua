@@ -30,6 +30,10 @@ kTranslateMessage["GAME_LENGTH_TEAM2"] = "区域侵入中 [%i:%02i]"
 kTranslateMessage["RESPAWN_EXTEND_TEAM2"] = "生物质重构 [%i秒]"
 kTranslateMessage["DEADLOCK_UNTIL_TEAM2"] = "区域侵入中 [%i:%02i]\n神经链强度 [%i:%02i]"
 kTranslateMessage["DEADLOCK_ACTIVATED_TEAM2"] = "区域侵入中 [%i:%02i]\n神经链消亡 [%i:%02i]"
+
+-- Short versions for HUD (single time display)
+kTranslateMessage["DEADLOCK_ACTIVATED_SHORT_TEAM1"] = "站点清理 [%i:%02i]"
+kTranslateMessage["DEADLOCK_ACTIVATED_SHORT_TEAM2"] = "区域侵入中 [%i:%02i]"
 kTranslateMessage["DEADLOCK_ACTIVATING_TEAM2"] = "神经链消亡中,立即扩张区域."
 kTranslateMessage["TEAM_RESOURCES_EFFICIENCY2"] = "资源收集率 [%i%%]"
 kTranslateMessage["NEXT_SPAWN_IN_TEAM2"] = "生物质重构:%i"
@@ -288,6 +292,12 @@ kLocales["DEADLOCK_ACTIVATING_TEAM2"] = "Hive Bio-link Degenerating,Expand Regio
 kLocales["TEAM_RESOURCES_EFFICIENCY2"] = "Res-Efficiency [%i%%]"
 kLocales["NEXT_SPAWN_IN_TEAM2"] = "Biomass Reformation:%i"
 kLocales["WAITING_SPAWN_TEAM2"] = "Hatch Awaiting..."
+
+-- Short versions for HUD (single time display)
+kLocales["DEADLOCK_UNTIL_SHORT_TEAM1"] = "Cleaning:[%s:%s]"
+kLocales["DEADLOCK_ACTIVATED_SHORT_TEAM1"] = "Self-Destructing [%s:%s]"
+kLocales["DEADLOCK_UNTIL_SHORT_TEAM2"] = "Infesting:[%s:%s]"
+kLocales["DEADLOCK_ACTIVATED_SHORT_TEAM2"] = "Bio-link Degenerating [%s:%s]"
 
 kLocales["BOUNTY"] = "BOUNTY"
 

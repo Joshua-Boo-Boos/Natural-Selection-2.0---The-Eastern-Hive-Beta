@@ -1,10 +1,12 @@
  if Server then
 
      NS2Gamerules.kBalanceConfig = LoadConfigFile("NS2.0Config.json", {
-         bountyActive = false,
-         resourceEfficiency = false,
-         recentWinsBalance = false,
-         deadlockInitialTime = 1800
+        bountyActive = true,
+        resourceEfficiency = true,
+        recentWinsBalance = true,
+        deadlockInitialTime = 120,
+        deadlockRequireMinPlayers = true,
+        deadlockMinPlayers = 2
      }, true)
 
      NS2Gamerules.kRecentRoundStatus = LoadConfigFile("NS2.0RoundStatus.json",{
