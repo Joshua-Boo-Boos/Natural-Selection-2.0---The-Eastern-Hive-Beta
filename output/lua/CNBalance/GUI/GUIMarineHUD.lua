@@ -71,9 +71,10 @@ end
 local baseInitialize = GUIMarineHUD.Initialize
 function GUIMarineHUD:Initialize()
     
-    self.militaryProtocol = CreateTechIcon(kTechId.MilitaryProtocol)
-
-    self.lastMilitaryProtocol = nil
+    if not kJoshuaWeapon then
+        self.militaryProtocol = CreateTechIcon(kTechId.MilitaryProtocol)
+        self.lastMilitaryProtocol = nil
+    end
 
     self.autoMedPack = GUIUtility_CreateRequestIcon(kTechId.MedPack, Vector(-52 - 32, -36, 0),kMarineTeamType)
     self.autoAmmoPack = GUIUtility_CreateRequestIcon(kTechId.AmmoPack, Vector(52 - 32, -36, 0),kMarineTeamType)
@@ -90,7 +91,9 @@ function GUIMarineHUD:Initialize()
 
     self.resourceDisplay.background:AddChild(self.autoMedPack)
     self.resourceDisplay.background:AddChild(self.autoAmmoPack)
-    self.background:AddChild(self.militaryProtocol)
+    if not kJoshuaWeapon then
+        self.background:AddChild(self.militaryProtocol)
+    end
     --........ or i should totally rewrite initialize
     for index,element in ipairs(self.teamCountElements) do
         --Vector(25, 46, 0)
@@ -110,15 +113,19 @@ end
 local baseReset = GUIMarineHUD.Reset
 function GUIMarineHUD:Reset()
     baseReset(self)
-    self.militaryProtocol:SetPosition(Vector(GUIMarineHUD.kUpgradePos.x, GUIMarineHUD.kUpgradePos.y - GUIMarineHUD.kUpgradeSize.y - 8, 0) * self.scale)
-    self.militaryProtocol:SetSize(GUIMarineHUD.kUpgradeSize * self.scale)
-    self.militaryProtocol:SetIsVisible(false)
+    if not kJoshuaWeapon then
+        self.militaryProtocol:SetPosition(Vector(GUIMarineHUD.kUpgradePos.x, GUIMarineHUD.kUpgradePos.y - GUIMarineHUD.kUpgradeSize.y - 8, 0) * self.scale)
+        self.militaryProtocol:SetSize(GUIMarineHUD.kUpgradeSize * self.scale)
+        self.militaryProtocol:SetIsVisible(false)
+    end
     
     local marineHudBars = GetAdvancedOption("hudbars_m")
     if marineHudBars > 0 then
         if marineHudBars == 2 then
-            local pos = self.militaryProtocol:GetPosition()
-            self.militaryProtocol:SetPosition(Vector(pos.x, pos.y-100, 0))
+            if not kJoshuaWeapon then
+                local pos = self.militaryProtocol:GetPosition()
+                self.militaryProtocol:SetPosition(Vector(pos.x, pos.y-100, 0))
+            end
         end
     end
 
@@ -133,7 +140,7 @@ function GUIMarineHUD:Update(deltaTime)
     baseUpdate(self,deltaTime)
     local player = Client.GetLocalPlayer()
     local hasMilitaryProtocol = GetHasTech(player,kTechId.MilitaryProtocol)
-    if hasMilitaryProtocol ~= self.lastMilitaryProtocol then
+    if not kJoshuaWeapon and (hasMilitaryProtocol ~= self.lastMilitaryProtocol) then
         self.lastMilitaryProtocol = hasMilitaryProtocol
         self.militaryProtocol:SetIsVisible(self.lastMilitaryProtocol)
     end
