@@ -155,7 +155,7 @@ function Vortex:SuckinPlayers(_deltaTime)
 end
 
 function Vortex:DamageEntities(_deltaTime)
-
+    --This code has been modified to require one of three ray-traces per entity to hit in order for the entity to be damaged. This stops the Vortex from damaging entities when there is a physical block between the Vortex and the entity
     self.damageInterval = self.damageInterval + _deltaTime
     if self.damageInterval < kDamageInterval then
         return
@@ -166,15 +166,63 @@ function Vortex:DamageEntities(_deltaTime)
     local otherTeam = GetEnemyTeamNumber(self:GetTeamNumber())
     local enemies = GetEntitiesWithMixinForTeamWithinRange("Live",otherTeam, attackPoint, Vortex.kRadius)
     for index, entity in ipairs(enemies) do
-        
-        local receiverPoint = entity:GetOrigin()
-        local damage = kVortexStructureDamagePerSecond
-        if entity:isa("Player") then
+        local receiverPoint = nil
+        local rayTrace = nil
+        local damage = nil
+        if entity.GetEyePos then
             receiverPoint = entity:GetEyePos()
-            damage = kVortexPlayerDamagePerSecond
-            self.endurance = self.endurance - kVortexPerPlayerDamageEnduranceCostPerSecond * kDamageInterval
+            rayTrace = Shared.TraceRay(attackPoint, receiverPoint, CollisionRep.Damage, PhysicsMask.Bullets, EntityFilterOne(self))
+            if rayTrace.fraction ~= 1 then
+                if rayTrace.entity then
+                    if rayTrace.entity == entity then
+                        damage = kVortexStructureDamagePerSecond
+                        if entity:isa("Player") then
+                            receiverPoint = entity:GetEyePos()
+                            damage = kVortexPlayerDamagePerSecond
+                            self.endurance = self.endurance - kVortexPerPlayerDamageEnduranceCostPerSecond * kDamageInterval
+                        end
+                        self:DoDamage(damage * kDamageInterval, entity, receiverPoint, (receiverPoint - attackPoint):GetUnit())
+                        goto end_of_the_code
+                    end
+                end
+            end
         end
-        self:DoDamage(damage * kDamageInterval, entity, receiverPoint, (receiverPoint - attackPoint):GetUnit())
+        if entity.GetOrigin and entity.GetExtents then
+            receiverPoint = entity:GetOrigin() + 0.5 * Vector(0, entity:GetExtents().y, 0)
+            rayTrace = Shared.TraceRay(attackPoint, receiverPoint, CollisionRep.Damage, PhysicsMask.Bullets, EntityFilterOne(self))
+            if rayTrace.fraction ~= 1 then
+                if rayTrace.entity then
+                    if rayTrace.entity == entity then
+                        damage = kVortexStructureDamagePerSecond
+                        if entity:isa("Player") then
+                            receiverPoint = entity:GetEyePos()
+                            damage = kVortexPlayerDamagePerSecond
+                            self.endurance = self.endurance - kVortexPerPlayerDamageEnduranceCostPerSecond * kDamageInterval
+                        end
+                        self:DoDamage(damage * kDamageInterval, entity, receiverPoint, (receiverPoint - attackPoint):GetUnit())
+                        goto end_of_the_code
+                    end
+                end
+            end
+        end
+        if entity.GetOrigin then
+            receiverPoint = entity:GetOrigin()
+            rayTrace = Shared.TraceRay(attackPoint, receiverPoint, CollisionRep.Damage, PhysicsMask.Bullets, EntityFilterOne(self))
+            if rayTrace.fraction ~= 1 then
+                if rayTrace.entity then
+                    if rayTrace.entity == entity then
+                        damage = kVortexStructureDamagePerSecond
+                        if entity:isa("Player") then
+                            receiverPoint = entity:GetEyePos()
+                            damage = kVortexPlayerDamagePerSecond
+                            self.endurance = self.endurance - kVortexPerPlayerDamageEnduranceCostPerSecond * kDamageInterval
+                        end
+                        self:DoDamage(damage * kDamageInterval, entity, receiverPoint, (receiverPoint - attackPoint):GetUnit())
+                    end
+                end
+            end
+        end
+        ::end_of_the_code::
     end
 end
 
