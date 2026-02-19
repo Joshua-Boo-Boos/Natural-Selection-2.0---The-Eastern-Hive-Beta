@@ -98,13 +98,13 @@ function ShadowStep:OnSecondaryAttack(player)
     local minTimePassed = not player:GetIsShadowStepping()
     local hasEnoughEnergy = player:GetEnergy() > kVokexShadowStepEnergyCost
     if not player.etherealStartTime or minTimePassed and hasEnoughEnergy and player:GetShadowStepAllowed() then
-        if not self.secondaryAttacking then
+        -- if not self.secondaryAttacking then --This hopefully will stop the requirement of pressing the secondary attack button to Shadow Step
 
             self:SetEthereal(player, true)
             self.timeBlinkStarted = Shared.GetTime()
             self.secondaryAttacking = true
 
-        end
+        -- end
     end
 
     Ability.OnSecondaryAttack(self, player)
