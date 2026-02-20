@@ -442,7 +442,7 @@ kHealthOnBlink = 0
 kVokexCost = 42
 kVokexUpgradeCost = 5
 
-kVokexShadowStepEnergyCost = 16 --Was 13
+kVokexShadowStepEnergyCost = 13
 kSwipeShadowStepDamage = 40
 kVokexGestateTime = 25
 kVokexEggCost = 80
@@ -456,11 +456,11 @@ kAcidRocketResearchTime = 40
 
 kAcidRocketVelocity = 32
 kAcidRocketEnergyCost = 10
-kAcidRocketRoundPerSecond = 2 --Was 2.4
+kAcidRocketRoundPerSecond = 2.4
 kAcidRocketBombDamageType = kDamageType.Corrode
 kAcidRocketBombDamage = 25
 kAcidRocketBombRadius = 0.3
-kAcidRocketBombSplashRadius = 4 --Was 4.5
+kAcidRocketBombSplashRadius = 4.5
 kAcidRocketBombDotIntervall = 0.4
 kAcidRocketBombDuration = 3
 

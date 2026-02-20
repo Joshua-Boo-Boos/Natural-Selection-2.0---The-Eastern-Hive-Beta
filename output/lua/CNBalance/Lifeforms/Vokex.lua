@@ -54,7 +54,7 @@ local kVokexScanDuration = 4
 local kShadowStepSpeed = 25 --40
 local kShadowStepSpeedBonusPerCelerity = 0.66
 Vokex.kShadowStepDuration = 0.2
-local kShadowStepCooldown = 0.5 --Was 0.4
+local kShadowStepCooldown = 0.4
 
 local kMaxSpeed = 7.2
 
