@@ -609,8 +609,8 @@ local function PerformAttackEntity( eyePos, target, lastSeenPos, bot, brain, mov
         
         if (not bot.lastHostilesTime or bot.lastHostilesTime < Shared.GetTime() - 45) and isDodgeable then
             CreateVoiceMessage( player, kVoiceId.MarineHostiles )
-            local chatMsg =  bot:SendTeamMessage( "Enemy contact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-            bot:SendTeamMessage(chatMsg, 60)
+            -- local chatMsg =  bot:SendTeamMessage( "Enemy contact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
+            -- bot:SendTeamMessage(chatMsg, 60)
             bot.lastHostilesTime = Shared.GetTime()
         end
         
@@ -2949,8 +2949,8 @@ local kExecAttackStructures = function(move, bot, brain, marine, action)
     end
 
     PerformAttackStructure( marine:GetEyePos(), target, memory.lastSeenPos, bot, brain, move )
-      local chatMsg =  bot:SendTeamMessage( "Structural threat! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-            bot:SendTeamMessage(chatMsg, 60)
+    --   local chatMsg =  bot:SendTeamMessage( "Structural threat! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
+            -- bot:SendTeamMessage(chatMsg, 60)
 
 end
 

@@ -229,8 +229,8 @@ local function PerformAttack( eyePos, mem, bot, brain, move )
     if target ~= nil then
 
         PerformAttackEntity( eyePos, target, mem.lastSeenPos, bot, brain, move )
-          local chatMsg =  bot:SendTeamMessage( "Cooonnntaaaact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-            bot:SendTeamMessage(chatMsg, 60)
+        --   local chatMsg =  bot:SendTeamMessage( "Cooonnntaaaact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
+            -- bot:SendTeamMessage(chatMsg, 60)
 
     end
 
