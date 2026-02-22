@@ -24,14 +24,6 @@ local kVerticalSpace = 2
 -- }
 
 function ArmoryAbility:GetIsPositionValid(position, player, surfaceNormal)
-
-    local marineEntityExtents = GetExtents(kTechId.Marine)
-    local marineHeight = marineEntityExtents.y
-    local minimumDistanceFromPhaseGate = marineHeight * 1.1
-    local phaseGatesWithinRangeOfPotentialBuildPosition = GetEntitiesWithRange("PhaseGate", position, minimumDistanceFromPhaseGate)
-    if #phaseGatesWithinRangeOfPotentialBuildPosition > 0 then
-        return false
-    end
     
     local valid = false
 

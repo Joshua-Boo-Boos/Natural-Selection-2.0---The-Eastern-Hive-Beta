@@ -19,6 +19,8 @@ local kCreateFailSound = PrecacheAsset("sound/NS2.fev/alien/gorge/create_fail")
 
 CombatBuilder.kSupportedStructures = { SentryAbility, ArmoryAbility}--, PhaseGateAbility, ObservatoryAbility }
 
+local kPhaseGateBlockRadius = 2.4
+
 local networkVars =
 {
     numSentriesLeft = "private integer (0 to 16)",
@@ -423,6 +425,11 @@ function CombatBuilder:GetPositionForStructure(startPosition, direction, structu
     
     -- Don't allow dropped structures to go too close to techpoints and resource nozzles
     if GetPointBlocksAttachEntities(displayOrigin) then
+        validPosition = false
+    end
+
+    -- Do not allow building too close to any PhaseGate (preview and actual build)
+    if validPosition and #GetEntitiesWithinRange("PhaseGate", displayOrigin, kPhaseGateBlockRadius) > 0 then
         validPosition = false
     end
     
