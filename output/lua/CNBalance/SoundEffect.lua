@@ -46,13 +46,12 @@ if Client then
         CustomBalanceVoice(self)
     end
 
-    -- Apply volume scaling ONLY to comm sounds (not weapons/abilities)
+    -- Apply volume scaling to NS2.0-TEH sounds
     local function GetVolume(soundEffectName, volume)
         if soundEffectName
            and string.find(soundEffectName, "ns2plus.fev") ~= nil
-           and string.find(soundEffectName, "/comm/") ~= nil
         then
-            volume = (volume or 1) * OptionsDialogUI_GetSoundVolume() / 100
+            volume = (volume or 0.8) * OptionsDialogUI_GetSoundVolume() / 100
         end
         return volume
     end
