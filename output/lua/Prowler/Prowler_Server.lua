@@ -12,7 +12,7 @@ function Prowler:InitWeapons()
     
     self:GiveItem(VolleyRappel.kMapName)
     self:GiveItem(ProwlerStructureAbility.kMapName)
-    self:SetActiveWeapon(VolleyRappel.kMapName)    
+    self:SetActiveWeapon(VolleyRappel.kMapName)
     
 end
 
@@ -20,8 +20,8 @@ function Prowler:InitWeaponsForReadyRoom()
     
     Alien.InitWeaponsForReadyRoom(self)
     
-    self:GiveItem(ReadyRoomRappel.kMapName)
-    self:SetActiveWeapon(ReadyRoomRappel.kMapName)
+    -- self:GiveItem(ReadyRoomRappel.kMapName)
+    -- self:SetActiveWeapon(ReadyRoomRappel.kMapName) Bruh too much usage in the Ready Room
     
 end
 

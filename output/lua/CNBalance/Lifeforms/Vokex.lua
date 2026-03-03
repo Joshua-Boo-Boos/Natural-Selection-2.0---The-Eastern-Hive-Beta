@@ -51,10 +51,11 @@ local kJumpHeight = 1.4
 
 local kVokexScanDuration = 4
 
-local kShadowStepSpeed = 25 --40
+-- Slow the Vokex down while Shadow Stepping by 10% (from 25 to 22.5) and increase the cooldown by 0.05 seconds (from 0.4 to 0.45).
+local kShadowStepSpeed = 22.5 -- 25 --40
 local kShadowStepSpeedBonusPerCelerity = 0.66
 Vokex.kShadowStepDuration = 0.2
-local kShadowStepCooldown = 0.4
+local kShadowStepCooldown = 0.45 -- 0.4
 
 local kMaxSpeed = 7.2
 

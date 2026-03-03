@@ -163,7 +163,7 @@ kOnosDamageReduction = {
     --["HeavyMachineGun"] = 1.08,
 }
 
-kProwlerHealth = 150 kProwlerArmor  = 20 kProwlerPointValue = 15 kProwlerHealthPerBioMass = 5
+kProwlerHealth = 160 kProwlerArmor  = 40 kProwlerPointValue = 15 kProwlerHealthPerBioMass = 5 -- kProwlerHealth was 150 and kProwlerArmor was 20
 kProwlerDamageReduction = {
     ["Grenade"] = 0.75,
     ["ImpactGrenade"] = 0.75,
@@ -173,7 +173,7 @@ kProwlerDamageReduction = {
     --["Cannon"] = 0.9,
 }
 
-kVokexHealth = 250   kVokexArmor = 70   kVokexPointvalue = 25   kVokexHealthPerBioMass = 5
+kVokexHealth = 240   kVokexArmor = 60   kVokexPointvalue = 25   kVokexHealthPerBioMass = 6 -- kVokexHealth was 250, kVokexArmor was 70 and kVokexHealthPerBioMass was 5
 
 kParasitePlayerPointValue = 1
 

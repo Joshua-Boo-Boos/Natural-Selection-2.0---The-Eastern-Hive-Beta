@@ -401,18 +401,18 @@ kSporesResearchCost = 20
 kSporesResearchTime = 60
 
 -- Prowler
-kProwlerCost = 18 --14
+kProwlerCost = 20 --14 The problem is that if the Prowler is 21 p-res then it's meant to be as powerful as a Lerk. Maybe I should make the Prowler weaker and reduce the p-res cost?
 kProwlerGestateTime = 6
-kProwlerUpgradeCost = 1
+kProwlerUpgradeCost = 2
 
-kVolleySpread = Math.Radians(3)
-kProwlerDamagePerPellet = 8 -- there are 6 pellets
+kVolleySpread = Math.Radians(1.9) -- More like an actual shotgun spread. Was 3 radians.
+kProwlerDamagePerPellet = 7 -- there are 6 pellets however reduced spread means more damage on target so reduced damage from 8 to 7.
 kVolleyRappelDamageType = kDamageType.Normal
 kVolleyEnergyCost = 7.0 --7.0
 kVolleyWebTime = 2
 
 kRappelDamage = 10 kRappelContinuousDamage = 5 kRappelContinuousDamageAgainstStructure = 80
-kRappelReelReactionTime = 0.7 kRappelReelContinuousSpeed = 8
+kRappelReelReactionTime = 0.6 kRappelReelContinuousSpeed = 9.2 -- 0.7 and 8 respectively
 kRappelResearchCost = 10
 kRappelResearchTime = 20
 kRappelEnergyCost = 12
@@ -422,7 +422,7 @@ kRappelRange = 30
 kAcidSprayResearchCost = 10
 kAcidSprayResearchTime = 60
 kAcidSprayEnergyCost = 24
-kAcidSprayDamage = 20  -- 3 missiles
+kAcidSprayDamage = 25  -- 3 missiles but the radius has been severely reduced (from 3.5 to 0.5 so much less AOE potential). Was 20.
 kAcidSprayDamageType = kDamageType.Corrode
 
 -- Fade
@@ -442,7 +442,7 @@ kHealthOnBlink = 0
 kVokexCost = 42
 kVokexUpgradeCost = 5
 
-kVokexShadowStepEnergyCost = 13
+kVokexShadowStepEnergyCost = 14 -- 13
 kSwipeShadowStepDamage = 40
 kVokexGestateTime = 25
 kVokexEggCost = 80
@@ -455,7 +455,7 @@ kAcidRocketResearchCost = 25
 kAcidRocketResearchTime = 40
 
 kAcidRocketVelocity = 32
-kAcidRocketEnergyCost = 10
+kAcidRocketEnergyCost = 12 -- Was 10
 kAcidRocketRoundPerSecond = 2.4
 kAcidRocketBombDamageType = kDamageType.Corrode
 kAcidRocketBombDamage = 25
