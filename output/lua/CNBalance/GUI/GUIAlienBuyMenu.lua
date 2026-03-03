@@ -1130,6 +1130,15 @@ local function ResourceFetchingDisabled(self, type)
 	end
 
 	if fetchingResource then
+
+		local player = Client.GetLocalPlayer()
+		local record = Scoreboard_GetPlayerRecord(player:GetClientIndex())
+		local isRookie = record and record.IsRookie
+
+		if isRookie then
+			return true, "ABM_BIOMASS_FETCH_RESTRICTED"
+		end
+
 		if Client.GetLocalPlayer():GetTeamResources() < kOriginFormTeamResourceFetchThreshold then
 			return true, "ABM_RESOURCE_LOW"
 		end
