@@ -5,7 +5,7 @@ function BulletsMixin:ApplyBulletGameplayEffects(player, target, endPoint, direc
 
     local blockedByUmbra = GetBlockedByUmbra(target)
     if not blockedByUmbra and target and GetHasTech(player,kTechId.DragonBreath) then
-        if HasMixin(target, "Fire") and GetAreEnemies(player,target) then
+        if HasMixin(target, "Fire") and GetAreEnemies(player,target) and not HasMixin(target, "Construct") then
             target:SetOnFire(player,self,true)
         end
     end

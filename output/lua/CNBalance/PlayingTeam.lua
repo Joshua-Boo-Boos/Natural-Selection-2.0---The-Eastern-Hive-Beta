@@ -287,8 +287,8 @@ function PlayingTeam:UpdateDeadlock()
         
         -- Fixed 2% of original EHP per tick applied to both teams' structures
         local kDamagePercentage = 0.02
-        local kDecayInterval = 5
-        local kMinScale = 0.25
+        local kDecayInterval = 15
+        local kMinScale = 0.4
         if now > self.deadlockDamageInterval then
             self.deadlockDamageInterval = now + kDecayInterval
 

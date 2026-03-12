@@ -223,6 +223,13 @@ function Vokex:MovementModifierChanged(newMovementModifierState, input)
     end
 end
 
+function Vokex:ModifyDamageTaken(damageTable, attacker, doer, damageType, hitPoint) -- dud
+    local reduction = kVokexDamageReduction[doer:GetClassName()]
+    if reduction then
+        damageTable.damage = damageTable.damage * reduction
+    end
+end
+
 function Vokex:OnProcessMove(input)
 
     Alien.OnProcessMove(self,input)

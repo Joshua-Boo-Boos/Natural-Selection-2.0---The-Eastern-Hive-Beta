@@ -23,16 +23,24 @@ if Server then
     
         local damageScalar = 1
         
+        -- local bountyScore = self:GetBountyCurrentLife()
+
+        -- --Self Bounty Damage Taken Increase
+        -- if bountyScore > 0 then   
+        --     local scalar = bountyScore  * (0.1 / self.kBountyThreshold)
+        --     scalar = scalar * (math.floor(bountyScore / self.kBountyThreshold)+ 1)
+        --     damageScalar = damageScalar + scalar      --Receive Additional Damage And Die Please
+        -- end
+
         local bountyScore = self:GetBountyCurrentLife()
 
         --Self Bounty Damage Taken Increase
-        if bountyScore > 0 then   
-            local scalar = bountyScore  * (0.1 / self.kBountyThreshold)
-            scalar = scalar * (math.floor(bountyScore / self.kBountyThreshold)+ 1)
-            damageScalar = damageScalar + scalar      --Receive Additional Damage And Die Please
+        if bountyScore > 0 then
+            local scalar = 1.5 * (bountyScore / 50)
+            damageScalar = damageScalar + scalar -- Requires 1.5 extra via scalar at 50 bounty
         end
 
-        damageScalar = Clamp(damageScalar,0.2,5.0)        --Seems enough
+        damageScalar = Clamp(damageScalar,0.2,2.5) -- Was 5 maximum
         damageTable.damage = damageTable.damage * damageScalar
     end
 

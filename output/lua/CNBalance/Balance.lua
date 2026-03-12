@@ -216,10 +216,10 @@ kSubMachineGunPointValue = 0
 kRifleMeleeDamage = 10
 
 --Knife
-kKnifeDamage = 20
-kKnifeRange = 1.3
+kKnifeDamage = 30
+kKnifeRange = 1.5
 kKnifeCost = 0
-kKnifeDamageType = kDamageType.Structural
+kKnifeDamageType = kDamageType.Light
 --
 
 kAxeDamage = 25
@@ -255,7 +255,7 @@ kDragonBreathStructureFireDamagePerStack = { kStructureFireDOTPerSecond / 100, k
 kFlamethrowerStructureDamagePerStack = { kStructureFireDOTPerSecond, kStructureFireDOTPerSecond, kStructureFireDOTPerSecond, kStructureFireDOTPerSecond }
 kStructureFireDamageMaxStack = { kStructureFireDOTPerSecond * 3 , kStructureFireDOTPerSecond * 4, kStructureFireDOTPerSecond * 5, kStructureFireDOTPerSecond * 6  }
 
-kMinigunDamage = 10
+kMinigunDamage = 9 -- Was 10
 kMinigunDamageType = kDamageType.Normal
 kRailgunDamage = 10
 kRailgunChargeDamage = 154
@@ -310,8 +310,8 @@ kExosuitTechResearchTime = 90
 
 kRoboticsFactoryBuildTime = 8
 
-kJetpackCost = 25
-kJetpackDropCost = 18
+kJetpackCost = 20
+kJetpackDropCost = 16
 kJetpackDropCooldown = 0
 
 --Cannon

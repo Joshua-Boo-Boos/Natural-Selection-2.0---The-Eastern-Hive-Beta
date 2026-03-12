@@ -22,6 +22,14 @@ end
 local kWebDistortMaterial = PrecacheAsset("models/alien/gorge/web_distort.material")
 local kWebCloakedMaterial = PrecacheAsset("cinematics/vfx_materials/cloaked.material")
 
+if Server then
+
+    function Web:SetVariant(gorgeVariant)
+        self.variant = 1
+    end
+
+end
+
 if Client then
 
     function Web:OnUpdateRender()

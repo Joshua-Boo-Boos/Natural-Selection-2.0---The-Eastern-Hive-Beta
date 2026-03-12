@@ -110,7 +110,7 @@ kMaxBiomassHealthMultiplyLevel = 8 --N-1
 
 kSkulkHealth = 75 kSkulkArmor = 10    kSkulkPointValue = 5  kSkulkHealthPerBioMass = 3 
 kSkulkDamageReduction = {
-    ["Grenade"] = 0.8,
+    ["Grenade"] = 0.6,
     ["ImpactGrenade"] = 0.8,
     ["PulseGrenade"] = 0.8,
     ["Cannon"] = 0.8,
@@ -120,6 +120,7 @@ kSkulkDamageReduction = {
 
 kGorgeHealth = 180   kGorgeArmor = 50    kGorgePointValue = 7 kGorgeHealthPerBioMass = 5
 kGorgeDamageReduction = {
+    ["Grenade"] = 0.9,
     ["Sentry"] = 0.5,
     ["MarineSentry"] = 0.5,
     ["Mine"] = 0.5,
@@ -136,6 +137,14 @@ kLerkDamageReduction = {
 
 kFadeHealth = 270  kFadeArmor = 80  kFadePointValue = 20 kFadeHealthPerBioMass = 5
 kFadeDamageReduction = {
+    ["Grenade"] = 0.8,
+    --["Mine"] = 1.25,
+    --["MarineSentry"] = 1.1,
+    --["HeavyMachineGun"] = 0.92,
+}
+
+kVokexDamageReduction = {
+    ["Grenade"] = 0.8,
     --["Mine"] = 1.25,
     --["MarineSentry"] = 1.1,
     --["HeavyMachineGun"] = 0.92,

@@ -170,13 +170,14 @@ function Cannon:OnFireBullets(shootCoords)
     local player = self:GetParent()
     if not player then return end
 
-    local onGround = player:GetIsOnGround()
-    if onGround then
-        local force = player:GetCrouching() and 5 or 8
-        ApplyPushback(player, .3, -player:GetCoords().zAxis * force + Vector(0,2,0))
-    else
-        player:SetVelocity(player:GetVelocity() -shootCoords.zAxis * 10)
-    end
+    -- local onGround = player:GetIsOnGround()
+    -- if onGround then
+    --     local force = player:GetCrouching() and 5 or 8
+    --     ApplyPushback(player, .3, -player:GetCoords().zAxis * force + Vector(0,2,0))
+    -- else
+    --     player:SetVelocity(player:GetVelocity() -shootCoords.zAxis * 10)
+    -- end
+    -- Disabled for now
 end
 
 local function NoFalloff()
@@ -187,7 +188,7 @@ function Cannon:OnBulletFirstHit(spreadDirection,endPoint,target)
     local hitEntities = GetEntitiesWithMixinWithinRange("Live", endPoint, kCannonAoeRadius)
     RadiusDamage(hitEntities, endPoint, kCannonAoeRadius, kCannonAoeDamage, self ,false ,NoFalloff,false)
     if target and target:isa("Player") then
-        ApplyPushback(target,.5,spreadDirection*8)
+        -- ApplyPushback(target,.5,spreadDirection*8) -- Disabled for now
     end
 end
 

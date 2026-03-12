@@ -110,8 +110,10 @@ function Onos:GetMaxSpeed(possible)
 
     if GetHasCarapaceUpgrade(self) then
         local shellLevel = self:GetShellLevel()
-        chargeSpeed = chargeSpeed - shellLevel * 0.66
-        normalSpeed = normalSpeed - shellLevel * 0.2
+        -- chargeSpeed = chargeSpeed - shellLevel * 0.66
+        -- normalSpeed = normalSpeed - shellLevel * 0.2
+        chargeSpeed = chargeSpeed - shellLevel * 0.5
+        normalSpeed = normalSpeed - shellLevel * 0.15
     end
 
     if self:GetIsDevouring() then
