@@ -154,10 +154,10 @@ ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/CNBalance/Weap
 ModLoader.SetupFileHook("lua/Weapons/Marine/Welder.lua", "lua/CNBalance/Weapons/Marine/Welder.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/Flamethrower.lua", "lua/CNBalance/Weapons/Marine/Flamethrower.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/Axe.lua", "lua/CNBalance/Weapons/Marine/Axe.lua", "post")
-ModLoader.SetupFileHook("lua/Weapons/Marine/Pistol.lua", "lua/CNBalance/Weapons/Marine/Pistol.lua", "post")
+-- ModLoader.SetupFileHook("lua/Weapons/Marine/Pistol.lua", "lua/CNBalance/Weapons/Marine/Pistol.lua", "post") -- Not needed (brings NS2.0-TEH's version of the Pistol to vanilla NS2) but kept for modding purposes at some point maybe
 ModLoader.SetupFileHook("lua/Weapons/Marine/Rifle.lua", "lua/CNBalance/Weapons/Marine/Rifle.lua", "post")
 ModLoader.SetupFileHook("lua/CommAbilities/Marine/EMPBlast.lua", "lua/CNBalance/Weapons/Marine/EMPBlast.lua", "post")
- ModLoader.SetupFileHook("lua/Weapons/Marine/PulseGrenade.lua", "lua/CNBalance/Weapons/Marine/PulseGrenade.lua", "post")
+ModLoader.SetupFileHook("lua/Weapons/Marine/PulseGrenade.lua", "lua/CNBalance/Weapons/Marine/PulseGrenade.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/GasGrenade.lua", "lua/CNBalance/Weapons/Marine/GasGrenade.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/ClusterGrenade.lua", "lua/CNBalance/Weapons/Marine/ClusterGrenade.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/Shotgun.lua", "lua/CNBalance/Weapons/Marine/Shotgun.lua", "post")

@@ -101,8 +101,20 @@ kRifleDamage = 10
 kRifleDamageType = kDamageType.Normal
 kRifleClipSize = 50
 
-kPistolRateOfFire = 0.01
+-- kPistolRateOfFire = 0.01
+-- kPistolDamage = 20
+-- Original NS2.0 values (NS2.0-CN)
+
+-- 10 bullets per second
+kPistolRateOfFire = 0.1
 kPistolDamage = 20
+kPistolDamageType = kDamageType.Normal
+kPistolClipSize = 10
+-- not used yet
+kPistolMinFireDelay = 0.1
+
+kPistolAltDamage = 40
+-- The values above for the pistol are taken from the vanilla NS2 code
 
 kShotgunDamage = 11.33 --11.33
 kShotgunDamageType = kDamageType.Normal
