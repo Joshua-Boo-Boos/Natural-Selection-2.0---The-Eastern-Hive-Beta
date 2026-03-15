@@ -267,7 +267,7 @@ kDragonBreathStructureFireDamagePerStack = { kStructureFireDOTPerSecond / 100, k
 kFlamethrowerStructureDamagePerStack = { kStructureFireDOTPerSecond, kStructureFireDOTPerSecond, kStructureFireDOTPerSecond, kStructureFireDOTPerSecond }
 kStructureFireDamageMaxStack = { kStructureFireDOTPerSecond * 3 , kStructureFireDOTPerSecond * 4, kStructureFireDOTPerSecond * 5, kStructureFireDOTPerSecond * 6  }
 
-kMinigunDamage = 8 -- Was 10
+kMinigunDamage = 9 -- Was 10
 kMinigunDamageType = kDamageType.Normal
 kRailgunDamage = 10
 kRailgunChargeDamage = 154
@@ -279,7 +279,7 @@ kPulseGrenadeDamage = 90  --75
 kPulseGrenadeEnergyDamage = 35  --25
 
 kClusterGrenadeDamageRadius = 10
-kClusterGrenadeDamage = 72
+kClusterGrenadeDamage = 80
 kClusterGrenadeDamageType = kDamageType.ClusterFlame
 
 kClusterFragmentDamageRadius = 6
@@ -296,7 +296,7 @@ kInfantryPortalCost = 15
 kRoboticsFactoryCost = 10
 kUpgradeRoboticsFactoryCost = 5
 kUpgradeRoboticsFactoryTime = 20
-kARCDamage = 530 -- Was 570
+kARCDamage = 550 -- Was 570
 kARCCost = 15
 kARCBuildTime = 5
 kMACCost = 4

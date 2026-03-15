@@ -16,9 +16,9 @@ function ClusterGrenade:Detonate(targetHit)
     if targetHit then
         table.removevalue(hitEntities, targetHit)
         self:DoDamage(kClusterGrenadeDamage, targetHit, targetHit:GetOrigin(), GetNormalizedVector(targetHit:GetOrigin() - self:GetOrigin()), "none")
-        if targetHit.SetOnFire then
-           targetHit:SetOnFire(self,self)
-        end
+        -- if grenadeTech and targetHit.SetOnFire then
+        --    targetHit:SetOnFire(self,self)
+        -- end
     end
 
     RadiusDamage(hitEntities, self:GetOrigin(), kClusterGrenadeDamageRadius, kClusterGrenadeDamage, self)
