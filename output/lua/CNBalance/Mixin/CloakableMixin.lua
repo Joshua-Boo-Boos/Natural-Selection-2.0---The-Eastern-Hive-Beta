@@ -125,6 +125,10 @@ local function UpdateDesiredCloakFraction(self, deltaTime)
 
         self.cloakingDesired = false
 
+        -- Ensure mixin fields are initialized (can be lost during entity lifecycle events)
+        self.timeUncloaked = self.timeUncloaked or 0
+        self.timeCloaked = self.timeCloaked or 0
+
         -- Animate towards uncloaked if triggered
         if Shared.GetTime() > self.timeUncloaked and (not HasMixin(self, "Detectable") or not self:GetIsDetected()) and ( not GetConcedeSequenceActive() ) then
 
@@ -396,7 +400,7 @@ function CloakableMixin:OnTakeDamage(damage, attacker, doer, point)
 
         if Server then
             if self:isa("Player") or self.GetReceivesStructuralDamage then
-                if Shared.GetTime() > self.timeUncloaked then
+                if Shared.GetTime() > (self.timeUncloaked or 0) then
                     AlienDetectionParry(self:GetTeamNumber(),self:GetOrigin(),ShadeInk.kShadeInkDisorientRadius)
                 end
             end
