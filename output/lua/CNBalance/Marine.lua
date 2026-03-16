@@ -100,6 +100,7 @@ if Server then
             if techId == kTechId.CombatInjector then
                 self.combatInjectorRespawn = CombatInjector.kMapName
             end
+
         end
         
         return result

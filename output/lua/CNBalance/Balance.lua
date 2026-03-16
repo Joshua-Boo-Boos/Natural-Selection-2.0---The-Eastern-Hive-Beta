@@ -216,7 +216,7 @@ kRevolverCost = 0
 
 -- Joshua-Boo-Boos Combat Injector
 kCombatInjectorClipSize = 1
-kCombatInjectorCost = 5
+kCombatInjectorCost = 10
 kCombatInjectorPointValue = 5
 --
 

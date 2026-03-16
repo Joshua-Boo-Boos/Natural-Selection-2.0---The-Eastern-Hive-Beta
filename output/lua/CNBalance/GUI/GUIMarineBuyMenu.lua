@@ -359,16 +359,16 @@ local kTechIdInfo =
 ------------
     [kTechId.Knife] =
     {
-        ButtonTextureIndex = 19,
-        BigPictureIndex = 15,
+        ButtonTextureIndex = 20,
+        BigPictureIndex = 17,
         Description = "KNIFE_BUYDESCRIPTION",    
         Stats = GetStatsForTechId(kTechId.Revolver)
     },
 
     [kTechId.CombatBuilder] =
     {
-        ButtonTextureIndex = 20,
-        BigPictureIndex = 17,
+        ButtonTextureIndex = 19,
+        BigPictureIndex = 15,
         Description = "COMBATBUILDER_BUYDESCRIPTION",    
         Stats = GetStatsForTechId(kTechId.CombatBuilder)
     },

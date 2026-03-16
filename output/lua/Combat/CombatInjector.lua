@@ -106,7 +106,7 @@ function CombatInjector:OnTag(tagName)
             if player then
                 -- apply effects now that the animation has fully completed
                 if self.injectorType == "REGEN" then
-                    for i = 1, 40 do
+                    for i = 1, 20 do
                         player:AddTimedCallback(function(self)
                             if self:GetHealth() < self:GetMaxHealth() then
                                 self:TriggerEffects("medpack_pickup", { effecthostcoords = self:GetCoords() })
@@ -344,6 +344,7 @@ if Server then
                 if activeWeapon == self then
                     player:QuickSwitchWeapon()
                 end
+                player.combatInjectorRespawn = nil
                 player:RemoveWeapon(self)
                 DestroyEntity(self)
             end
