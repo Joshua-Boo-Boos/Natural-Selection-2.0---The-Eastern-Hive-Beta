@@ -45,6 +45,7 @@ function MarineTeam:InitTechTree()
 
     self.techTree:AddBuyNode(kTechId.SubMachineGun,               kTechId.None,                kTechId.None)
     self.techTree:AddBuyNode(kTechId.Revolver,                    kTechId.None,                kTechId.None)
+    self.techTree:AddBuyNode(kTechId.CombatInjector,                    kTechId.AdvancedArmory,                kTechId.None)
     self.techTree:AddBuyNode(kTechId.Knife,                       kTechId.None,                kTechId.None)
 
     self.techTree:AddBuildNode(kTechId.SentryBattery,             kTechId.RoboticsFactory,      kTechId.None)

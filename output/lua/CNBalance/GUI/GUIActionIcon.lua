@@ -20,6 +20,7 @@ local kPickupBackgroundBigCoords = { 53, 0, 116, 31 }
 local kBackgroundYOffset = -GUIScale(10)
 
 local kIconsTextureName = PrecacheAsset("ui/pickup_icons.dds")
+local kCombatInjectorIconTexture = PrecacheAsset("ui/inventory_icon_combat_injector.dds")
 local kKeyTextureName = PrecacheAsset("ui/key_mouse_marine.dds")
 local kProgressBarTextureName = PrecacheAsset("ui/progress_bar_bg.dds")
 local kCommanderBarTextureName = PrecacheAsset("ui/commanderbar.dds")
@@ -40,6 +41,7 @@ kIconOffsets["SubMachineGun"] = 11
 kIconOffsets["Cannon"] = 12
 kIconOffsets["LightMachineGun"] = 13
 kIconOffsets["CombatBuilder"] = 14
+kIconOffsets["CombatInjector"] = 0
 ------
 
 local kItemText = { }
@@ -233,7 +235,13 @@ function GUIActionIcon:ShowIcon(buttonText, weaponType, hintText, holdFraction)
     else
         local iconIndex = kIconOffsets[weaponType]
         self.pickupIcon:SetColor(Color(1, 1, 1, 1))
-        self.pickupIcon:SetTexturePixelCoordinates(0, iconIndex * kIconHeight, kIconWidth, (iconIndex + 1) * kIconHeight)
+        if weaponType == "CombatInjector" then
+            self.pickupIcon:SetTexture(kCombatInjectorIconTexture)
+            self.pickupIcon:SetTexturePixelCoordinates(0, 0, 128, 64)
+        else
+            self.pickupIcon:SetTexture(kIconsTextureName)
+            self.pickupIcon:SetTexturePixelCoordinates(0, iconIndex * kIconHeight, kIconWidth, (iconIndex + 1) * kIconHeight)
+        end
 
         self.pickupText:SetText(ConditionalValue(kItemText[weaponType] ~= nil, kItemText[weaponType], ""))
         self.pickupText:SetIsVisible(true)

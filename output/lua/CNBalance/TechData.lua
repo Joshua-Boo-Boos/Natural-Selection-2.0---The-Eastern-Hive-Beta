@@ -344,6 +344,17 @@ function BuildTechData()
         [kTechDataTooltipInfo] = "REVOLVER_TOOLTIP",
     })
 
+    table.insert(techData, {
+        [kTechDataId] = kTechId.CombatInjector,
+        [kTechDataMaxHealth] = kMarineWeaponHealth,
+        [kTechDataPointValue] = kCombatInjectorPointValue,
+        [kTechDataMapName] = CombatInjector.kMapName,
+        [kTechDataModel] = CombatInjector.kModelName,
+        [kTechDataCostKey] = kCombatInjectorCost,
+        [kTechDataDisplayName] = "COMBAT_INJECTOR",
+        [kTechDataTooltipInfo] = "COMBAT_INJECTOR_TOOLTIP",
+    })
+
     table.insert(techData,{
 
         [kTechDataId] = kTechId.SubMachineGun,

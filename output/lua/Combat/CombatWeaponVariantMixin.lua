@@ -32,6 +32,7 @@ if Client then
         ["LightMachineGun"] = 0,
         ["SubMachineGun"] = 0,
         ["Revolver"] = 0,
+        ["CombatInjector"] = 0,
         ["Cannon"] = 0,
     }
     CombatWeaponVariant.kMarineHandMaterials = 

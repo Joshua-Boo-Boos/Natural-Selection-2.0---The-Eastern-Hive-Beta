@@ -115,6 +115,8 @@ ModLoader.SetupFileHook("lua/Hud/GUINotificationItem.lua", "lua/CNBalance/GUI/GU
 
 ModLoader.SetupFileHook("lua/GUIActionIcon.lua", "lua/CNBalance/GUI/GUIActionIcon.lua", "replace")
 ModLoader.SetupFileHook("lua/GUIPickups.lua", "lua/CNBalance/GUI/GUIPickups.lua", "post")
+ModLoader.SetupFileHook("lua/GUIDeathMessages.lua", "lua/CNBalance/GUI/GUIDeathMessages.lua", "post")
+ModLoader.SetupFileHook("lua/Hud/GUIInventory.lua", "lua/CNBalance/GUI/GUIInventory.lua", "post")
 ModLoader.SetupFileHook("lua/MarineBuy_Client.lua", "lua/CNBalance/MarineBuy_Client.lua", "post" )
 ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/MarineTeam.lua", "post")
 ModLoader.SetupFileHook("lua/MarineTeamInfo.lua", "lua/CNBalance/MarineTeamInfo.lua", "replace")
@@ -177,6 +179,7 @@ ModLoader.SetupFileHook("lua/GUIInsight_PlayerHealthbars.lua", "lua/CNBalance/GU
 --Combat Weapon Hacks
 ModLoader.SetupFileHook("lua/Weapons/Marine/Axe.lua", "lua/Combat/Knife.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/Revolver.lua", "post")
+ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/CombatInjector.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/SubMachineGun.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/LightMachineGun.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/Cannon.lua", "post")

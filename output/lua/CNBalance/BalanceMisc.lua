@@ -49,6 +49,7 @@ kKnifeWeight = -0.01
 kSubMachineGunWeight = 0.08
 kLightMachineGunWeight = 0.13
 kRevolverWeight = 0
+kCombatInjectorWeight = 0.05
 
 kMaxInfantryPortalsPerCommandStation = 99
 kNumMines = 1 -- Was 4 mines for 20 p-res

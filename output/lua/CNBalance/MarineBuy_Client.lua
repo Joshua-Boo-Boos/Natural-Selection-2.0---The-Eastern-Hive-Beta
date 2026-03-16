@@ -11,12 +11,13 @@ local kDefensiveTechIds =
 {
     kTechId.CombatBuilder,
     kTechId.LayMines,
+    kTechId.CombatInjector,
 }
 
 
 function MarineBuy_GetHasDefensiveTech( techId )
 
-    if techId == kTechId.CombatBuilder or techId == kTechId.LayMines then
+    if techId == kTechId.CombatBuilder or techId == kTechId.LayMines or techId == kTechId.CombatInjector then
         return true
     end
 

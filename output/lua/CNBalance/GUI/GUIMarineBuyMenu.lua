@@ -226,6 +226,13 @@ local kTechIdStats =
         Range = 0.7,	
     },
 
+    [kTechId.CombatInjector]=
+    {   
+        LifeFormDamage = 0,
+        StructureDamage = 0,
+        Range = 0,
+    },
+
     [kTechId.SubMachineGun] =
     {
         LifeFormDamage = 0.7,
@@ -489,6 +496,16 @@ local kTechIdInfo =
         Description = "CANNON_BUYDESCRIPTION",
         Stats = GetStatsForTechId(kTechId.Cannon)
     },
+
+    [kTechId.CombatInjector] =
+    {
+        ButtonTextureIndex = 0,
+        BigPictureIndex = 0,
+        Description = "COMBAT_INJECTOR_BUYDESCRIPTION",
+        ButtonPath = PrecacheAsset("ui/buymenu_marine/Combat_Injector_Button.dds"),
+        BigInfoPath = PrecacheAsset("ui/buymenu_marine/Combat_Injector_Bigicon.dds"),
+        Stats = GetStatsForTechId(kTechId.CombatInjector)
+    },
     
     [kTechId.Jetpack] =
     {
@@ -522,6 +539,12 @@ function GUIMarineBuyMenu:_GetPigPicturePixelCoordinatesForTechID(techId)
 
     -- NOTE(Salads): The texture file for purchase buttons have a column for "not hovered", and another for "hovered"
 
+    -- Custom standalone texture - use full texture dimensions
+    local info = kTechIdInfo[techId]
+    if info and info.BigInfoPath then
+        return { 0, 0, 651, 319 }
+    end
+
     local pictureWidth = 651 -- armory dimensions
     local pictureHeight = 319
     if self.hostStructure:isa("PrototypeLab") then
@@ -545,6 +568,15 @@ end
 function GUIMarineBuyMenu:_GetButtonPixelCoordinatesForTechID(techId, isHover)
 
     -- NOTE(Salads): The texture file for purchase buttons have a column for "not hovered", and another for "hovered"
+
+    -- Custom standalone texture - use full texture dimensions
+    local info = kTechIdInfo[techId]
+    if info and info.ButtonPath then
+        local buttonIconWidth = 441
+        local buttonIconHeight = 114
+        local hoverAdd = isHover and buttonIconWidth or 0
+        return { hoverAdd, 0, hoverAdd + buttonIconWidth, buttonIconHeight }
+    end
 
     local buttonIconWidth = 441
     local buttonIconHeight = 114
@@ -644,7 +676,12 @@ function GUIMarineBuyMenu:_CreateButton(parent, buttonPosition, buttonTechId)
     buyButton:SetIsScaling(false)
     buyButton:AddAsChildTo(parent)
     buyButton:SetPosition(buttonPosition)
-    buyButton:SetTexture(self.kButtonsTexture)
+    local info = kTechIdInfo[buttonTechId]
+    if info and info.ButtonPath then
+        buyButton:SetTexture(info.ButtonPath)
+    else
+        buyButton:SetTexture(self.kButtonsTexture)
+    end
     buyButton:SetTexturePixelCoordinates(GUIUnpackCoords(buttonPixelCoordinates))
     buyButton:SetSize(GUIGetSizeFromCoords(buttonPixelCoordinates))
     buyButton:SetOptionFlag(GUIItem.CorrectScaling)
@@ -874,6 +911,7 @@ function GUIMarineBuyMenu:CreateArmoryUI()
     self.background:SetLayer(kGUILayerMarineBuyMenu)
 
     local x2ButtonPositions = kWeaponGroupButtonPositions[self.kButtonGroupFrame_Unlabeled_x2]
+    local x3ButtonPositions = kWeaponGroupButtonPositions[self.kButtonGroupFrame_Labeled_x3]
     local x4ButtonPositions = kWeaponGroupButtonPositions[self.kButtonGroupFrame_Labeled_x4]
 
     local weaponGroupTopLeft = self:CreateAnimatedGraphicItem()
@@ -943,14 +981,29 @@ function GUIMarineBuyMenu:CreateArmoryUI()
     weaponGroupAdditional:SetIsScaling(false)
     weaponGroupAdditional:AddAsChildTo(self.background)
     weaponGroupAdditional:SetPosition(Vector(weaponGroupTopRight:GetPosition().x + weaponGroupTopRight:GetSize().x + paddingXWeaponGroups, paddingY, 0))
-    weaponGroupAdditional:SetTexture(self.kButtonGroupFrame_Unlabeled_x2)
+    weaponGroupAdditional:SetTexture(self.kButtonGroupFrame_Labeled_x3)
     weaponGroupAdditional:SetSizeFromTexture()
     weaponGroupAdditional:SetOptionFlag(GUIItem.CorrectScaling)
-    self:_InitializeWeaponGroup(weaponGroupAdditional, x2ButtonPositions,
+    self:_InitializeWeaponGroup(weaponGroupAdditional, x3ButtonPositions,
     {
         kTechId.CombatBuilder,
         kTechId.LayMines,
+        kTechId.CombatInjector,
     },2)
+
+    local x3LabelStartX = 335
+
+    local labelItemAdditional = self:CreateAnimatedTextItem()
+    labelItemAdditional:SetIsScaling(false)
+    labelItemAdditional:AddAsChildTo(weaponGroupAdditional)
+    labelItemAdditional:SetPosition(Vector(x3LabelStartX, 376, 0))
+    labelItemAdditional:SetAnchor(GUIItem.Left, GUIItem.Top)
+    labelItemAdditional:SetTextAlignmentX(GUIItem.Align_Min)
+    labelItemAdditional:SetTextAlignmentY(GUIItem.Align_Min)
+    labelItemAdditional:SetFontName(Fonts.kAgencyFB_Tiny)
+    labelItemAdditional:SetText(Locale.ResolveString("BUYMENU_GROUPLABEL_EQUIPMENT"))
+    labelItemAdditional:SetOptionFlag(GUIItem.CorrectScaling)
+    GUIMakeFontScale(labelItemAdditional, "kAgencyFB", 24)
     
 --------------
 
@@ -1018,7 +1071,7 @@ function GUIMarineBuyMenu:_CreateRightSide(startPos,bigPicOffset)
     self.rightSideRoot:SetColor(Color(0,0,0,0))
     self.rightSideRoot:SetOptionFlag(GUIItem.CorrectScaling)
 
-    local y = 0
+    local y = 150
     self.itemTitle = self:CreateAnimatedTextItem()
     self.itemTitle:AddAsChildTo(self.rightSideRoot)
     self.itemTitle:SetIsScaling(false)
@@ -1152,7 +1205,7 @@ function GUIMarineBuyMenu:_CreateRightSide(startPos,bigPicOffset)
     local structuresBarHeight = self.vsStructuresBar:GetSize().y
     self.vsStructuresBar:SetPosition(self.vsStructuresBar:GetPosition() + Vector(0, (structuresTextHeight - structuresBarHeight) / 2, 0))
 
-    y = y + 50
+    y = y + 80
 
     self.itemDescriptionPositionY = y
     self.itemDescription = self:CreateAnimatedTextItem()
@@ -1322,6 +1375,12 @@ function GUIMarineBuyMenu:_SetDetailsSectionTechId(techId, techCost)
     self.itemDescription:SetText(Locale.ResolveString(description))
 
     local bigPictureCoords = self:_GetPigPicturePixelCoordinatesForTechID(techId)
+    local info = kTechIdInfo[techId]
+    if info and info.BigInfoPath then
+        self.bigPicture:SetTexture(info.BigInfoPath)
+    else
+        self.bigPicture:SetTexture(self.kArmoryBigPicturesTexture)
+    end
     self.bigPicture:SetTexturePixelCoordinates(GUIUnpackCoords(bigPictureCoords))
 
     local stats = kTechIdInfo[techId].Stats
