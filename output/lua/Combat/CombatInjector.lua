@@ -301,16 +301,16 @@ function CombatInjector:OnSecondaryAttack()
             -- end
             if parent.weaponUpgradeLevel then
                 if self.injectorType == "REGEN" then
-                    StartSoundEffectOnEntity(kAntidoteSound, player, 0.35)
+                    -- StartSoundEffectOnEntity(kAntidoteSound, player, 0.35)
                     self.injectorType = "ANTIDOTE"
                 elseif self.injectorType == "ANTIDOTE" then
-                    StartSoundEffectOnEntity(kCatPackSound, player, 0.35)
+                    -- StartSoundEffectOnEntity(kCatPackSound, player, 0.35)
                     self.injectorType = "CAT-PACK"
                 elseif self.injectorType == "CAT-PACK" then
-                    StartSoundEffectOnEntity(kDefensePlusSound, player, 0.35)
+                    -- StartSoundEffectOnEntity(kDefensePlusSound, player, 0.35)
                     self.injectorType = "DEFENSE+"
                 elseif self.injectorType == "DEFENSE+" then
-                    StartSoundEffectOnEntity(kRegenerationSound, player, 0.35)
+                    -- StartSoundEffectOnEntity(kRegenerationSound, player, 0.35)
                     self.injectorType = "REGEN"
                 end
             end
