@@ -38,7 +38,6 @@ function GetTexCoordsForTechId(techId)
         gTechIdPosition[kTechId.ShadowStep] = kDeathMessageIcon.ShadowStep
 
 		gTechIdPosition[kTechId.Revolver] = kDeathMessageIcon.Revolver
-        gTechIdPosition[kTechId.CombatInjector] = kDeathMessageIcon.CombatInjector
 		gTechIdPosition[kTechId.SubMachineGun] = kDeathMessageIcon.SubMachineGun
 		gTechIdPosition[kTechId.LightMachineGun] = kDeathMessageIcon.LightMachineGun
 		gTechIdPosition[kTechId.Knife] = kDeathMessageIcon.Knife

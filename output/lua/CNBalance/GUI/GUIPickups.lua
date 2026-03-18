@@ -1,7 +1,6 @@
 
 local GetPickupTextureCoordinates = debug.getupvaluex(GUIPickups.Update, "GetPickupTextureCoordinates")
 local kPickupTypes = debug.getupvaluex(GetPickupTextureCoordinates, "kPickupTypes")
-table.insert(kPickupTypes, "CombatInjector")
 table.insert(kPickupTypes, "Revolver")
 table.insert(kPickupTypes, "SubMachineGun")
 table.insert(kPickupTypes, "LightMachineGun")
@@ -9,7 +8,6 @@ table.insert(kPickupTypes, "Cannon")
 table.insert(kPickupTypes, "CombatBuilder")
 table.insert(kPickupTypes, "Heavy")
 local kPickupTextureYOffsets = debug.getupvaluex(GetPickupTextureCoordinates, "kPickupTextureYOffsets")
-kPickupTextureYOffsets["CombatInjector"] = 13
 kPickupTextureYOffsets["Revolver"] = 13
 kPickupTextureYOffsets["SubMachineGun"] = 14
 kPickupTextureYOffsets["Cannon"] = 15
@@ -23,7 +21,6 @@ local kMinPickupSize = 16
 local kMaxPickupSize = 48
 -- Note: This graphic can probably be smaller as we don't need the icons to be so big.
 local kIconsTextureName = "ui/drop_icons.dds"
-local kCombatInjectorPickupTexture = PrecacheAsset("ui/inventory_icon_combat_injector.dds")
 local kExpireBarTextureName = "ui/healthbarsmall.dds"
 local kIconWorldOffset = Vector(0, 0.5, 0)
 local kBounceSpeed = 2
@@ -110,15 +107,7 @@ function GUIPickups:Update()
                 freePickupGraphic:SetColor(Color(1, 1, 1, distance))
                 freePickupGraphic:SetSize(GUIScale(Vector(pickupSize, pickupSize, 0)))
                 freePickupGraphic:SetPosition(Vector(pickupInScreenspace.x, pickupInScreenspace.y-5*distance, 0))
-
-                -- Use standalone CombatInjector icon texture instead of the atlas
-                if pickup:isa("CombatInjector") then
-                    freePickupGraphic:SetTexture(kCombatInjectorPickupTexture)
-                    freePickupGraphic:SetTexturePixelCoordinates(0, 0, 128, 64)
-                else
-                    freePickupGraphic:SetTexture(kIconsTextureName)
-                    freePickupGraphic:SetTexturePixelCoordinates(GetPickupTextureCoordinates(pickup))
-                end
+                freePickupGraphic:SetTexturePixelCoordinates(GetPickupTextureCoordinates(pickup))
 
                 freePickupGraphic.expireBarBg:SetIsVisible(self.visible and isBarVisible)
                 freePickupGraphic.expireBar:SetIsVisible(self.visible and isBarVisible)

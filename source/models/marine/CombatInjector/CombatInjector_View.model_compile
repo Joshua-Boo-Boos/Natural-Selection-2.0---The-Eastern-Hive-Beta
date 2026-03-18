@@ -1,9 +1,0 @@
-geometry "CombatInjector_View.fbx"
-animation "initial_pose" "CombatInjector_View.fbx" from 0 to 0
-animation "run" "CombatInjector_View.fbx" loop from 10 to 31
-animation "sprint" "CombatInjector_View.fbx" loop from 40 to 61
-animation "jump" "CombatInjector_View.fbx" from 70 to 91
-animation "inject" "CombatInjector_View.fbx" from 100 to 121
-animation "idle" "CombatInjector_View.fbx" loop from 130 to 151
-animation "holster" "CombatInjector_View.fbx" from 160 to 171
-animation "draw" "CombatInjector_View.fbx" from 180 to 191

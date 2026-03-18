@@ -17,6 +17,5 @@ GUIInsight_PlayerHealthbars.kAmmoColors = {
     ["cannon"] = Color(1,0.5,0,1),
     ["revolver"] = Color(0,1,1,1),
     ["combatbuilder"] = Color(1,1,1,1), -- white
-    ["combatinjector"] = Color(1,1,1,1), -- white
     ["knife"] = Color(1,1,1,1), -- white
 }

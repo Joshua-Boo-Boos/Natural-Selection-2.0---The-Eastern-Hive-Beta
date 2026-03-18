@@ -1,5 +1,0 @@
-shader = "shaders/ViewModel.surface_shader"
-albedoMap = "models/marine/CombatInjector/CombatInjector.png"
-normalMap = "models/marine/CombatInjector/CombatInjector_Normal.png"
-emissiveMap = "models/marine/CombatInjector/CombatInjector_Emissive.png"
-specularMap = "models/marine/CombatInjector/CombatInjector_Specular.png"

@@ -9,7 +9,6 @@ debug.appendtoenum(kPlayerStatus, "Welder")
 
 debug.appendtoenum(kPlayerStatus, "Pistol")
 debug.appendtoenum(kPlayerStatus, "Revolver")
-debug.appendtoenum(kPlayerStatus, "CombatInjector")
 debug.appendtoenum(kPlayerStatus, "SubMachineGun")
 debug.appendtoenum(kPlayerStatus, "LightMachineGun")
 
@@ -35,7 +34,6 @@ debug.appendtoenum(kDeathMessageIcon, "SporeMine")
 debug.appendtoenum(kDeathMessageIcon, "TeamBuildAbility")
 debug.appendtoenum(kDeathMessageIcon, "AcidRocket")
 debug.appendtoenum(kDeathMessageIcon, "ShadowStep")
-debug.appendtoenum(kDeathMessageIcon, "CombatInjector")
 
 debug.appendtoenum(kMinimapBlipType, "HeavyMarine")
 debug.appendtoenum(kMinimapBlipType, "DevouredPlayer")

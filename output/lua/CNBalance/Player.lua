@@ -59,7 +59,6 @@ if Server then
 			player.primaryRespawn = nil
 			player.secondaryRespawn = nil
 			player.meleeRespawn = nil
-			player.combatInjectorRespawn = nil
 		end
 		
 		if player:isa("Marine") and not self:GetIsAlive() then
@@ -75,10 +74,6 @@ if Server then
 			if player.meleeRespawn then
 				player:GiveItem(player.meleeRespawn,false)
 			end
-
-			if player.combatInjectorRespawn then
-				player:GiveItem(player.combatInjectorRespawn,false)
-			end
 		end
 		
 		return player
@@ -90,7 +85,6 @@ if Server then
 		self.primaryRespawn = nil
 		self.secondaryRespawn = nil
 		self.meleeRespawn = nil
-		self.combatInjectorRespawn = nil
 	end
 	
 	local baseCopyPlayerDataFrom = Player.CopyPlayerDataFrom
@@ -100,7 +94,6 @@ if Server then
 		self.primaryRespawn = player.primaryRespawn
 		self.secondaryRespawn = player.secondaryRespawn
 		self.meleeRespawn = player.meleeRespawn
-		self.combatInjectorRespawn = player.combatInjectorRespawn
 	end
 
 	

@@ -214,12 +214,6 @@ kRevolverNumClips = 5
 kRevolverCost = 0
 --
 
--- Joshua-Boo-Boos Combat Injector
-kCombatInjectorClipSize = 1
-kCombatInjectorCost = 10
-kCombatInjectorPointValue = 5
---
-
 --SubMachineGun
 kSubMachineGunClipSize = 42
 kSubMachineGunClipNum = 5

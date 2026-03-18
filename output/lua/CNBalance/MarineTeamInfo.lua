@@ -44,7 +44,6 @@ local kTrackedMarineGadgets =
 -----------
     Knife.kMapName,
     Revolver.kMapName,
-    CombatInjector.kMapName,
     SubMachineGun.kMapName,
     LightMachineGun.kMapName,
     Cannon.kMapName,

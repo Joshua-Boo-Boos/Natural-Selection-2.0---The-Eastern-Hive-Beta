@@ -4,7 +4,6 @@ if Client then
     kBmacMaterialViewIndices["LightMachineGun"] = 0
     kBmacMaterialViewIndices["SubMachineGun"] = 0
     kBmacMaterialViewIndices["Revolver"] = 0
-    kBmacMaterialViewIndices["CombatInjector"] = 0
     kBmacMaterialViewIndices["Cannon"] = 0
 end
 

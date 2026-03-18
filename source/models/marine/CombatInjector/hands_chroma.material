@@ -1,4 +1,0 @@
-shader = "shaders/ViewModel.surface_shader"
-albedoMap = "models/marine/CombatInjector/hands_chroma.dds"
-normalMap = "models/marine/CombatInjector/hands_normal.dds"
-specularMap = "models/marine/CombatInjector/hands_chroma_spec.dds"

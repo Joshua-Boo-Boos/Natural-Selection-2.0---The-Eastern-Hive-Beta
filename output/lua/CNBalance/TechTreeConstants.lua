@@ -49,7 +49,6 @@ debug.appendtoenum(kTechId, "BioformSuppressProtocol")
 debug.appendtoenum(kTechId, "Knife")
 debug.appendtoenum(kTechId, "SubMachineGun")
 debug.appendtoenum(kTechId, "Revolver")
-debug.appendtoenum(kTechId, "CombatInjector")
 debug.appendtoenum(kTechId, "LightMachineGun")
 debug.appendtoenum(kTechId, "LightMachineGunAcquire")
 

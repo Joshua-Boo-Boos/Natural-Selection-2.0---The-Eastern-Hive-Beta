@@ -96,11 +96,6 @@ if Server then
             elseif techId == kTechId.Knife then
                 self.meleeRespawn = Knife.kMapName
             end
-
-            if techId == kTechId.CombatInjector then
-                self.combatInjectorRespawn = CombatInjector.kMapName
-            end
-
         end
         
         return result
@@ -127,14 +122,6 @@ if Server then
                 
                 if mineWeapon then
                     mineWeapon:Refill(kNumMines)
-                    continue = false
-                    setActive = false
-                end
-
-            elseif itemMapName == CombatInjector.kMapName then
-
-                local injectorWeapon = self:GetWeapon(CombatInjector.kMapName)
-                if injectorWeapon then
                     continue = false
                     setActive = false
                 end
@@ -339,7 +326,6 @@ local kWeaponToStatusDesc = {
     ["Cannon"] = kPlayerStatus.Cannon,
     ["Pistol"] = kPlayerStatus.Pistol,
     ["Revolver"] = kPlayerStatus.Revolver,
-    ["CombatInjector"] = kPlayerStatus.CombatInjector,
     ["Axe"] = kPlayerStatus.Axe,
     ["Knife"] = kPlayerStatus.Knife,
     ["Welder"] = kPlayerStatus.Welder,
