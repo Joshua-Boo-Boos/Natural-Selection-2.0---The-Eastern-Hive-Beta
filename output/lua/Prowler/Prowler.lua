@@ -592,10 +592,6 @@ function Prowler:PostUpdateMove(input)
     local followEntity = Shared.GetEntity(self.rappelFollow)
     if self.rappelFollow ~= Entity.invalidId then
         if followEntity and followEntity.GetIsAlive and followEntity:GetIsAlive() then
-            if HasMixin(followEntity, "Stun") and not followEntity:GetIsStunned() and not followEntity.rappelStunned then
-                followEntity:SetStun(kRappelStunTime)
-                followEntity.rappelStunned = true
-            end
             self.rappelPoint = followEntity:GetModelOrigin()
             if self:GetEnergy() < kRappelEnergyCost or (followEntity.GetOrigin and (self:GetOrigin() - followEntity:GetOrigin()):GetLength() < kMinDistanceForRappel) then
                 breakRappel = true
@@ -624,11 +620,6 @@ function Prowler:PostUpdateMove(input)
     self.rappelling = false
     self.rappelPoint = nil
     self.rappelFollow = Entity.invalidId
-    if followEntity then
-        if followEntity.rappelStunned then
-            followEntity.rappelStunned = false
-        end
-    end
 end
 
 
