@@ -479,10 +479,10 @@ kAcidRocketBombDuration = 3
 kVortexShadowStepResearchCost = 30
 kVortexShadowStepResearchTime = 90
 kVortexLifetime = 6 kVortexInitTime = 0.5
-kVortexRadius = 2
+kVortexRadius = 4
 kVortexEnergyCost = 50
 kVortexPlayerDamagePerSecond = 10 kVortexStructureDamagePerSecond = 80
-kVortexSuckinVelocityPerSecond = 42.5
+kVortexSuckinVelocityPerSecond = 30
 
 kVortexMaxDamageEndurance = 10 kVortexPerPlayerDamageEnduranceCostPerSecond = 1 --kVortexProjectileEnduranceCost = 0
 
