@@ -420,7 +420,7 @@ kProwlerUpgradeCost = 2
 kVolleySpread = Math.Radians(1.9) -- More like an actual shotgun spread. Was 3 radians.
 kProwlerDamagePerPellet = 7 -- there are 6 pellets however reduced spread means more damage on target so reduced damage from 8 to 7.
 kVolleyRappelDamageType = kDamageType.Normal
-kVolleyEnergyCost = 22.5 --7.0
+kVolleyEnergyCost = 15 --7.0
 kVolleyWebTime = 2
 
 kRappelDamage = 10 kRappelContinuousDamage = 5 kRappelContinuousDamageAgainstStructure = 80
