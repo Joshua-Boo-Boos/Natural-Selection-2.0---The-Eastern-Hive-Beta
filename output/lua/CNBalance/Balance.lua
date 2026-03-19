@@ -86,9 +86,9 @@ kGrenadeTechResearchTime = 45   --45
 
 kMaxARCs = 5 -- Was 6
 
-kMineCost = 5 -- Was 20 p-res for 4 mines
+kMineCost = 10 -- Was 20 p-res for 4 mines
 kMineDamage = 130
-kDropMineCost = 3 -- Was 12 for 4 mines? Therefore 3 each
+kDropMineCost = 6 -- Was 12 for 4 mines? Therefore 3 each
 kDropMineCooldown = 0
 
 kShotgunTechResearchCost = 20
@@ -417,10 +417,10 @@ kProwlerCost = 20 --14 The problem is that if the Prowler is 21 p-res then it's 
 kProwlerGestateTime = 6
 kProwlerUpgradeCost = 2
 
-kVolleySpread = Math.Radians(1.9) -- More like an actual shotgun spread. Was 3 radians.
-kProwlerDamagePerPellet = 7 -- there are 6 pellets however reduced spread means more damage on target so reduced damage from 8 to 7.
+-- kVolleySpread = Math.Radians(1.9) -- More like an actual shotgun spread. Was 3 radians.
+-- kProwlerDamagePerPellet = 7 -- there are 6 pellets however reduced spread means more damage on target so reduced damage from 8 to 7.
 kVolleyRappelDamageType = kDamageType.Normal
-kVolleyEnergyCost = 15 --7.0
+kVolleyEnergyCost = 14 --7.0
 kVolleyWebTime = 2
 
 kRappelDamage = 10 kRappelContinuousDamage = 5 kRappelContinuousDamageAgainstStructure = 80

@@ -567,11 +567,13 @@ function Prowler:OnRappel(impactPoint, hitEntity)
         self.wallWalking = false
     end
 
-    self.rappelling = true
-    self.rappelPoint = self.rappelling and impactPoint or nil
-    self.rappelFollow = hitEntity and hitEntity:GetId() or Entity.invalidId
-    self.timeRappelStart = Shared.GetTime()
-    self.timeLastReel = Shared.GetTime()
+    if not hitEntity or (hitEntity and hitEntity:isa("Player") and HasMixin(hitEntity, "Team") and hitEntity:GetTeamNumber() ~= self:GetTeamNumber()) then
+        self.rappelling = true
+        self.rappelPoint = self.rappelling and impactPoint or nil
+        self.rappelFollow = hitEntity and hitEntity:GetId() or Entity.invalidId
+        self.timeRappelStart = Shared.GetTime()
+        self.timeLastReel = Shared.GetTime()
+    end
 end
 
 function Prowler:RappelFilter()
