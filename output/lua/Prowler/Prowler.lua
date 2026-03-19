@@ -48,6 +48,7 @@ local kProwlerForwardAdjust = -0.15   -- unused
 local kProwlerAttackVertAdjust = 0.25 -- unused
 local kMass = 40
 local kRappelDuration = 2.99 -- unused
+local kRappelStunTime = 1
 
 Prowler.kModelName = PrecacheAsset("models/alien/prowler/prowler.model")
 Prowler.kAnimationGraph = PrecacheAsset("models/alien/prowler/prowler.animation_graph")
@@ -582,6 +583,8 @@ function Prowler:RappelFilter()
 end
 
 local breakRappelTolerance = 0.2
+local kMinDistanceForRappel = 1.4
+
 function Prowler:PostUpdateMove(input)
     if not self.rappelling then return end
     local breakRappel = false
@@ -589,8 +592,12 @@ function Prowler:PostUpdateMove(input)
     local followEntity = Shared.GetEntity(self.rappelFollow)
     if self.rappelFollow ~= Entity.invalidId then
         if followEntity and followEntity.GetIsAlive and followEntity:GetIsAlive() then
+            if HasMixin(followEntity, "Stun") and not followEntity:GetIsStunned() and not followEntity.rappelStunned then
+                followEntity:SetStun(kRappelStunTime)
+                followEntity.rappelStunned = true
+            end
             self.rappelPoint = followEntity:GetModelOrigin()
-            if self:GetEnergy() < kRappelEnergyCost then
+            if self:GetEnergy() < kRappelEnergyCost or (followEntity.GetOrigin and (self:GetOrigin() - followEntity:GetOrigin()):GetLength() < kMinDistanceForRappel) then
                 breakRappel = true
             end
         else
@@ -617,6 +624,11 @@ function Prowler:PostUpdateMove(input)
     self.rappelling = false
     self.rappelPoint = nil
     self.rappelFollow = Entity.invalidId
+    if followEntity then
+        if followEntity.rappelStunned then
+            followEntity.rappelStunned = false
+        end
+    end
 end
 
 

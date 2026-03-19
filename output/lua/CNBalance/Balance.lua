@@ -420,7 +420,7 @@ kProwlerUpgradeCost = 2
 kVolleySpread = Math.Radians(1.9) -- More like an actual shotgun spread. Was 3 radians.
 kProwlerDamagePerPellet = 7 -- there are 6 pellets however reduced spread means more damage on target so reduced damage from 8 to 7.
 kVolleyRappelDamageType = kDamageType.Normal
-kVolleyEnergyCost = 7.0 --7.0
+kVolleyEnergyCost = 22.5 --7.0
 kVolleyWebTime = 2
 
 kRappelDamage = 10 kRappelContinuousDamage = 5 kRappelContinuousDamageAgainstStructure = 80
@@ -479,7 +479,7 @@ kAcidRocketBombDuration = 3
 kVortexShadowStepResearchCost = 30
 kVortexShadowStepResearchTime = 90
 kVortexLifetime = 6 kVortexInitTime = 0.5
-kVortexRadius = 4
+kVortexRadius = 2
 kVortexEnergyCost = 50
 kVortexPlayerDamagePerSecond = 10 kVortexStructureDamagePerSecond = 80
 kVortexSuckinVelocityPerSecond = 42.5

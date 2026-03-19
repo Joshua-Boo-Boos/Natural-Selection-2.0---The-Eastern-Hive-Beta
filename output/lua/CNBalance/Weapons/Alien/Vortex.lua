@@ -27,6 +27,7 @@ Vortex.kModelName = PrecacheAsset("models/alien/fade/vortex.model")
 Vortex.kRadius = kVortexRadius
 local kDamageInterval = 0.1
 local kVortexSpeed = 0.45
+local kScalarForVortexPower = 4
 
 local networkVars =
 {
@@ -127,7 +128,7 @@ function Vortex:UpdateMovement()
     local direction = self.movementDirection
     local startPoint = self:GetOrigin()
     local endPoint = startPoint + direction * kVortexSpeed
-    local traceCapsule = Shared.TraceCapsule(startPoint, endPoint, 1, 1,CollisionRep.Move, PhysicsMask.All, EntityFilterOne(self))
+    local traceCapsule = Shared.TraceCapsule(startPoint, endPoint, 0.2, 0.2, CollisionRep.Move, PhysicsMask.All, EntityFilterOne(self))
     if traceCapsule.fraction == 1 then
         self:SetOrigin(endPoint)
     else
@@ -175,7 +176,7 @@ function Vortex:SuckInEnemies(_deltaTime)
                         if rayTrace.entity == entity then
                             local reelOffset = attackPoint - playerTargetPoint
                             distanceToTarget = reelOffset:GetLength()
-                            entity:SetVelocity(entity:GetVelocity() + reelOffset:GetUnit() * (Vortex.kRadius - distanceToTarget) * kVortexSuckinVelocityPerSecond * _deltaTime)
+                            entity:SetVelocity(entity:GetVelocity() + kScalarForVortexPower * reelOffset:GetUnit() * Vortex.kRadius * kVortexSuckinVelocityPerSecond * _deltaTime)
                             goto continue_to_next_entity
                         end
                     end
@@ -189,7 +190,7 @@ function Vortex:SuckInEnemies(_deltaTime)
                         if rayTrace.entity == entity then
                             local reelOffset = attackPoint - playerTargetPoint
                             distanceToTarget = reelOffset:GetLength()
-                            entity:SetVelocity(entity:GetVelocity() + reelOffset:GetUnit() * (Vortex.kRadius - distanceToTarget) * kVortexSuckinVelocityPerSecond * _deltaTime)
+                            entity:SetVelocity(entity:GetVelocity() + kScalarForVortexPower * reelOffset:GetUnit() * Vortex.kRadius * kVortexSuckinVelocityPerSecond * _deltaTime)
                             goto continue_to_next_entity
                         end
                     end
@@ -203,7 +204,7 @@ function Vortex:SuckInEnemies(_deltaTime)
                         if rayTrace.entity == entity then
                             local reelOffset = attackPoint - playerTargetPoint
                             distanceToTarget = reelOffset:GetLength()
-                            entity:SetVelocity(entity:GetVelocity() + reelOffset:GetUnit() * (Vortex.kRadius - distanceToTarget) * kVortexSuckinVelocityPerSecond * _deltaTime)
+                            entity:SetVelocity(entity:GetVelocity() + kScalarForVortexPower * reelOffset:GetUnit() * Vortex.kRadius * kVortexSuckinVelocityPerSecond * _deltaTime)
                             goto continue_to_next_entity
                         end
                     end

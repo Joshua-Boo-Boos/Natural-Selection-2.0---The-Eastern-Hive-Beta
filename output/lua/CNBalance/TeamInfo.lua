@@ -456,8 +456,52 @@ function TeamInfo:UpdateRelevancy()
 
 end
 
+local kScalarFactorForPResShare = 0.5
+
 function TeamInfo:OnUpdate(deltaTime)
     self:UpdateInfo()
+    if Server then
+        -- Every 30 seconds: Donors with >= 100 p-res give 5 * kScalarFactorForPResShare p-res (up to 5 donations)
+        -- to the 5 lowest p-res players with < 95 p-res.
+        if self.nextPResShare == nil then self.nextPResShare = 0 end
+        if Shared.GetTime() >= self.nextPResShare then
+            self.nextPResShare = Shared.GetTime() + 30
+            if self.team then
+                local playersInTeam = self.team:GetPlayers()
+                local recipients = {}
+                local donors = {}
+
+                for i, player in ipairs(playersInTeam) do
+                    table.insert(recipients, player)
+                    table.insert(donors, player)
+                end
+
+                table.sort(recipients, function(a,b) return a:GetResources() < b:GetResources() end)
+                table.sort(donors, function(a,b) return a:GetResources() > b:GetResources() end)
+
+                for _, donor in ipairs(donors) do
+                    if IsValid(donor) and donor:GetResources() >= 100 then
+                        local donationsGiven = 0
+                        for _, recipient in ipairs(recipients) do
+                            if donationsGiven >= 5 then break end
+                            if IsValid(recipient) and recipient ~= donor and recipient:GetResources() < 95 then
+                                local recBefore = recipient:GetResources()
+                                -- donor always loses 5 p-res; recipient only receives a fraction (scalar)
+                                local giveAmount = 5
+                                local gain = math.min(giveAmount * kScalarFactorForPResShare, 100 - recBefore)
+                                if gain > 0 then
+                                    donor:SetResources(math.max(0, donor:GetResources() - giveAmount))
+                                    recipient:SetResources(math.min(100, recBefore + gain))
+                                    donationsGiven = donationsGiven + 1
+                                end
+                            end
+                        end
+                        table.sort(recipients, function(a,b) return a:GetResources() < b:GetResources() end)
+                    end
+                end
+            end
+        end
+    end
 end
 
 function TeamInfo:SetLatestResearchedTech(researchId, displayTime, techPriority)
