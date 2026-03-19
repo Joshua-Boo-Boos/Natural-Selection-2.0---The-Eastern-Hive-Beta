@@ -106,6 +106,8 @@ local function CreateVortex(self, player)
     
     local vortex = CreateEntity( Vortex.kMapName, endPoint, player:GetTeamNumber() )
     vortex:SetOwner(player)
+    vortex.movementDirection = viewCoords.zAxis
+    vortex.impacted = false
     return vortex
 
 end
