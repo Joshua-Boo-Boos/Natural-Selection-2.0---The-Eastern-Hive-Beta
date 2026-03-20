@@ -15,19 +15,46 @@ local kAttackDuration2 = Shared.GetAnimationLength("models/alien/prowler/prowler
 local kAttackDuration3 = Shared.GetAnimationLength("models/alien/prowler/prowler_view.model", "bite_attack3") -- 1.8166667222977
 local kAttackDuration4 = Shared.GetAnimationLength("models/alien/prowler/prowler_view.model", "bite_attack4") -- 0.36666667461395
 
--- Burst-fire parameters: kBurstShotCount shots per click with a short delay between each
-local kBurstShotCount = 4
-local kBurstShotDelay = 0.065  -- seconds between each burst shot
+-- higher numbers reduces the spread
+local kSpreadDistance = 12.5 -- Was 10.0
+local kSpreadVertMult = 1.0 --0.66
+VolleyRappel.kSpreadVectors =
+{
+    --[[GetNormalizedVector(Vector(0.0, 0.0, kSpreadDistance)),
+    GetNormalizedVector(Vector(3.0, 0.0, kSpreadDistance)),
+    GetNormalizedVector(Vector(-3.0, 0.0, kSpreadDistance)),
+    GetNormalizedVector(Vector(0.0, 3.0, kSpreadDistance)),
+    GetNormalizedVector(Vector(0.0, -3.0, kSpreadDistance)),--]]
+    
+    GetNormalizedVector(Vector(-0.44, 0.1, kSpreadDistance)),
+    GetNormalizedVector(Vector( 0.44, 0.1, kSpreadDistance)),
+    
+    GetNormalizedVector(Vector(-0.88, -0.05, kSpreadDistance)),
+    GetNormalizedVector(Vector( 0.88, -0.05, kSpreadDistance)),
+    
+    GetNormalizedVector(Vector(0.0, 0.08, kSpreadDistance)),
+    GetNormalizedVector(Vector(0.0, -0.4, kSpreadDistance)),
+    GetNormalizedVector(Vector(0.0, -0.08, kSpreadDistance)),
 
--- Damage falloff: full damage up close, linear falloff to minimum at range
-local kMaxDamagePerShot = 60 / kBurstShotCount
-local kMinDamagePerShot = 10 / kBurstShotCount
-local kFalloffStartDistance = 4     -- full damage up to this distance
-local kFalloffEndDistance = 16       -- minimum damage beyond this distance
+    GetNormalizedVector(Vector(-1.22, -0.05, kSpreadDistance)),
+    GetNormalizedVector(Vector(1.22, -0.05, kSpreadDistance)),
+
+    --GetNormalizedVector(Vector(-0.7, -0.7, kSpreadDistance)),
+    --GetNormalizedVector(Vector( 0.7, -0.7, kSpreadDistance)),
+    --GetNormalizedVector(Vector( 0.7,  0.7, kSpreadDistance)),
+    --GetNormalizedVector(Vector(-0.7,  0.7, kSpreadDistance)),
+    
+    --GetNormalizedVector(Vector(-0.7, 0, kSpreadDistance)),
+    --GetNormalizedVector(Vector(0.7, 0, kSpreadDistance)),
+    --GetNormalizedVector(Vector(0, -0.7, kSpreadDistance)),
+    --GetNormalizedVector(Vector(0, 0.7, kSpreadDistance)),
+    
+}
+
+local spreadRadius = math.tan(kVolleySpread)
 
 local networkVars =
 {
-    lastAttackedAt = "time",
 }
 
 AddMixinNetworkVars(RappelMixin, networkVars)
@@ -39,16 +66,14 @@ function VolleyRappel:OnCreate()
     InitMixin(self, BulletsMixin)
     
     self.primaryAttacking = false
-    self.timeDrawCooldown = 0
-    self.burstShotsRemaining = 0
-    self.nextBurstTime = 0
-
-    self.lastAttackedAt = 0
-end
-
-function VolleyRappel:ProcessMoveOnWeapon(player, input)
-    self:UpdateBurstFire(player)
-    RappelMixin.ProcessMoveOnWeapon(self, player, input)
+    self.timeDrawCooldown = 0    
+    --[[if Client then
+        Print("AS: ")
+        Print(ToString(kAttackDuration))
+        Print(ToString(kAttackDuration2))
+        Print(ToString(kAttackDuration3))
+        Print(ToString(kAttackDuration4))
+    end--]]
 end
 function VolleyRappel:GetAnimationGraphName()
     return kAnimationGraph
@@ -79,15 +104,16 @@ function VolleyRappel:GetTracerResidueEffectName()
     return kVolleyRappelTracer
 end
 
-function VolleyRappel:GetDamageForDistance(distance)
-    if distance <= kFalloffStartDistance then
-        return kMaxDamagePerShot
-    elseif distance >= kFalloffEndDistance then
-        return kMinDamagePerShot
-    else
-        local t = (distance - kFalloffStartDistance) / (kFalloffEndDistance - kFalloffStartDistance)
-        return kMaxDamagePerShot - t * (kMaxDamagePerShot - kMinDamagePerShot)
+function VolleyRappel:GetBulletsPerShot()
+    local player = self:GetParent()
+    if player then
+        local teamInfo = GetTeamInfoEntity(player:GetTeamNumber())
+        local biomassLevel = (teamInfo and teamInfo.GetBioMassLevel) and teamInfo:GetBioMassLevel() or 0
+        
+        return 5 + biomassLevel / 5
     end
+    
+    return 6
 end
 
 function VolleyRappel:GetEnergyCost(player)
@@ -103,7 +129,7 @@ function VolleyRappel:GetRange()
     return 40
 end
 function VolleyRappel:GetBulletDamage()
-    return kMaxDamagePerShot
+    return kProwlerDamagePerPellet
 end
 
 function VolleyRappel:GetBarrelPoint()
@@ -112,10 +138,10 @@ function VolleyRappel:GetBarrelPoint()
 end
 
 function VolleyRappel:GetDeathIconIndex()
-    if self.secondaryAttacking then
-        return RappelMixin:GetDeathIconIndex()
-    else
+    if self.primaryAttacking then
         return kDeathMessageIcon.Volley
+    else
+        return RappelMixin:GetDeathIconIndex()
     end
 end
 
@@ -125,13 +151,8 @@ end
 
 function VolleyRappel:OnPrimaryAttack(player)
     local hasEnergy = player:GetEnergy() >= self:GetEnergyCost()
-    -- local cooledDown = (not self.nextAttackTime) or (Shared.GetTime() >= self.nextAttackTime)
-    -- if hasEnergy and cooledDown then
-    if hasEnergy and self.lastAttackedAt == 0 and not player:GetPrimaryAttackLastFrame() then
-        self.lastAttackedAt = Shared.GetTime()
-        self.primaryAttacking = true
-    elseif hasEnergy and self.lastAttackedAt and Shared.GetTime() >= self.lastAttackedAt + kBurstShotCount * kBurstShotDelay + 0.365 and not player:GetPrimaryAttackLastFrame() then
-        self.lastAttackedAt = Shared.GetTime()
+    local cooledDown = (not self.nextAttackTime) or (Shared.GetTime() >= self.nextAttackTime)
+    if hasEnergy and cooledDown then
         self.primaryAttacking = true
     else
         self.primaryAttacking = false
@@ -149,7 +170,6 @@ end
 
 function VolleyRappel:OnDraw(player, previousWeaponMapName)
     Ability.OnDraw(self, player, previousWeaponMapName)
-    self.burstShotsRemaining = 0
     if previousWeaponMapName == ProwlerStructureAbility.kMapName then
         self.timeDrawCooldown = Shared.GetTime() + 0.3
     end
@@ -162,76 +182,7 @@ function VolleyRappel:OnUpdateAnimationInput(modelMixin)
     modelMixin:SetAnimationInput("ability", "bite")
     
     local activityString = (self.primaryAttacking and Shared.GetTime() > self.timeDrawCooldown) and "primary" or "none"
-    modelMixin:SetAnimationInput("activity", activityString)
-end
-
--- Fire a single bullet in the player's aim direction with distance-based damage falloff
-function VolleyRappel:FireSingleShot(player)
-
-    local viewAngles = player:GetViewAngles()
-    local shootCoords = viewAngles:GetCoords()
-    local filter = EntityFilterTwo(player, self)
-    local range = self:GetRange()
-    local startPoint = player:GetEyePos()
-    local endPoint = startPoint + shootCoords.zAxis * range
-
-    local targets, trace, hitPoints = GetBulletTargets(startPoint, endPoint, shootCoords.zAxis, 0.1, filter)
-
-    HandleHitregAnalysis(player, startPoint, endPoint, trace)
-
-    local direction = (trace.endPoint - startPoint):GetUnit()
-    local hitDistance = (trace.endPoint - startPoint):GetLength()
-    local damage = self:GetDamageForDistance(hitDistance)
-    local hitOffset = direction * kHitEffectOffset
-    local impactPoint = trace.endPoint - hitOffset
-    local showTracer = true
-    local numTargets = #targets
-
-    if numTargets == 0 then
-        self:ApplyBulletGameplayEffects(player, nil, impactPoint, direction, 0, "rock", showTracer)
-    end
-
-    if Client and showTracer then
-        TriggerFirstPersonTracer(self, impactPoint)
-    end
-
-    for i = 1, numTargets do
-
-        local target = targets[i]
-        local hitPoint = hitPoints[i]
-
-        self:ApplyBulletGameplayEffects(player, target, hitPoint - hitOffset, direction, damage, "rock", showTracer and i == numTargets)
-
-        if HasMixin(target, "Webable") then
-            if target.GetIsOnGround and not target:GetIsOnGround() then
-                target:SetWebbed(kVolleyWebTime, true)
-            end
-        end
-
-        local client = Server and player:GetClient() or Client
-        if not Shared.GetIsRunningPrediction() and client and client.hitRegEnabled then
-            RegisterHitEvent(player, 1, startPoint, trace, damage)
-        end
-
-    end
-
-    if Server then
-        self:TriggerEffects("volley_attack")
-    end
-
-end
-
--- Called each frame via ProcessMoveOnWeapon to fire remaining burst shots
-function VolleyRappel:UpdateBurstFire(player)
-    if self.burstShotsRemaining > 0 and Shared.GetTime() >= self.nextBurstTime then
-        if player and IsValid(player) then
-            self:FireSingleShot(player)
-        end
-        self.burstShotsRemaining = self.burstShotsRemaining - 1
-        if self.burstShotsRemaining > 0 then
-            self.nextBurstTime = Shared.GetTime() + kBurstShotDelay
-        end
-    end
+    modelMixin:SetAnimationInput("activity", activityString)    
 end
 
 function VolleyRappel:OnTag(tagName)
@@ -239,14 +190,96 @@ function VolleyRappel:OnTag(tagName)
 
     if tagName == "hit" then
         local player = self:GetParent()
-
+        
         if player then
-            -- Fire first shot immediately, schedule remaining burst shots
-            self:FireSingleShot(player)
-            self.burstShotsRemaining = kBurstShotCount - 1
-            self.nextBurstTime = Shared.GetTime() + kBurstShotDelay
+            local viewAngles = player:GetViewAngles()
+            --local roll = NetworkRandom() * math.pi * 2
+            --local rollAngles = Angles(0,0,roll):GetCoords()
 
+            local shootCoords = viewAngles:GetCoords()
+            --shootCoords.yAxis = shootCoords.yAxis * kSpreadVertMult
+
+            -- Filter ourself out of the trace so that we don't hit ourselves.
+            local filter = EntityFilterTwo(player, self)
+            local range = self:GetRange()
+            
+            local numberBullets = self:GetBulletsPerShot()
+            local startPoint = player:GetEyePos()
+            local viewCoords = player:GetViewCoords()
+            
+            for bullet = 1, math.min(numberBullets, #self.kSpreadVectors) do
+            
+                if not self.kSpreadVectors[bullet] then
+                    break
+                end
+                
+                local spreadVector = Vector(self.kSpreadVectors[bullet])
+                --spreadVector = rollAngles:TransformVector(spreadVector)
+            
+                -- add random spread
+                local randomAngle = NetworkRandom() * math.pi * 2
+                local randomRadius = (0.5 - NetworkRandom()) * spreadRadius --* math.tan(spreadAngle)
+                
+                local spreadX = math.cos(randomAngle) * randomRadius
+                local spreadY = math.sin(randomAngle) * randomRadius
+                spreadVector.x = spreadVector.x + spreadX
+                spreadVector.y = spreadVector.y + spreadY
+                                
+                local spreadDirection = shootCoords:TransformVector(spreadVector) --CalculateSpread(shootCoords, kVolleySpread, NetworkRandom) 
+
+                local endPoint = startPoint + spreadDirection * range
+                startPoint = player:GetEyePos() + shootCoords.xAxis * spreadVector.x * self.kStartOffset + shootCoords.yAxis * spreadVector.y * self.kStartOffset
+                
+                local targets, trace, hitPoints = GetBulletTargets(startPoint, endPoint, spreadDirection, 0.1, filter)
+                
+                local damage = self:GetBulletDamage()
+
+                HandleHitregAnalysis(player, startPoint, endPoint, trace)        
+                    
+                local direction = (trace.endPoint - startPoint):GetUnit()
+                local hitOffset = direction * kHitEffectOffset
+                local impactPoint = trace.endPoint - hitOffset
+                local showTracer = true
+                
+                local numTargets = #targets
+                
+                if numTargets == 0 then
+                    self:ApplyBulletGameplayEffects(player, nil, impactPoint, direction, 0, "rock", showTracer)
+                end
+                
+                if Client and showTracer then
+                    TriggerFirstPersonTracer(self, impactPoint)
+                end
+                
+                for i = 1, numTargets do
+
+                    local target = targets[i]
+                    local hitPoint = hitPoints[i]
+
+                    self:ApplyBulletGameplayEffects(player, target, hitPoint - hitOffset, direction, damage, "rock", showTracer and i == numTargets)
+
+                    if HasMixin(target, "Webable") then
+                        if target.GetIsOnGround and not target:GetIsOnGround() then
+                            target:SetWebbed(kVolleyWebTime, true)
+                        end
+                    end
+                    
+                    local client = Server and player:GetClient() or Client
+                    if not Shared.GetIsRunningPrediction() and client and client.hitRegEnabled then
+                        RegisterHitEvent(player, bullet, startPoint, trace, damage)
+                    end
+                
+                end
+                
+            end
+                        
+            if Server then
+                --self:TriggerEffects("drifter_parasite_hit")
+               self:TriggerEffects("volley_attack")
+            end
+                        
             self:OnAttack(player)
+            
         end
     end
 
