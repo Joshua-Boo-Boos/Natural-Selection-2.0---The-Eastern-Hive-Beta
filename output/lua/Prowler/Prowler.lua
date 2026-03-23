@@ -408,12 +408,12 @@ function Prowler:ModifyVelocity(input, velocity, deltaTime)
                 if now > (self.timeRappelStart + kContinuousReelDamageInterval) and now > (self.timeLastReel + kContinuousReelDamageInterval) then
                     self.timeLastReel = now
 
-                    --local endPoint = hitTarget:GetOrigin()
-                    --local volleyWeapon = self:GetWeapon(VolleyRappel.kMapName)
-                    --if volleyWeapon and now > (self.timeRappelStart + kRappelReelReactionTime) then
-                    --    local damage = targetIsPlayer and kRappelContinuousDamage or kRappelContinuousDamageAgainstStructure
-                    --    volleyWeapon:DoDamage(damage * kContinuousReelDamageInterval, hitTarget, endPoint, self:GetViewCoords().zAxis, "organic", false)
-                    --end
+                    local endPoint = hitTarget:GetOrigin()
+                    local volleyWeapon = self:GetWeapon(VolleyRappel.kMapName)
+                    if volleyWeapon and now > (self.timeRappelStart + kRappelReelReactionTime) then
+                       local damage = targetIsPlayer and kRappelContinuousDamage or kRappelContinuousDamageAgainstStructure
+                       volleyWeapon:DoDamage(damage * kContinuousReelDamageInterval, hitTarget, endPoint, self:GetViewCoords().zAxis, "organic", false)
+                    end
 
                     if HasMixin(hitTarget, "ParasiteAble" ) then
                         hitTarget:SetParasited( self, 3 )
@@ -567,13 +567,11 @@ function Prowler:OnRappel(impactPoint, hitEntity)
         self.wallWalking = false
     end
 
-    if not hitEntity or (hitEntity and hitEntity:isa("Player") and HasMixin(hitEntity, "Team") and hitEntity:GetTeamNumber() ~= self:GetTeamNumber()) then
-        self.rappelling = true
-        self.rappelPoint = self.rappelling and impactPoint or nil
-        self.rappelFollow = hitEntity and hitEntity:GetId() or Entity.invalidId
-        self.timeRappelStart = Shared.GetTime()
-        self.timeLastReel = Shared.GetTime()
-    end
+    self.rappelling = true
+    self.rappelPoint = self.rappelling and impactPoint or nil
+    self.rappelFollow = hitEntity and hitEntity:GetId() or Entity.invalidId
+    self.timeRappelStart = Shared.GetTime()
+    self.timeLastReel = Shared.GetTime()
 end
 
 function Prowler:RappelFilter()
@@ -585,7 +583,6 @@ function Prowler:RappelFilter()
 end
 
 local breakRappelTolerance = 0.2
-local kMinDistanceForRappel = 1.4
 
 function Prowler:PostUpdateMove(input)
     if not self.rappelling then return end
@@ -595,7 +592,7 @@ function Prowler:PostUpdateMove(input)
     if self.rappelFollow ~= Entity.invalidId then
         if followEntity and followEntity.GetIsAlive and followEntity:GetIsAlive() then
             self.rappelPoint = followEntity:GetModelOrigin()
-            if self:GetEnergy() < kRappelEnergyCost or (followEntity.GetOrigin and (self:GetOrigin() - followEntity:GetOrigin()):GetLength() < kMinDistanceForRappel) then
+            if self:GetEnergy() < kRappelEnergyCost then
                 breakRappel = true
             end
         else

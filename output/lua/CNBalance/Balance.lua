@@ -413,7 +413,7 @@ kSporesResearchCost = 20
 kSporesResearchTime = 60
 
 -- Prowler
-kProwlerCost = 20 --14 The problem is that if the Prowler is 21 p-res then it's meant to be as powerful as a Lerk. Maybe I should make the Prowler weaker and reduce the p-res cost?
+kProwlerCost = 15 --14 The problem is that if the Prowler is 21 p-res then it's meant to be as powerful as a Lerk. Maybe I should make the Prowler weaker and reduce the p-res cost?
 kProwlerGestateTime = 6
 kProwlerUpgradeCost = 2
 
