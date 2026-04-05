@@ -42,7 +42,8 @@ if Client then
             local predictor = Shared.GetEntity(self.predictorId)
             if predictor
                and Client.GetLocalPlayer() == predictor
-               and Client.GetIsControllingPlayer() then
+               and Client.GetIsControllingPlayer()
+               and self:GetParent() == predictor then
                 return
             end
         end
@@ -196,13 +197,23 @@ if Client then
         CustomBalanceVoice(self)
     end
 
-    -- OnProcessMove / OnProcessSpectate: disabled on client.
-    -- Running the same FMOD logic 3× per frame is unnecessary and triples
-    -- the dead-handle error rate for zero benefit.
+    -- OnProcessMove / OnProcessSpectate: restore base processing so that
+    -- action-driven sounds (e.g. Gorge taunt) still trigger, plus run
+    -- custom volume balancing.  The heavy FMOD retry logic stays in OnUpdate.
+    local baseOnProcessMove = SoundEffect.OnProcessMove
     function SoundEffect:OnProcessMove()
+        if baseOnProcessMove then
+            baseOnProcessMove(self)
+        end
+        CustomBalanceVoice(self)
     end
 
+    local baseOnProcessSpectate = SoundEffect.OnProcessSpectate
     function SoundEffect:OnProcessSpectate()
+        if baseOnProcessSpectate then
+            baseOnProcessSpectate(self)
+        end
+        CustomBalanceVoice(self)
     end
 
     -- ── Volume scaling for one-shot NS2.0-TEH sounds ────────────────

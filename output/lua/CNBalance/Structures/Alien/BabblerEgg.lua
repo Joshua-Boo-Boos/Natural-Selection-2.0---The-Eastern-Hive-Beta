@@ -273,7 +273,7 @@ if Server then
         end
 
         if self:GetIsBuilt()
-                --and owner.GetBabblerCount and owner:GetBabblerCount() < kBabblerHatchMaxAmount 
+                and (not owner.GetBabblerCount or owner:GetBabblerCount() < kMaxBabblerCount)
         then
             local otherTeam = GetEnemyTeamNumber(self:GetTeamNumber())
             local allEnemies = GetEntitiesWithMixinForTeamWithinRange("Live", otherTeam, self:GetOrigin(), kBabblerEggHatchRadius)
@@ -312,10 +312,14 @@ if Server then
 
         local owner = self:GetOwner()
         if  owner and owner.GetBabblerCount and attacker then
+            local spawned = 0
             for i=1 ,kBabblerExplodeAmount ,1 do
+                if owner:GetBabblerCount() >= kMaxBabblerCount then break end
                 local babbler = self:HatchBabbler(owner)
                 babbler:SetMoveType(kBabblerMoveType.Attack, attacker, attacker:GetOrigin(), true)
+                spawned = spawned + 1
             end
+            if spawned == 0 then self:Explode() return end
             self:TriggerEffects("Babbler_hatch")
             DestroyEntity(self)
         else

@@ -81,8 +81,11 @@ function FireMixin:OnDestroy()
 
     if Server then
 
-        -- The onFireSound was already destroyed at this point, clear the reference.
-        self.onFireSound = nil
+        if self.onFireSound then
+            self.onFireSound:Stop()
+            DestroyEntity(self.onFireSound)
+            self.onFireSound = nil
+        end
 
     end
 

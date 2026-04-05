@@ -46,11 +46,11 @@ BotAim.kMinAccuracyTime = 0.125
 -- Use BotAim:GetAccuracyGoal to get the correct accuracy value
 BotAim.kAccuracies =
 {   
-    [kBotAccWeaponGroup.Bullets] = { 14.5, 16.5, 21, 25, 28.5, 34, 38.5 },
+    [kBotAccWeaponGroup.Bullets] = { 14, 16, 18.5, 21.5, 25, 29, 34.5 },
 
     -- These guys should be stonker
-    [kBotAccWeaponGroup.ExoMinigun] = { 23, 25, 28, 30, 35, 39, 43 },
-    [kBotAccWeaponGroup.ExoRailgun] = { 25, 28, 30, 32, 35, 39, 43 },
+    [kBotAccWeaponGroup.ExoMinigun] = { 22, 24, 26.5, 29.5, 33, 37, 41.5 },
+    [kBotAccWeaponGroup.ExoRailgun] = { 24, 27, 29, 31, 34, 38, 42 },
 
     -- Similar to "bullets", but caps off in higher tiers
     [kBotAccWeaponGroup.LerkSpikes] = { 14.5, 16.5, 21, 25, 28.5, 28.5, 28.5 },
@@ -105,13 +105,14 @@ BotAim.kMissDirections =
     ["Marine"] = Vector(1, 0, 0),
     ["JetpackMarine"] = Vector(1, 0, 0),
     ["Exo"] = Vector(1, 0, 0),
-
     ["Skulk"] = Vector(0, 1, 0),
     ["Gorge"] = Vector(0, 1, 0),
     ["Lerk"]  = Vector(0, -1, 0),
     ["Fade"]  = Vector(1, 0, 0),
     ["Onos"]  = Vector(0.5, 0, 0), -- Onos should be 100% accuracy  ....should it?
     ["Embryo"] = Vector(0, 1, 0),
+    ["Vokex"] = Vector(1.35, 0, 0),
+    ["Prowler"] = Vector(0, 1, 0),
 }
 
 -- Map of classnames -> speed modifiers for bot movements
@@ -125,7 +126,9 @@ BotAim.kBotTurnSpeeds =
     ["Gorge"] = 1.5,
     ["Lerk"] = 2.0,
     ["Fade"] = 2.3,
-    ["Onos"] = 1.5, -- extra hinzugefügt
+    ["Onos"] = 1.5,
+    ["Vokex"] = 2.3,
+    ["Prowler"] = 1.6,
 }
 --[[{
     ["Default"] = 1.0,
@@ -136,7 +139,7 @@ BotAim.kBotTurnSpeeds =
     ["Gorge"] = 1.0,
     ["Lerk"] = 1.5,
     ["Fade"] = 1.8,
-}--]] --orginal Werte
+}--]] --original Werte
 
 function BotAim:Initialize(owner)
     self.owner = owner

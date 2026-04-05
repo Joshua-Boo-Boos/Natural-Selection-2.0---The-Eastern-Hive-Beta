@@ -303,7 +303,7 @@ local function UpdateButton(ability, button, index)
         local amountString = ToString(numLeft)
         local maxNum = GorgeBuild_GetMaxNumStructure(button.techId)
         
-        if maxNum > 0 then
+        if maxNum >= 0 then
             amountString = amountString .. "/" .. ToString(maxNum)
         end
         
