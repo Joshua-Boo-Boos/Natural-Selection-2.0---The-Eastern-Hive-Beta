@@ -1,4 +1,4 @@
-﻿Script.Load("lua/CNBalance/Weapons/Alien/Gorge/AdvancedStructure/AdvancedStructureAbility.lua")
+Script.Load("lua/CNBalance/Weapons/Alien/Gorge/AdvancedStructure/AdvancedStructureAbility.lua")
 
 class 'WhipAbility' (AdvancedStructureAbility)
 
@@ -11,7 +11,10 @@ function WhipAbility:OverrideInfestationCheck(_trace)
 end
 
 function WhipAbility:GetMaxStructures(biomass)
-    return 3
+    if biomass >= 10 then return 3
+    elseif biomass >= 5 then return 2
+    else return 1
+    end
 end
 
 function WhipAbility:GetStructurePlaceSide(player)

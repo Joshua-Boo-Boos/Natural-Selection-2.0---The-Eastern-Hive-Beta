@@ -135,9 +135,11 @@ function PredictedProjectileShooterMixin:CreatePredictedProjectile(className, st
 
 end
 
+-- perf: reuse a single table instead of allocating a new one per player per tick
+local cleanUp = {}
 local function UpdateProjectiles(self, input, predict)
 
-    local cleanUp = {}
+    local cleanUpCount = 0
 
     for _, projectileId in ipairs(self.predictedProjectilesList:GetList()) do
 
@@ -157,7 +159,7 @@ local function UpdateProjectiles(self, input, predict)
                 entry.Cinematic:SetCoords(renderCoords)
                 entry.Cinematic:SetIsVisible(isVisible)
             end
-            
+
             if entry.Model then
                 local className = entry.className
                 if(_G[className].OnModifyModelCoords) then
@@ -171,13 +173,15 @@ local function UpdateProjectiles(self, input, predict)
         end
 
         if entry.EntityId == Entity.invalidId and Shared.GetTime() - entry.CreationTime > 5 then
-            table.insert(cleanUp, projectileId)
+            cleanUpCount = cleanUpCount + 1
+            cleanUp[cleanUpCount] = projectileId
         end
 
     end
 
-    for i = 1, #cleanUp do
+    for i = 1, cleanUpCount do
         self:SetProjectileDestroyed(cleanUp[i])
+        cleanUp[i] = nil
     end
 
 end

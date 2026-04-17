@@ -16,6 +16,7 @@ Script.Load("lua/RailgunTargetMixin.lua")
 Script.Load("lua/Prowler/VolleyRappel.lua")
 Script.Load("lua/Prowler/AcidSpray.lua")
 Script.Load("lua/Prowler/ProwlerStructureAbility.lua")
+
 Script.Load("lua/Prowler/ReadyRoomRappel.lua")
 Script.Load("lua/Weapons/PredictedProjectile.lua")
 Script.Load("lua/IdleMixin.lua")
@@ -676,6 +677,7 @@ function Prowler:OnWorldCollision(normal, impactForce, newVelocity)
     self.wallWalking = self.wallWalking or self.movementModiferState or Math.DotProduct(-coords.zAxis,normal) > .6
 
 end
+
 
 function Prowler:GetMoveSpeedIs2D()
     return not self:GetIsWallWalking()

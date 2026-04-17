@@ -47,6 +47,11 @@ end
 local function UpdateMemory(mem, ent, locationMemories, ignoreLOS)
     PROFILE("TeamBrain - UpdateMemory")
 
+    -- Guard against destroyed or invalid entities during game-end cleanup
+    if not ent or (ent.GetIsDestroyed and ent:GetIsDestroyed()) then
+        return
+    end
+
     local time = Shared.GetTime()
 
     -- this works as long as this is run as part of the server, as we will always have full
@@ -104,9 +109,10 @@ end
 
 local function CreateMemory(ent)
 
-    assert(HasMixin(ent, "MapBlip"),
-            string.format(
-                    "Entity missing MapBlip mixin! (Old Entity Id?) - Last Class: %s", ent and GetLastEntityClass(ent:GetId()) or "None"))
+    -- Guard against destroyed entities during game-end cleanup
+    if not ent or (ent.GetIsDestroyed and ent:GetIsDestroyed()) or not HasMixin(ent, "MapBlip") then
+        return nil
+    end
 
     ---@type number
     local now = Shared.GetTime()
@@ -385,7 +391,10 @@ function TeamBrain:FilterNearbyMemories(locationName, teamNumber, filter)
 
     for _, memory in self:IterMemoriesNearLocation(locationName, teamNumber) do
         if filter(memory) then
-            table.insert(entities, Shared.GetEntity(memory.entId))
+            local ent = Shared.GetEntity(memory.entId)
+            if ent then
+                table.insert(entities, ent)
+            end
         end
     end
 
@@ -479,7 +488,7 @@ function TeamBrain:DebugDraw()
 
         local lostTime = Shared.GetTime() - mem.lastSeenTime
         local ent = Shared.GetEntity(mem.entId)
-        assert( ent ~= nil )
+        if not ent then goto CONTINUE_DEBUG end
 
         Shared.DebugColor(0,1,1,1)
         Shared.DebugText( string.format("-- %s %0.2f (%d)",
@@ -497,6 +506,7 @@ function TeamBrain:DebugDraw()
             end
         end
 
+        ::CONTINUE_DEBUG::
     end
 
 end
@@ -593,6 +603,10 @@ end
 function TeamBrain:UpdateMemoryOfEntity( ent, fromSound )
     PROFILE("TeamBrain:UpdateMemoryOfEntity")
 
+    if not ent or (ent.GetIsDestroyed and ent:GetIsDestroyed()) then
+        return
+    end
+
     local entId = ent:GetId()
     local entValid = HasMixin(ent, "MapBlip")
 
@@ -603,6 +617,7 @@ function TeamBrain:UpdateMemoryOfEntity( ent, fromSound )
     local mem = self.entId2memory[ entId ]
     if not mem then
         mem = CreateMemory(ent)
+        if not mem then return end
         self:AddMemory(entId, mem)
 
         -- if ent:isa("Player") and gBotDebug:Get("spam") then
@@ -810,6 +825,25 @@ function TeamBrain:Update()
 
     end
 
+    -- perf: skip all expensive memory/sound/entity scanning when no bots exist on this team.
+    -- TeamBrain memories are only consumed by bot AI; human players use the minimap/HUD directly.
+    if #self.teamBots == 0 then
+        self.lastUpdate = Shared.GetTime()
+        return
+    end
+
+    -- fix: skip brain update entirely when game is not in progress.
+    -- During game-end cleanup entities are being destroyed and calling GetMapBlipInfo / GetIsSighted
+    -- on them causes Lua errors that break HUD rendering and game-state transitions.
+    local gamerules = GetGamerules()
+    if gamerules then
+        local gameState = gamerules:GetGameState()
+        if gameState ~= kGameState.Started and gameState ~= kGameState.Countdown then
+            self.lastUpdate = Shared.GetTime()
+            return
+        end
+    end
+
     do PROFILE("TeamBrain:Update - KnownEntities")
 
     local enemyTeam = GetEnemyTeamNumber(self.teamNumber)
@@ -822,7 +856,7 @@ function TeamBrain:Update()
             local ent = Shared.GetEntity(entId)
             local mem = self.entId2memory[entId]
 
-            if ent then
+            if ent and not (ent.GetIsDestroyed and ent:GetIsDestroyed()) and mem then
                 -- we always have "vision" on friendly entities due to minimap
                 UpdateMemory(mem, ent, self.locationMemories[mem.team], mem.team == self.teamNumber)
 

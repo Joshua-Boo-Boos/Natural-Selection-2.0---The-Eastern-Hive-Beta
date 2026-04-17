@@ -197,22 +197,15 @@ if Client then
         CustomBalanceVoice(self)
     end
 
-    -- OnProcessMove / OnProcessSpectate: restore base processing so that
-    -- action-driven sounds (e.g. Gorge taunt) still trigger, plus run
-    -- custom volume balancing.  The heavy FMOD retry logic stays in OnUpdate.
-    local baseOnProcessMove = SoundEffect.OnProcessMove
+    -- OnProcessMove / OnProcessSpectate: run SafeSharedUpdate (with pcall
+    -- protection) instead of the vanilla base, plus custom volume balancing.
     function SoundEffect:OnProcessMove()
-        if baseOnProcessMove then
-            baseOnProcessMove(self)
-        end
+        SafeSharedUpdate(self)
         CustomBalanceVoice(self)
     end
 
-    local baseOnProcessSpectate = SoundEffect.OnProcessSpectate
     function SoundEffect:OnProcessSpectate()
-        if baseOnProcessSpectate then
-            baseOnProcessSpectate(self)
-        end
+        SafeSharedUpdate(self)
         CustomBalanceVoice(self)
     end
 
@@ -221,7 +214,7 @@ if Client then
         if soundEffectName
            and string.find(soundEffectName, "ns2plus.fev") ~= nil
         then
-            volume = (volume or 0.8) * OptionsDialogUI_GetSoundVolume() / 100
+            volume = (volume or 1) * OptionsDialogUI_GetSoundVolume() / 100
         end
         return volume
     end

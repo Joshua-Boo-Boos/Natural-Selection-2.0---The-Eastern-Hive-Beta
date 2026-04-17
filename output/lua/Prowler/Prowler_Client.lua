@@ -30,11 +30,11 @@ end
 
         local roll = self.currentViewModelRoll and self.currentViewModelRoll * Prowler.kViewModelRollTiltModifier or 0
         local rotationCoords = Angles(0, 0, roll):GetCoords()
-        
+
         return viewModelCoords * rotationCoords
-    
+
     end
-    
+
     return viewModelCoords
 
 end--]]

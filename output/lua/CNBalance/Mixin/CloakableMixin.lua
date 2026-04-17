@@ -187,6 +187,15 @@ local function UpdateCloakState(self, deltaTime)
     -- Account for trigger cloak, uncloak, camouflage speed
     UpdateDesiredCloakFraction(self, deltaTime)
 
+    -- perf: early-out when fully uncloaked and staying uncloaked — skip Slerp and server checks
+    if self.cloakFraction == 0 and self.desiredCloakFraction == 0 then
+        -- Still need to clear fullyCloaked flag on server in case it was set previously
+        if Server then
+            self.fullyCloaked = false
+        end
+        return
+    end
+
     -- Animate towards desired/internal cloak fraction (so we never "snap")
     local rate = (self.desiredCloakFraction > self.cloakFraction) and CloakableMixin.kCloakRate * (self.cloakRate / 3) or CloakableMixin.kUncloakRate
 
@@ -224,6 +233,18 @@ end
 
 
 function CloakableMixin:OnUpdate(deltaTime)
+    -- perf: skip for the local player on Client (OnProcessMove already handles it)
+    -- and skip on Server for players (OnProcessMove handles it there too).
+    -- Remote clients MUST still run this — cloakFraction is not a network var,
+    -- it's computed locally via Slerp and drives opacity/material rendering.
+    if self:isa("Player") then
+        if Client and Client.GetLocalPlayer() == self then
+            return
+        end
+        if Server then
+            return
+        end
+    end
     UpdateCloakState(self, deltaTime)
 end
 

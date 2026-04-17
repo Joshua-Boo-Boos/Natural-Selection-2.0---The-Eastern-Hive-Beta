@@ -9,6 +9,18 @@
 TunnelUserMixin = CreateMixin( TunnelUserMixin )
 TunnelUserMixin.type = "TunnelUser"
 
+-- perf: cache Tunnel entity count once per tick instead of per-entity
+local _tunnelCountCache = 0
+local _tunnelCountTime = -1
+local function GetTunnelCount()
+    local now = Shared.GetTime()
+    if now ~= _tunnelCountTime then
+        _tunnelCountTime = now
+        _tunnelCountCache = Shared.GetEntitiesWithClassname("Tunnel"):GetSize()
+    end
+    return _tunnelCountCache
+end
+
 local kTunnelSinkSpeed = 2.3
 local kTunnelUseScreenCinematic = PrecacheAsset("cinematics/alien/tunnel/entrance_use_1p.cinematic")
 local kScreenEffectDuration = 4
@@ -168,9 +180,12 @@ local function SharedUpdate(self, deltaTime)
         elseif Server then
             
             self.timeSinkInStarted = nil
-            local tunnel = GetIsPointInGorgeTunnel(self:GetOrigin())
-            if tunnel then
-                UpdateExitTunnel(self, deltaTime, tunnel)
+            -- perf: skip GetIsPointInGorgeTunnel when no tunnels exist on the map
+            if GetTunnelCount() > 0 then
+                local tunnel = GetIsPointInGorgeTunnel(self:GetOrigin())
+                if tunnel then
+                    UpdateExitTunnel(self, deltaTime, tunnel)
+                end
             end
             
         end
@@ -212,7 +227,11 @@ end
 
 function TunnelUserMixin:OnUpdate(deltaTime)
     PROFILE("TunnelUserMixin:OnUpdate")
-    SharedUpdate(self, deltaTime)
+    -- perf: skip for players; OnProcessMove already calls SharedUpdate each tick.
+    -- OnUpdate is still needed for non-player TunnelUser entities.
+    if not self:isa("Player") then
+        SharedUpdate(self, deltaTime)
+    end
 end
 
 function TunnelUserMixin:SetEnterTunnelDesired(enterTunnelDesired)

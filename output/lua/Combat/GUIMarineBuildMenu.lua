@@ -17,7 +17,6 @@ function MarineBuild_OnSelect()
 end
 
 function MarineBuild_OnMouseOver()
-    --Shared.PlaySound(nil, kMouseOverSound)
 end
 
 function MarineBuild_Close()
@@ -36,14 +35,14 @@ function MarineBuild_SendSelect(index)
     local player = Client.GetLocalPlayer()
 
     if player then
-    
+
         local dropStructureAbility = player:GetWeapon(CombatBuilder.kMapName)
         if dropStructureAbility then
             dropStructureAbility:SetActiveStructure(index)
         end
-        
+
     end
-    
+
 end
 
 function MarineBuild_GetIsAbilityAvailable(index)
@@ -60,12 +59,9 @@ function MarineBuild_GetCanAffordAbility(techId)
 
     local player = Client.GetLocalPlayer()
     local abilityCost = LookupTechData(techId, kTechDataPersonalCostKey, 0)
-    
+
     local canAfford = player:GetResources() >= abilityCost
 
-    --local exceededLimit = not MarineBuild_AllowConsumeDrop(techId) and MarineBuild_GetNumStructureBuilt(techId) >= MarineBuild_GetMaxNumStructure(techId)
-    --canAfford = canAfford and not exceededLimit
-    
     return Shared.GetCheatsEnabled() or canAfford
 
 end
@@ -82,11 +78,11 @@ function MarineBuild_GetNumStructureBuilt(techId)
 
     local player = Client.GetLocalPlayer()
     local weapon = player:GetActiveWeapon()
-    
+
     if weapon and weapon:isa("CombatBuilder") then
         return weapon:GetNumStructuresBuilt(techId)
     end
-    
+
     return -1
 
 end
@@ -99,7 +95,7 @@ function MarineBuild_GetMaxNumStructure(techId)
     if weapon and weapon:isa("CombatBuilder") then
         return weapon:GetNumStructuresCanDrop(techId,player)
     end
-    
+
     return -1
 end
 
@@ -149,19 +145,25 @@ function PulseInAnimation(script, item)
     item:SetColor(GUIMarineBuildMenu.kLowColor, GUIMarineBuildMenu.kPulseOutAnimationDuration, "PULSE", AnimateLinear, PulseOutAnimation)
 end
 
+-- TechIds that use the vanilla buildmenu.dds atlas instead of the custom sprite sheet
+local kVanillaAtlasTechIds = {
+    [kTechId.Extractor] = true,
+    [kTechId.InfantryPortal] = true,
+}
+
 local rowTable = nil
 local function GetRowForTechId(techId)
 
     if not rowTable then
-    
+
         rowTable = {}
         rowTable[kTechId.MarineSentry] = 1
         rowTable[kTechId.WeaponCache] = 2
-		rowTable[kTechId.Observatory] = 3
-		rowTable[kTechId.PhaseGate] = 4
-    
+        rowTable[kTechId.Extractor] = 3
+        rowTable[kTechId.InfantryPortal] = 4
+
     end
-    
+
     return rowTable[techId]
 
 end
@@ -174,15 +176,15 @@ function GUIMarineBuildMenu:Initialize()
     self.background = self:CreateAnimatedGraphicItem()
     self.background:SetAnchor(GUIItem.Middle, GUIItem.Center)
     self.background:SetColor(Color(0,0,0,0))
-    
+
     self.buttons = {}
-    
+
     self:Reset()
 
 end
 
 function GUIMarineBuildMenu:Uninitialize()
-    
+
     GUIAnimatedScript.Uninitialize(self)
 
 end
@@ -196,12 +198,12 @@ function GUIMarineBuildMenu:SetIsVisible(isVisible)
 end
 
 function GUIMarineBuildMenu:_HandleMouseOver(onItem)
-    
+
     if onItem ~= self.lastActiveItem then
         MarineBuild_OnMouseOver()
         self.lastActiveItem = onItem
     end
-    
+
 end
 
 local function UpdateButton(button, index)
@@ -213,52 +215,56 @@ local function UpdateButton(button, index)
         col = 2
         color = GUIMarineBuildMenu.kTooExpensiveColor
     end
-    
+
     if not MarineBuild_GetIsAbilityAvailable(index) then
         col = 2
         color = GUIMarineBuildMenu.kUnavailableColor
     end
-    
-    local row = GetRowForTechId(button.techId)
-   
-    local spriteRow = math.min(row, 4)
-    button.graphicItem:SetTexturePixelCoordinates(GUIGetSprite(col, spriteRow, GUIMarineBuildMenu.kPixelSize, GUIMarineBuildMenu.kPixelSize))
+
+    if kVanillaAtlasTechIds[button.techId] then
+        -- Use vanilla buildmenu.dds icon for this tech, no background
+        button.graphicItem:SetTexture("ui/buildmenu.dds")
+        button.graphicItem:SetTexturePixelCoordinates(GUIUnpackCoords(GetTextureCoordinatesForIcon(button.techId)))
+        button.graphicItem:SetColor(color)
+        button.iconBg:SetIsVisible(false)
+        button.background:SetColor(Color(0, 0, 0, 0))
+    else
+        button.iconBg:SetIsVisible(false)
+        local row = GetRowForTechId(button.techId)
+        local spriteRow = math.min(row, 4)
+        button.graphicItem:SetTexture(GUIMarineBuildMenu.kButtonTexture)
+        button.graphicItem:SetTexturePixelCoordinates(GUIGetSprite(col, spriteRow, GUIMarineBuildMenu.kPixelSize, GUIMarineBuildMenu.kPixelSize))
+        button.graphicItem:SetColor(Color(1, 1, 1, 1))
+    end
     button.description:SetColor(color)
     button.costIcon:SetColor(color)
     button.costText:SetColor(color)
 
     local numLeft = MarineBuild_GetNumStructureBuilt(button.techId)
-    -- if numLeft == -1 then
-        -- button.structuresLeft:SetIsVisible(false)
-    -- else
-        button.structuresLeft:SetIsVisible(true)
-        local amountString = ToString(numLeft)
-        local maxNum = MarineBuild_GetMaxNumStructure(button.techId)
-        
-        if maxNum > 0 then
-            amountString = amountString .. "/" .. ToString(maxNum)
-        end
-        
-        if numLeft >= maxNum then
-            color = GUIMarineBuildMenu.kTooExpensiveColor
-        end
-        
-        button.structuresLeft:SetColor(color)
-        button.structuresLeft:SetText(amountString)
-        
-    -- end    
-    
+    button.structuresLeft:SetIsVisible(true)
+    local amountString = ToString(numLeft)
+    local maxNum = MarineBuild_GetMaxNumStructure(button.techId)
+
+    if maxNum >= 0 then
+        amountString = amountString .. "/" .. ToString(maxNum)
+    end
+
+    if numLeft >= maxNum then
+        color = GUIMarineBuildMenu.kTooExpensiveColor
+    end
+
+    button.structuresLeft:SetColor(color)
+    button.structuresLeft:SetText(amountString)
+
      local cost = MarineBuild_GetStructureCost(button.techId)
-     if cost == 0 then        
+     if cost == 0 then
         button.costIcon:SetIsVisible(false)
-        --button.structuresLeft:SetPosition(kCenteredStructureCountPos)
      else
         button.costIcon:SetIsVisible(true)
         button.costText:SetText(ToString(cost))
-        --button.structuresLeft:SetPosition(kDefaultStructureCountPos)
      end
-    
-    
+
+
 end
 
 
@@ -266,33 +272,32 @@ end
 function GUIMarineBuildMenu:Update(deltaTime)
 
     GUIAnimatedScript.Update(self, deltaTime)
-    
+
     for index, button in ipairs(self.buttons) do
-        
+
         UpdateButton(button, index)
-        
+
         if self:_GetIsMouseOver(button.graphicItem) then
             self:_HandleMouseOver(button.graphicItem)
         end
-       
+
     end
 
 end
 
 function GUIMarineBuildMenu:Reset()
-    
+
     self.background:SetUniformScale(self.scale)
 
     for index, structureAbility in ipairs(CombatBuilder.kSupportedStructures) do
-    
-        -- TODO: pass keybind from options instead of index
+
         table.insert( self.buttons, self:CreateButton(structureAbility.GetDropStructureId(), self.scale, self.background, MarineBuild_GetKeybindForIndex(index), index - 1) )
-    
+
     end
-    
+
     local backgroundXOffset = (#self.buttons * GUIMarineBuildMenu.kButtonWidth) * -.5
     self.background:SetPosition(Vector(backgroundXOffset, GUIMarineBuildMenu.kBackgroundYOffset, 0))
-    
+
 end
 
 function GUIMarineBuildMenu:OnResolutionChanged(oldX, oldY, newX, newY)
@@ -317,26 +322,33 @@ function GUIMarineBuildMenu:CreateButton(techId, scale, frame, keybind, position
          costIcon = self:CreateAnimatedGraphicItem(),
          costText = self:CreateAnimatedTextItem(),
     }
-    
+
     button.frame:SetUniformScale(scale)
     button.frame:SetSize(Vector(GUIMarineBuildMenu.kButtonWidth, GUIMarineBuildMenu.kButtonHeight, 0))
     button.frame:SetColor(Color(1,1,1,0))
     button.frame:SetPosition(Vector(position * GUIMarineBuildMenu.kButtonWidth, 0, 0))
     frame:AddChild(button.frame)
-    
+
     button.background:SetUniformScale(scale)
-    button.graphicItem:SetUniformScale(scale)    
+    button.graphicItem:SetUniformScale(scale)
     button.frame:AddChild(button.background)
-    
-    button.description:SetUniformScale(scale) 
-    
+
+    button.description:SetUniformScale(scale)
+
     button.background:SetSize(Vector(GUIMarineBuildMenu.kButtonWidth, GUIMarineBuildMenu.kButtonHeight * 1.5, 0))
     button.background:SetColor(Color(0,0,0,0))
-    
+
     button.graphicItem:SetSize(Vector(GUIMarineBuildMenu.kButtonWidth, GUIMarineBuildMenu.kButtonHeight, 0))
     button.graphicItem:SetTexture(GUIMarineBuildMenu.kButtonTexture)
-     
-    --button.description:SetText(LookupTechData(techId, kTechDataDisplayName, "") .. " (".. keybind ..")")
+
+    -- Background panel for vanilla-atlas icons (Extractor, IP) — sized to match the icon area
+    button.iconBg = self:CreateAnimatedGraphicItem()
+    button.iconBg:SetUniformScale(scale)
+    button.iconBg:SetSize(Vector(GUIMarineBuildMenu.kButtonWidth, GUIMarineBuildMenu.kButtonHeight, 0))
+    button.iconBg:SetColor(Color(0, 0, 0, 0))
+    button.iconBg:SetIsVisible(false)
+    button.background:AddChild(button.iconBg)
+
     button.description:SetText(Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "")))
     button.description:SetAnchor(GUIItem.Middle, GUIItem.Top)
     button.description:SetTextAlignmentX(GUIItem.Align_Center)
@@ -345,12 +357,12 @@ function GUIMarineBuildMenu:CreateButton(techId, scale, frame, keybind, position
     button.description:SetFontName(kFontName)
     button.description:SetPosition(Vector(0, 0, 0))
     button.description:SetFontIsBold(true)
-    
+
     button.keyIcon:SetAnchor(GUIItem.Middle, GUIItem.Bottom)
     button.keyIcon:SetFontName(kFontName)
     local pos = Vector(-button.keyIcon:GetSize().x/2, 0.5*button.keyIcon:GetSize().y, 0)
     button.keyIcon:SetPosition(pos)
-    
+
     button.structuresLeft:SetAnchor(GUIItem.Middle, GUIItem.Bottom)
     button.structuresLeft:SetTextAlignmentX(GUIItem.Align_Center)
     button.structuresLeft:SetTextAlignmentY(GUIItem.Align_Center)
@@ -359,7 +371,7 @@ function GUIMarineBuildMenu:CreateButton(techId, scale, frame, keybind, position
     button.structuresLeft:SetPosition(kCenteredStructureCountPos)
     button.structuresLeft:SetFontIsBold(true)
     button.structuresLeft:SetColor(GUIMarineBuildMenu.kAvailableColor)
-    
+
     -- Personal display.
     button.costIcon:SetSize(Vector(GUIMarineBuildMenu.kPersonalResourceIcon.Width, GUIMarineBuildMenu.kPersonalResourceIcon.Height, 0))
     button.costIcon:SetAnchor(GUIItem.Middle, GUIItem.Top)
@@ -367,23 +379,23 @@ function GUIMarineBuildMenu:CreateButton(techId, scale, frame, keybind, position
     button.costIcon:SetPosition(Vector(0, GUIMarineBuildMenu.kPersonalResourceIcon.Height * .5 + 4 , 0))
     button.costIcon:SetUniformScale(scale)
     GUISetTextureCoordinatesTable(button.costIcon, GUIMarineBuildMenu.kPersonalResourceIcon.Coords)
-    
+
     button.costText:SetUniformScale(scale)
     button.costText:SetAnchor(GUIItem.Middle, GUIItem.Middle)
     button.costText:SetTextAlignmentX(GUIItem.Align_Min)
     button.costText:SetTextAlignmentY(GUIItem.Align_Center)
     button.costText:SetPosition(Vector(GUIMarineBuildMenu.kIconTextXOffset, 3, 0))
     button.costText:SetColor(Color(1, 1, 1, 1))
-    button.costText:SetFontIsBold(true)    
+    button.costText:SetFontIsBold(true)
     button.costText:SetFontSize(28)
     button.costText:SetFontName(kFontName)
     button.costText:SetColor(GUIMarineBuildMenu.kAvailableColor)
     button.costIcon:AddChild(button.costText)
-    
-    button.background:AddChild(button.graphicItem)    
+
+    button.background:AddChild(button.graphicItem)
     button.graphicItem:AddChild(button.description)
     button.graphicItem:AddChild(button.structuresLeft)
-    button.graphicItem:AddChild(button.keyIcon)   
+    button.graphicItem:AddChild(button.keyIcon)
     button.graphicItem:AddChild(button.costIcon)
 
     return button
@@ -407,7 +419,7 @@ function GUIMarineBuildMenu:OverrideInput(input)
     local selectPressed = false
 
     for index, weaponSwitchCommand in ipairs(weaponSwitchCommands) do
-    
+
         if HasMoveCommand( input.commands, weaponSwitchCommand ) then
 
             if MarineBuild_GetIsAbilityAvailable(index) and MarineBuild_GetCanAffordAbility(self.buttons[index].techId)  then
@@ -416,14 +428,14 @@ function GUIMarineBuildMenu:OverrideInput(input)
                 input.commands = RemoveMoveCommand( input.commands, weaponSwitchCommand )
 
             end
-            
+
             selectPressed = true
             break
-            
+
         end
-        
-    end  
-    
+
+    end
+
     if selectPressed then
 
         MarineBuild_OnClose()
@@ -432,17 +444,11 @@ function GUIMarineBuildMenu:OverrideInput(input)
     elseif HasMoveCommand( input.commands, Move.SecondaryAttack )
         or HasMoveCommand( input.commands, Move.PrimaryAttack ) then
 
-        --DebugPrint("before override: %d",input.commands)
-
-        -- close menu
         MarineBuild_OnClose()
         MarineBuild_Close()
 
-        -- leave the secondary attack command so the drop-ability can handle it
         input.commands = AddMoveCommand( input.commands, Move.SecondaryAttack )
         input.commands = RemoveMoveCommand( input.commands, Move.PrimaryAttack )
-        //DebugPrint("after override: %d",input.commands)
-        //DebugPrint("primary = %d secondary = %d", Move.PrimaryAttack, Move.SecondaryAttack)
 
     end
 
@@ -453,7 +459,7 @@ end
 function GUIMarineBuildMenu:_GetIsMouseOver(overItem)
 
     return GUIItemContainsPoint(overItem, Client.GetCursorPosScreen())
-    
+
 end
 
 function GUIMarineBuildMenu:OnAnimationCompleted(animatedItem, animationName, itemHandle)

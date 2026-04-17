@@ -1248,15 +1248,7 @@ function MAC:OnDestroy()
 
     Entity.OnDestroy(self)
 
-    if Server then
-
-        if self.jetsSound then
-            self.jetsSound:Stop()
-            DestroyEntity(self.jetsSound)
-            self.jetsSound = nil
-        end
-
-    elseif Client then
+    if Client then
 
         for id,cinematic in ipairs(self.jetsCinematics) do
 

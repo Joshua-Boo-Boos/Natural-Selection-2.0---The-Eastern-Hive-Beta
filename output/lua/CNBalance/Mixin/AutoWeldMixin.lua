@@ -104,7 +104,11 @@ if Server then
     end
 
     function AutoWeldMixin:OnUpdate(deltaTime)
-        SharedUpdate(self)
+        -- perf: skip OnUpdate for players; OnProcessMove already handles them each tick.
+        -- OnUpdate is still needed for non-player entities (e.g. MACs) that don't run OnProcessMove.
+        if not self:isa("Player") then
+            SharedUpdate(self)
+        end
     end
 
     function AutoWeldMixin:GetCanSelfWeld()

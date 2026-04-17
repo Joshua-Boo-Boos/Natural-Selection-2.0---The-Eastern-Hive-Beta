@@ -1,4 +1,7 @@
 
 function WebsAbility:GetMaxStructures(biomass)
-    return math.min(4, 2 + math.floor(biomass / 6))
+    if biomass >= 8 then return 4
+    elseif biomass >= 4 then return 3
+    else return 2
+    end
 end

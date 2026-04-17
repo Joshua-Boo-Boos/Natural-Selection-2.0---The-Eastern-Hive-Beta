@@ -66,6 +66,29 @@ local kBabblerOffMapInterval = 1
 local kUpdateMoveInterval = 0.3
 local kUpdateAttackInterval = 0.4
 
+-- perf: per-owner babbler list avoids O(N²) GetEntitiesForTeamWithinRange scans for group attack orders
+local babblersByOwner = {}
+
+-- Called during round reset to ensure no stale references survive across rounds
+function Babbler.ClearBabblersByOwner()
+    babblersByOwner = {}
+end
+
+-- Returns the number of living babblers owned by the given entity id.
+-- Used by BabblerEgg to enforce the per-owner cap without an O(N) team scan.
+function Babbler.GetBabblerCountForOwner(ownerId)
+    local list = babblersByOwner[ownerId]
+    if not list then return 0 end
+    local count = 0
+    for i = 1, #list do
+        local b = list[i]
+        if b and not b:GetIsDestroyed() and b:GetIsAlive() then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local kMinJumpDistance = 5
 local kBabblerRunSpeed = 8.2
 local kBabblerJumpSpeed = 7.75
@@ -224,6 +247,25 @@ function Babbler:OnDestroy()
     ScriptActor.OnDestroy(self)
 
     if Server then
+        -- perf: clean up per-owner babbler list before detach/destroy
+        -- Use self.ownerId (network var) instead of self:GetOwner() since owner entity
+        -- may already be destroyed during round reset, but the ID persists.
+        local ownerId = self.ownerId
+        if ownerId and ownerId ~= Entity.invalidId then
+            local list = babblersByOwner[ownerId]
+            if list then
+                for i = #list, 1, -1 do
+                    if list[i] == self then
+                        table.remove(list, i)
+                        break
+                    end
+                end
+                if #list == 0 then
+                    babblersByOwner[ownerId] = nil
+                end
+            end
+        end
+
         self:Detach(true)
     end
 
@@ -352,7 +394,13 @@ function Babbler:UpdateBabbler(deltaTime)
         
         self:UpdateLifeTime()
         self:UpdateAttack()
-        self:UpdateRelevancy()
+
+        -- perf: relevancy mask changes rarely (only when owner sighted state flips); 1s is sufficient
+        local now = Shared.GetTime()
+        if not self.nextRelevancyUpdate or now >= self.nextRelevancyUpdate then
+            self:UpdateRelevancy()
+            self.nextRelevancyUpdate = now + 1
+        end
 
     elseif Client then
 
@@ -515,10 +563,32 @@ if Server then
             oldOwner:BabblerDestroyed()
         end
 
+        -- perf: maintain per-owner babbler list for O(1) group lookups
+        if oldOwner then
+            local oldId = oldOwner:GetId()
+            local list = babblersByOwner[oldId]
+            if list then
+                for i = #list, 1, -1 do
+                    if list[i] == self then
+                        table.remove(list, i)
+                        break
+                    end
+                end
+                if #list == 0 then
+                    babblersByOwner[oldId] = nil
+                end
+            end
+        end
+
         if newOwner then
             if HasMixin(newOwner, "BabblerOwner") then
                 newOwner:BabblerCreated()
             end
+            local newId = newOwner:GetId()
+            if not babblersByOwner[newId] then
+                babblersByOwner[newId] = {}
+            end
+            table.insert(babblersByOwner[newId], self)
         else -- Destroy Babblers without Owner
             -- Use callback to avoid server crashs due to calls to destroyed unit by mixins
             self:AddTimedCallback(KillCallback, 1)
@@ -770,9 +840,15 @@ if Server then
 
             if target then
                 -- All babblers get that attack order too (all the group focus on the same target)
-                for _, babbler in ipairs(GetEntitiesForTeamWithinRange("Babbler", self:GetTeamNumber(), self:GetOrigin(), 30 ))
-                do
-                    if babbler:GetOwner() == owner and babbler:GetTarget() ~= target then
+                -- perf: use per-owner list instead of O(N²) GetEntitiesForTeamWithinRange scan
+                local ownerId = owner and owner:GetId()
+                local siblings = ownerId and babblersByOwner[ownerId] or {}
+                local selfOrigin = self:GetOrigin()
+                for _, babbler in ipairs(siblings) do
+                    if babbler ~= self and not babbler:GetIsDestroyed() and babbler:GetIsAlive()
+                       and not babbler:GetIsClinged()
+                       and babbler:GetTarget() ~= target
+                       and (babbler:GetOrigin() - selfOrigin):GetLengthSquared() < 900 then  -- 30^2 = vanilla range limit
                         babbler:SetMoveType(kBabblerMoveType.Attack, target, target:GetOrigin())
                     end
                 end
@@ -998,6 +1074,7 @@ if Server then
 
                         if target:AttachBabbler(self) then
                             self.clinged = true
+                            self.hasDetachCallbacks = false  -- reset so next Detach can add callbacks
 
                             self:DestroyHitbox()
                             travelDistance = distance
@@ -1063,9 +1140,13 @@ if Server then
         self:SetMoveType(kBabblerMoveType.None)
         self:JumpRandom()
 
-        self:AddTimedCallback(Babbler.BabblerOffMap, kBabblerOffMapInterval)
-        self:AddTimedCallback(Babbler.MoveRandom, kUpdateMoveInterval + math.random() / 5)
-        self:AddTimedCallback(Babbler.UpdateWag, 0.4)
+        -- fix: guard against stacked callbacks from rapid detach/attach cycles
+        if not self.hasDetachCallbacks then
+            self:AddTimedCallback(Babbler.BabblerOffMap, kBabblerOffMapInterval)
+            self:AddTimedCallback(Babbler.MoveRandom, kUpdateMoveInterval + math.random() / 5)
+            self:AddTimedCallback(Babbler.UpdateWag, 0.4)
+            self.hasDetachCallbacks = true
+        end
     end
 
     function Babbler:UpdateTargetPosition()
@@ -1330,14 +1411,9 @@ if Server then
                 self.targetReached = false -- preserve that state when moving from move <-> attack
             end
             
-            if moveType == kBabblerMoveType.None or moveType == kBabblerMoveType.Move then
-                -- makes sure that babbler will fall down when move ends
-                self:Jump(Vector(0,0,0)) -- Force update physics and reset ground move
-            end    
-
             self.jumpAttempts = 0
             OnMoveTypeChanged(self)
-            
+
             if force or ignoreOrderDelay then
                 self:SetIgnoreOrders(ignoreOrderDelay or 0.5)
             end

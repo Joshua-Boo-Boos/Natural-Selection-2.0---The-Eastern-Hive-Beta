@@ -63,24 +63,52 @@ Shared.RegisterNetworkMessage("OnPhase", kOnPhase)
 
 if Server then
 
+    -- perf: cache PhaseGate entity count once per tick instead of per-entity
+    local _pgCountCache = 0
+    local _pgCountTime = -1
+    local function GetPhaseGateCount()
+        local now = Shared.GetTime()
+        if now ~= _pgCountTime then
+            _pgCountTime = now
+            _pgCountCache = Shared.GetEntitiesWithClassname("PhaseGate"):GetSize()
+        end
+        return _pgCountCache
+    end
+
     function PhaseGateUserMixin:OnProcessMove(input)
         PROFILE("PhaseGateUserMixin:OnProcessMove")
 
-        if self:GetCanPhase() then
-            for _, phaseGate in ipairs(GetEntitiesForTeamWithinRange("PhaseGate", self:GetTeamNumber(), self:GetOrigin(), 0.5)) do
-                if phaseGate:GetIsDeployed() and GetIsUnitActive(phaseGate) and phaseGate:Phase(self) then
-                    -- If we can found a phasegate we can phase through, inform the server
-                    self.timeOfLastPhase = Shared.GetTime()
-                    local id = self:GetId()
-                    Server.SendNetworkMessage(self:GetClient(), "OnPhase", { phaseGateId = phaseGate:GetId(), phasedEntityId = id or Entity.invalidId }, true)
-                    return
-                end
+        -- perf: skip the expensive spatial query when no phase gates exist on the map
+        if GetPhaseGateCount() == 0 then
+            return
+        end
+
+        -- perf: skip the expensive spatial query when phase is on cooldown
+        if not self:GetCanPhase() then
+            return
+        end
+
+        for _, phaseGate in ipairs(GetEntitiesForTeamWithinRange("PhaseGate", self:GetTeamNumber(), self:GetOrigin(), 0.5)) do
+            if phaseGate:GetIsDeployed() and GetIsUnitActive(phaseGate) and phaseGate:Phase(self) then
+                -- If we can found a phasegate we can phase through, inform the server
+                self.timeOfLastPhase = Shared.GetTime()
+                local id = self:GetId()
+                Server.SendNetworkMessage(self:GetClient(), "OnPhase", { phaseGateId = phaseGate:GetId(), phasedEntityId = id or Entity.invalidId }, true)
+                return
             end
         end
     end
 
     function PhaseGateUserMixin:OnUpdate(deltaTime)
-        SharedUpdate(self)
+        -- perf: skip for players; OnProcessMove already handles phasing each tick.
+        -- OnUpdate is still needed for non-player PhaseGateUser entities (e.g. Exos use OnUpdate).
+        if not self:isa("Player") then
+            -- perf: skip when no phase gates exist on the map
+            if GetPhaseGateCount() == 0 then
+                return
+            end
+            SharedUpdate(self)
+        end
     end
     
 end

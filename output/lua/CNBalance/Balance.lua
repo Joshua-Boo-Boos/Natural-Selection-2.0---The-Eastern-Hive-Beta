@@ -101,11 +101,12 @@ kRifleDamage = 10
 kRifleDamageType = kDamageType.Normal
 kRifleClipSize = 50
 
+-- perf test: CN still uses 0.01 (100 rps beam pistol). EN already fixed to 0.1 (10 rps).
+-- Original CN value commented below for reference. Do NOT revert to 0.01.
 -- kPistolRateOfFire = 0.01
 -- kPistolDamage = 20
--- Original NS2.0 values (NS2.0-CN)
 
--- 10 bullets per second
+-- 10 bullets per second (matches vanilla NS2, avoids 10x DoDamage overhead)
 kPistolRateOfFire = 0.1
 kPistolDamage = 20
 kPistolDamageType = kDamageType.Normal
@@ -734,22 +735,25 @@ function GetOriginFormBiomassLevel(count)
     return level
 end
 
+-- perf test: Respawn time extension table. Using CN values (lower than the EN dead-code values).
+-- These add seconds to base respawn time per tech researched. Only active if GetRespawnTimeExtend reads them.
+-- Rollback: restore old EN values (Armor2=2, Armor3=4, etc.) or disable via Globals.lua returning 0.
 kTechRespawnTimeExtension = 
 {
     --[kTechId.Armor1] = 0,[kTechId.Weapons1] = 0, [kTechId.Observatory] = 0,
     --[kTechId.MinesTech] = 0,[kTechId.ShotgunTech] = 0,
-    [kTechId.Armor2] = 2, [kTechId.Weapons2] = 2,
-    [kTechId.Armor3] = 4, [kTechId.Weapons3] = 4,
+    [kTechId.Armor2] = 1, [kTechId.Weapons2] = 1,                                     -- perf test: +1s each, kicks in mid-game
+    [kTechId.Armor3] = 2, [kTechId.Weapons3] = 2,                                     -- perf test: +2s each, late-game
     --[kTechId.PhaseGate] = 0, [kTechId.AdvancedArmory] = 0,
-    [kTechId.ExosuitPrototypeLab] = 3, [kTechId.JetpackPrototypeLab] = 3,-- [kTechId.CannonPrototypeLab] = 2,
-    --[kTechId.DragonBreath] = 2, [kTechId.ArmorRegen] = 2,  [kTechId.MotionTrack] = 2, --[kTechId.MACEmpBlast] = 1,[kTechId.GrenadeLauncherUpgrade] = 1,
+    [kTechId.ExosuitPrototypeLab] = 2, [kTechId.JetpackPrototypeLab] = 2,              -- perf test: +2s, late-game tier3
+    --[kTechId.DragonBreath] = 2, [kTechId.ArmorRegen] = 2,  [kTechId.MotionTrack] = 2,
     
     --[kTechId.BioMassOne] = 0, [kTechId.BioMassTwo] = 0, 
     --[kTechId.BioMassThree] = 1, [kTechId.BioMassFour] = 1, 
-    [kTechId.BioMassFive] = 2, [kTechId.BioMassSix] = 2,
+    [kTechId.BioMassFive] = 1, [kTechId.BioMassSix] = 1,                              -- perf test: +1s each, alien mid-game
     --[kTechId.TwoVeils] = 1,[kTechId.ThreeVeils] = 1,[kTechId.TwoShells] = 1,[kTechId.ThreeShells] = 1,[kTechId.TwoSpurs] = 1, [kTechId.ThreeSpurs] = 1,
-    [kTechId.BioMassSeven] = 3, [kTechId.BioMassEight] = 3,
-    [kTechId.BioMassNine] = 4, [kTechId.BioMassTen] = 4,
+    [kTechId.BioMassSeven] = 2, [kTechId.BioMassEight] = 2,                           -- perf test: +2s each, alien late-game
+    [kTechId.BioMassNine] = 2, [kTechId.BioMassTen] = 2,                              -- perf test: +2s each, alien very late
     --[kTechId.BioMassEleven] = 1, [kTechId.BioMassTwelve] = 1,
 }
 

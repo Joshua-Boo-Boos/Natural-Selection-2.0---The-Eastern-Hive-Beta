@@ -243,6 +243,13 @@ local kBioMassTechIds =
 }
 function AlienTeam:UpdateBioMassLevel()
 
+    -- perf: biomass only changes when hives are built/killed/researching, 0.5s throttle is sufficient
+    local now = Shared.GetTime()
+    if self.timeLastBiomassUpdate and now < self.timeLastBiomassUpdate + 0.5 then
+        return
+    end
+    self.timeLastBiomassUpdate = now
+
     local newBiomass = 0
     self.bioMassAlertLevel = 0
     self.bioMassFraction = 0
@@ -250,6 +257,7 @@ function AlienTeam:UpdateBioMassLevel()
     local progress = 0
 
     local isOriginForm = self:IsOriginForm()
+    -- perf: query hive list once, reuse for both loops below
     local ents = GetEntitiesForTeam("Hive", self:GetTeamNumber())
 
     for _, entity in ipairs(ents) do
@@ -283,7 +291,7 @@ function AlienTeam:UpdateBioMassLevel()
 
             self.bioMassFraction = self.bioMassFraction + currentBioMass
 
-            if Shared.GetTime() - entity:GetTimeLastDamageTaken() < 7 then
+            if now - entity:GetTimeLastDamageTaken() < 7 then
                 self.bioMassAlertLevel = self.bioMassAlertLevel + currentBioMass
             end
 
@@ -314,7 +322,8 @@ function AlienTeam:UpdateBioMassLevel()
 
     self.maxBioMassLevel = 0
 
-    for _, hive in ipairs(GetEntitiesForTeam("Hive", self:GetTeamNumber())) do
+    -- perf: reuse the same hive list from above instead of querying again
+    for _, hive in ipairs(ents) do
 
         if GetIsUnitActive(hive) then
             self.maxBioMassLevel = self.maxBioMassLevel + 4
@@ -347,11 +356,15 @@ function AlienTeam:OnUpdateBiomass(oldBiomass, newBiomass)
     end
 
     UpdateBiomassChanges(self,true,newBiomass)
+    -- perf: also schedule armor recalc since biomass affects armor values
+    self.updateAlienArmorInTicks = 3
 end
 
 function AlienTeam:AddPlayer(player)
     local available = Team.AddPlayer(self,player)
     UpdateBiomassChanges(self,false,self.bioMassLevel)
+    -- fix: ensure newly-spawned aliens get correct shell armor immediately
+    self.updateAlienArmorInTicks = 3
     return available
 end
 
@@ -586,6 +599,13 @@ end
 
 function AlienTeam:UpdateEggCount()
 
+    -- perf: egg count is informational, 1s throttle is sufficient
+    local now = Shared.GetTime()
+    if self.timeLastEggCountUpdate and now < self.timeLastEggCountUpdate + 1 then
+        return
+    end
+    self.timeLastEggCountUpdate = now
+
     self.eggCount = 0
 
     for _, egg in ipairs(GetEntitiesForTeam("Egg", self:GetTeamNumber())) do
@@ -662,7 +682,9 @@ function AlienTeam:UpdateEggGeneration()
         self.timeLastEggUpdate = Shared.GetTime()
     end
 
-    if self.timeLastEggUpdate + ScaleWithPlayerCount(kEggGenerationRate, #GetEntitiesForTeam("Player", self:GetTeamNumber())) < Shared.GetTime() then
+    -- perf: use cached player count instead of GetEntitiesForTeam every tick just for a count
+    local playerCount = self:GetNumPlayers()
+    if self.timeLastEggUpdate + ScaleWithPlayerCount(kEggGenerationRate, playerCount) < Shared.GetTime() then
 
         local hives = GetEntitiesForTeam("Hive", self:GetTeamNumber())
         local builtHives = {}
@@ -747,22 +769,25 @@ function AlienTeam:Update(timePassed)
     self:UpdateAlienSpectators()
     self:UpdateBioMassLevel()
 
-    -- Todo: Make this event driven
-    for _, alien in ipairs(GetEntitiesForTeam("Alien", self:GetTeamNumber())) do
-        local shellLevel = alien:GetShellLevel()
-        alien:UpdateArmorAmount(shellLevel, alien:GetUpgradeLevel("bioMassLevel"))
+    -- perf: armor update is now event-driven instead of every tick.
+    -- Triggered by OnTechTreeUpdated (shell/upgrade changes) and OnUpdateBiomass (biomass changes).
+    -- AddPlayer/RemovePlayer already call UpdateBiomassChanges which covers player join/leave.
+    if self.updateAlienArmorInTicks and self.updateAlienArmorInTicks > 0 then
+        self.updateAlienArmorInTicks = self.updateAlienArmorInTicks - 1
+        if self.updateAlienArmorInTicks == 0 then
+            for _, alien in ipairs(GetEntitiesForTeam("Alien", self:GetTeamNumber())) do
+                local shellLevel = alien:GetShellLevel()
+                alien:UpdateArmorAmount(shellLevel, alien:GetUpgradeLevel("bioMassLevel"))
+            end
+        end
     end
 
 end
 
 function AlienTeam:OnTechTreeUpdated()
 
-    if self.updateAlienArmor then
-
-        self.updateAlienArmor = false
-        self.updateAlienArmorInTicks = 100
-
-    end
+    -- perf: schedule armor recalc a few ticks out to batch rapid tech-tree changes
+    self.updateAlienArmorInTicks = 3
 
 end
 
@@ -1140,6 +1165,7 @@ function AlienTeam:InitTechTree()
     self.techTree:AddPassive(kTechId.Volley)
     self.techTree:AddPassive(kTechId.Rappel)
     self.techTree:AddPassive(kTechId.ProwlerStructureAbility)
+
     -- self.techTree:AddResearchNode(kTechId.Rappel,              kTechId.BioMassThree,  kTechId.None, kTechId.AllAliens)
     self.techTree:AddActivation(kTechId.AcidSpray,           kTechId.BioMassFive,  kTechId.None,kTechId.AllAliens)
     

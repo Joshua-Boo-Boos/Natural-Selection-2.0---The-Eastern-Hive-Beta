@@ -1,5 +1,7 @@
 Script.Load("lua/Combat/SentryAbility.lua")
 Script.Load("lua/Combat/ArmoryAbility.lua")
+Script.Load("lua/Combat/ExtractorAbility.lua")
+Script.Load("lua/Combat/InfantryPortalAbility.lua")
 Script.Load("lua/PickupableWeaponMixin.lua")
 Script.Load("lua/LiveMixin.lua")
 Script.Load("lua/BuilderVariantMixin.lua")
@@ -17,16 +19,14 @@ CombatBuilder.kModelName = PrecacheAsset("models/marine/welder/builder_sandstorm
 
 local kCreateFailSound = PrecacheAsset("sound/NS2.fev/alien/gorge/create_fail")
 
-CombatBuilder.kSupportedStructures = { SentryAbility, ArmoryAbility}--, PhaseGateAbility, ObservatoryAbility }
-
-local kPhaseGateBlockRadius = 2.4
+CombatBuilder.kSupportedStructures = { SentryAbility, ArmoryAbility }
 
 local networkVars =
 {
     numSentriesLeft = "private integer (0 to 16)",
     numMiniArmoriesLeft = "private integer (0 to 16)",
-	-- numPhaseGatesLeft = string.format("private integer (0 to %d)", kMaxStructures[kTechId.PhaseGate]),
-	-- numObservatoriesLeft = string.format("private integer (0 to %d)", kMaxStructures[kTechId.Observatory]),
+    numExtractorsLeft = "private integer (0 to 16)",
+    numInfantryPortalsLeft = "private integer (0 to 16)",
 }
 
 AddMixinNetworkVars(BuilderVariantMixin, networkVars)
@@ -51,7 +51,7 @@ end
 function CombatBuilder:OnCreate()
 
     Weapon.OnCreate(self)
-    
+
     self.dropping = false
     self.mouseDown = false
     self.activeStructure = nil
@@ -60,17 +60,17 @@ function CombatBuilder:OnCreate()
     InitMixin(self, PickupableWeaponMixin)
     InitMixin(self, LiveMixin)
     InitMixin(self, PointGiverMixin)
-    
+
     if Server then
         self.lastCreatedId = Entity.invalidId
     end
-        
+
     self.numSentriesLeft = 0
     self.numMiniArmoriesLeft = 0
-	-- self.numPhaseGatesLeft = 0
-    -- self.numObservatoriesLeft = 0
+    self.numExtractorsLeft = 0
+    self.numInfantryPortalsLeft = 0
     self.lastClickedPosition = nil
-    
+
 end
 
 function CombatBuilder:OnInitialized()
@@ -93,7 +93,7 @@ end
 function CombatBuilder:SetActiveStructure(structureNum)
 
     self.activeStructure = structureNum
-    
+
 end
 
 function CombatBuilder:GetHasDropCooldown()
@@ -109,18 +109,18 @@ function CombatBuilder:GetNumStructuresBuilt(techId)
     if techId == kTechId.MarineSentry then
         return self.numSentriesLeft
     end
-	
+
 	if techId == kTechId.WeaponCache then
         return self.numMiniArmoriesLeft
     end
-	
-	-- if techId == kTechId.PhaseGate then
-    --     return self.numPhaseGatesLeft
-    -- end
 
-    -- if techId == kTechId.Observatory then
-    --     return self.numObservatoriesLeft
-    -- end
+    if techId == kTechId.Extractor then
+        return self.numExtractorsLeft
+    end
+
+    if techId == kTechId.InfantryPortal then
+        return self.numInfantryPortalsLeft
+    end
 
     return -1
 end
@@ -134,7 +134,15 @@ function CombatBuilder:GetNumStructuresCanDrop(techId,player)
     if techId == kTechId.WeaponCache then
         return ArmoryAbility.GetMaxStructures(nil,player)
     end
-    
+
+    if techId == kTechId.Extractor then
+        return ExtractorAbility.GetMaxStructures(nil,player)
+    end
+
+    if techId == kTechId.InfantryPortal then
+        return InfantryPortalAbility.GetMaxStructures(nil,player)
+    end
+
     -- unlimited
     return -1
 end
@@ -146,9 +154,9 @@ function CombatBuilder:OnPrimaryAttack(player)
         if self.activeStructure ~= nil
         and not self.dropping
         and not self.mouseDown then
-        
+
             self.mouseDown = true
-        
+
 			if self:PerformPrimaryAttack(player) then
 				self.dropping = true
             else
@@ -156,7 +164,7 @@ function CombatBuilder:OnPrimaryAttack(player)
             end
 
         end
-    
+
     end
 
 end
@@ -164,16 +172,16 @@ end
 function CombatBuilder:OnPrimaryAttackEnd(player)
 
     if not Shared.GetIsRunningPrediction() then
-    
+
         if Client and self.dropping then
             self:OnSetActive()
         end
 
         self.dropping = false
         self.mouseDown = false
-        
+
     end
-    
+
 end
 
 function CombatBuilder:GetIsDropping()
@@ -192,7 +200,6 @@ end
 function CombatBuilder:Dropped(prevOwner)
 
     Weapon.Dropped(self, prevOwner)
-    -- prevOwner:GetTeam():ClearMarineStructure(prevOwner)
 
     self.dropping = false
     self.mouseDown = false
@@ -200,11 +207,11 @@ function CombatBuilder:Dropped(prevOwner)
     if Server then
         self.lastCreatedId = Entity.invalidId
     end
-        
+
     self.numSentriesLeft = 0
     self.numMiniArmoriesLeft = 0
-	-- self.numPhaseGatesLeft = 0
-    -- self.numObservatoriesLeft = 0
+    self.numExtractorsLeft = 0
+    self.numInfantryPortalsLeft = 0
     self.lastClickedPosition = nil
 end
 
@@ -227,34 +234,34 @@ function CombatBuilder:PerformPrimaryAttack(player)
 
     if self.activeStructure == nil then
         return false
-    end 
+    end
 
     local success = false
 
     -- Ensure the current location is valid for placement.
     local coords, valid = self:GetPositionForStructure(player:GetEyePos(), player:GetViewCoords().zAxis, self:GetActiveStructure(), self.lastClickedPosition)
     local secondClick = true
-    
+
     local structureID = self:GetActiveStructure().GetDropStructureId()
-    
+
     if LookupTechData(structureID, kTechDataSpecifyOrientation, false) then
         secondClick = self.lastClickedPosition ~= nil
     end
-    
+
     if secondClick then
-    
+
         if valid then
 
             -- Ensure they have enough resources.
              local cost = LookupTechData(structureID, kTechDataPersonalCostKey, 0)
-             if player:GetResources() >= cost then --and not self:GetHasDropCooldown() then
+             if player:GetResources() >= cost then
                 local message = BuildMarineDropStructureMessage(player:GetEyePos(), player:GetViewCoords().zAxis, self.activeStructure, self.lastClickedPosition)
                 Client.SendNetworkMessage("MarineBuildStructure", message, true)
                 self.timeLastDrop = Shared.GetTime()
                 success = true
 
              end
-        
+
         end
 
         self.lastClickedPosition = nil
@@ -262,105 +269,105 @@ function CombatBuilder:PerformPrimaryAttack(player)
     else
         self.lastClickedPosition = Vector(coords.origin)
     end
-    
+
     if not valid then
         player:TriggerInvalidSound()
     end
-        
+
     return success
-    
+
 end
 
 local function DropStructure(self, player, origin, direction, structureAbility, lastClickedPosition)
 
     -- If we have enough resources
     if Server then
-    
+
         local coords, valid, onEntity = self:GetPositionForStructure(origin, direction, structureAbility, lastClickedPosition)
         local techId = structureAbility:GetDropStructureId()
         local maxStructures = structureAbility:GetMaxStructures(self:GetParent())
-        
+
         local cost = LookupTechData(structureAbility:GetDropStructureId(), kTechDataPersonalCostKey, 0)
         local enoughRes = player:GetResources() >= cost
-        
+
+        -- Allow placement at cap — AddMarineStructure will auto-recycle the oldest structure
+
         if valid and structureAbility:IsAllowed(player) and not self:GetHasDropCooldown() then
-        
+
             -- Create structure
             local structure = self:CreateStructure(coords, player, structureAbility)
             if structure then
-            
+
                 structure:SetOwner(player)
                 structure:Construct(0.01,player)
 				player:GetTeam():AddMarineStructure(player, structure,maxStructures)
-                
+
                 -- Check for space
                 if structure:SpaceClearForEntity(coords.origin) then
-                
-                    local angles = Angles()                    
+
+                    local angles = Angles()
                     angles:BuildFromCoords(coords)
                     structure:SetAngles(angles)
-                    
+
                      player:AddResources(-cost)
-                    
+
                     if structureAbility:GetStoreBuildId() then
                         self.lastCreatedId = structure:GetId()
                     end
-                    
-                    -- self:TriggerEffects("spawn", {effecthostcoords = Coords.GetLookIn(origin, direction)} )
-                    
+
                     if structureAbility.OnStructureCreated then
                         structureAbility:OnStructureCreated(structure, lastClickedPosition)
                     end
-                    
+
                     self.timeLastDrop = Shared.GetTime()
-                    
+
                     return true
-                    
+
                 else
-                
+
                     player:TriggerInvalidSound()
                     DestroyEntity(structure)
-                    
+
                 end
-                
+
             else
                 player:TriggerInvalidSound()
             end
-            
+
         else
-        
+
             if not valid then
                 player:TriggerInvalidSound()
             elseif not enoughRes then
                 player:TriggerInvalidSound()
             end
-            
+
         end
-        
+
     end
-    
+
     return true
-    
+
 end
 
 function CombatBuilder:OnDropStructure(origin, direction, structureIndex, lastClickedPosition)
 
     local player = self:GetParent()
-        
+
     if player then
-    
-        local structureAbility = CombatBuilder.kSupportedStructures[structureIndex]        
-        if structureAbility then        
+
+        local structureAbility = CombatBuilder.kSupportedStructures[structureIndex]
+        if structureAbility then
              DropStructure(self, player, origin, direction, structureAbility, lastClickedPosition)
         end
-        
+
     end
-    
+
 end
 
 function CombatBuilder:CreateStructure(coords, player, structureAbility, lastClickedPosition)
     local created_structure = structureAbility:CreateStructure(coords, player, lastClickedPosition)
-    if created_structure then 
+    if created_structure then
         return created_structure
     else
         return CreateEntity(structureAbility:GetDropMapName(), coords.origin, player:GetTeamNumber())
@@ -371,9 +378,6 @@ local function FilterBabblersAndTwo(ent1, ent2)
     return function (test) return test == ent1 or test == ent2 or test:isa("Babbler") end
 end
 
--- Given a gorge player's position and view angles, return a position and orientation
--- for structure. Used to preview placement via a ghost structure and then to create it.
--- Also returns bool if it's a valid position or not.
 function CombatBuilder:GetPositionForStructure(startPosition, direction, structureAbility, lastClickedPosition)
 
     PROFILE("CombatBuilder:GetPositionForStructure")
@@ -385,78 +389,59 @@ function CombatBuilder:GetPositionForStructure(startPosition, direction, structu
 
     -- Trace short distance in front
     local trace = Shared.TraceRay(player:GetEyePos(), origin, CollisionRep.Default, PhysicsMask.AllButPCsAndRagdolls, FilterBabblersAndTwo(player, self))
-    
+
     local displayOrigin = trace.endPoint
-    
+
     -- If we hit nothing, trace down to place on ground
     if trace.fraction == 1 then
-    
+
         origin = startPosition + direction * range
         trace = Shared.TraceRay(origin, origin - Vector(0, range, 0), CollisionRep.Default, PhysicsMask.AllButPCsAndRagdolls, EntityFilterTwo(player, self))
-        
+
     end
-    
+
     -- If it hits something, position on this surface (must be the world or another structure)
     if trace.fraction < 1 then
-    
+
         if trace.entity == nil then
             validPosition = true
 		end
-        
+
         displayOrigin = trace.endPoint
-        
+
     end
-    
-    -- Can only be built on infestation
-    -- local requiresInfestation = LookupTechData(structureAbility.GetDropStructureId(), kTechDataRequiresInfestation)
-    -- if requiresInfestation and not GetIsPointOnInfestation(displayOrigin) then
-    
-    --     if self:GetActiveStructure().OverrideInfestationCheck then
-    --         validPosition = self:GetActiveStructure():OverrideInfestationCheck(trace)
-    --     else
-    --         validPosition = false
-    --     end
-        
-    -- end
-    
+
     if not structureAbility.AllowBackfacing() and trace.normal:DotProduct(GetNormalizedVector(startPosition - trace.endPoint)) < 0 then
-        validPosition = false
-    end    
-    
-    -- Don't allow dropped structures to go too close to techpoints and resource nozzles
-    if GetPointBlocksAttachEntities(displayOrigin) then
         validPosition = false
     end
 
-    -- Do not allow building too close to any PhaseGate (preview and actual build)
-    if validPosition and #GetEntitiesWithinRange("PhaseGate", displayOrigin, kPhaseGateBlockRadius) > 0 then
+    -- Don't allow dropped structures to go too close to techpoints and resource nozzles
+    -- UNLESS the structure attaches to those points (like Extractor)
+    local attachesToPoint = structureAbility.GetAttachesToPoint and structureAbility:GetAttachesToPoint()
+    if not attachesToPoint and GetPointBlocksAttachEntities(displayOrigin) then
         validPosition = false
     end
-    
+
     if not structureAbility:GetIsPositionValid(displayOrigin, player, trace.normal, lastClickedPosition, trace.entity) then
         validPosition = false
-    end    
-    
+    end
+
     -- Don't allow placing above or below us and don't draw either
     local structureFacing = Vector(direction)
-    
+
     if math.abs(Math.DotProduct(trace.normal, structureFacing)) > 0.9 then
         structureFacing = trace.normal:GetPerpendicular()
     end
-    
-    -- Coords.GetLookIn will prioritize the direction when constructing the coords,
-    -- so make sure the facing direction is perpendicular to the normal so we get
-    -- the correct y-axis.
+
     local perp = Math.CrossProduct( trace.normal, structureFacing )
     structureFacing = Math.CrossProduct( perp, trace.normal )
-    
+
     local coords = Coords.GetLookIn( displayOrigin, structureFacing, trace.normal )
-    
+
     if structureAbility.ModifyCoords then
         structureAbility:ModifyCoords(coords, lastClickedPosition)
     end
-    
-    -- Shared.Message(tostring(validPosition))
+
     return coords, validPosition, trace.entity
 
 end
@@ -464,7 +449,7 @@ end
 function CombatBuilder:OnDraw(player, previousWeaponMapName)
 
     Weapon.OnDraw(self, player, previousWeaponMapName)
-	
+
 	-- Attach weapon to parent's hand
     self:SetAttachPoint(Weapon.kHumanAttachPoint)
 
@@ -478,25 +463,25 @@ end
 function CombatBuilder:OnUpdateAnimationInput(modelMixin)
 
     PROFILE("CombatBuilder:OnUpdateAnimationInput")
-	
+
 	local parent = self:GetParent()
     local sprinting = parent ~= nil and HasMixin(parent, "Sprint") and parent:GetIsSprinting()
     local activity = (self:GetActiveStructure() ~= nil and not sprinting) and "primary" or "none"
-    
+
     modelMixin:SetAnimationInput("activity", activity)
     modelMixin:SetAnimationInput("welder", false)
-    
+
 end
 
 function CombatBuilder:UpdateViewModelPoseParameters(viewModel)
-    viewModel:SetPoseParam("welder", 0)    
+    viewModel:SetPoseParam("welder", 0)
 end
 
 function CombatBuilder:OnUpdatePoseParameters(viewModel)
 
     PROFILE("Welder:OnUpdatePoseParameters")
     self:SetPoseParam("welder", 0)
-    
+
 end
 
 -- for marine third person model pose, "builder" fits perfectly for this.
@@ -509,36 +494,20 @@ function CombatBuilder:ProcessMoveOnWeapon(input)
     -- Show ghost if we're able to create structure, and if menu is not visible
     local player = self:GetParent()
     if player then
-    
+
         if Server then
 
-            -- This is where you limit the number of entities that are alive
-			local team = player:GetTeam()
-            --local numAllowedSentries = LookupTechData(kTechId.MarineSentry, kTechDataMaxAmount, -1) 
-            --local numAllowedMiniArmories = LookupTechData(kTechId.WeaponCache, kTechDataMaxAmount, -1) 
-            -- local numAllowedPhaseGates = LookupTechData(kTechId.PhaseGate, kTechDataMaxAmount, -1) 
-            -- local numAllowedObservatories = LookupTechData(kTechId.Observatory, kTechDataMaxAmount, -1) 
+            local team = player:GetTeam()
 
-            --if numAllowedSentries >= 0 then     
-                self.numSentriesLeft = team:GetNumDroppedMarineStructures(player, kTechId.MarineSentry)           
-            --end
-   
-            --if numAllowedMiniArmories >= 0 then     
-                self.numMiniArmoriesLeft = team:GetNumDroppedMarineStructures(player, kTechId.WeaponCache)           
-            --end
-            
-            -- if numAllowedPhaseGates >= 0 then     
-            --     self.numPhaseGatesLeft = team:GetNumDroppedMarineStructures(player, kTechId.PhaseGate)           
-            -- end
-            
-            -- if numAllowedObservatories >= 0 then     
-            --     self.numObservatoriesLeft = team:GetNumDroppedMarineStructures(player, kTechId.Observatory)           
-            -- end
-            
+            self.numSentriesLeft = team:GetNumDroppedMarineStructures(player, kTechId.MarineSentry)
+            self.numMiniArmoriesLeft = team:GetNumDroppedMarineStructures(player, kTechId.WeaponCache)
+            self.numExtractorsLeft = team:GetNumDroppedMarineStructures(player, kTechId.Extractor)
+            self.numInfantryPortalsLeft = team:GetNumDroppedMarineStructures(player, kTechId.InfantryPortal)
+
         end
-        
-    end    
-    
+
+    end
+
 end
 
 function CombatBuilder:GetShowGhostModel()
@@ -547,7 +516,7 @@ end
 
 function CombatBuilder:GetGhostModelCoords()
     return self.ghostCoords
-end   
+end
 
 function CombatBuilder:GetIsPlacementValid()
     return self.placementValid
@@ -577,93 +546,101 @@ if Client then
         if player and self.activeStructure then
 
             self.ghostCoords, self.placementValid = self:GetPositionForStructure(player:GetEyePos(), viewDirection, self:GetActiveStructure(), self.lastClickedPosition)
-            
+
              if player:GetResources() < LookupTechData(self:GetActiveStructure():GetDropStructureId(), kTechDataPersonalCostKey) then
                  self.placementValid = false
              end
-        
+
+             -- Also invalidate placement when at max structure count
+             local structureAbility = self:GetActiveStructure()
+             local techId = structureAbility:GetDropStructureId()
+             local maxStructures = structureAbility:GetMaxStructures(player)
+             if maxStructures >= 0 then
+                 local numBuilt = self:GetNumStructuresBuilt(techId)
+                 if numBuilt >= maxStructures then
+                     self.placementValid = false
+                 end
+             end
+
         end
-        
+
     end
-    
+
     function CombatBuilder:CreateBuildMenu()
-    
-        if not self.buildMenu then        
-            self.buildMenu = GetGUIManager():CreateGUIScript("Combat/GUIMarineBuildMenu")            
+
+        if not self.buildMenu then
+            self.buildMenu = GetGUIManager():CreateGUIScript("Combat/GUIMarineBuildMenu")
         end
-        
+
     end
-    
+
     function CombatBuilder:DestroyBuildMenu()
 
         if self.buildMenu ~= nil then
-        
+
             GetGUIManager():DestroyGUIScript(self.buildMenu)
             self.buildMenu = nil
-        
+
         end
-    
+
     end
 
     function CombatBuilder:OnDestroy()
-    
-        self:DestroyBuildMenu()        
+
+        self:DestroyBuildMenu()
         Weapon.OnDestroy(self)
-        
+
     end
-    
+
     function CombatBuilder:OnKillClient()
         self.menuActive = false
     end
-    
+
     function CombatBuilder:OnDrawClient()
-    
+
         Weapon.OnDrawClient(self)
-        
-        -- We need this here in case we switch to it via Prev/NextWeapon keys
-        
-        -- Do not show menu for other players or local spectators.
+
         local player = self:GetParent()
         if player and player:GetIsLocalPlayer() and self:GetActiveStructure() == nil and Client.GetIsControllingPlayer() then
             self.menuActive = true
         end
-        
+
     end
-    
+
     local function UpdateGUI(self, player)
 
         local localPlayer = Client.GetLocalPlayer()
         if localPlayer == player then
             self:CreateBuildMenu()
         end
- 
+
         if self.buildMenu then
             self.buildMenu:SetIsVisible(player and localPlayer == player and player:isa("Marine") and self.menuActive)
         end
-    
+
     end
 
     function CombatBuilder:OnHolsterClient()
-    
+
         self.menuActive = false
         Weapon.OnHolsterClient(self)
-        
+
     end
-    
+
     function CombatBuilder:OnSetActive()
     end
-    
+
     function CombatBuilder:OverrideInput(input)
-    
+
         if self.buildMenu then
 
             -- Build menu is up, let it handle input
             if self.buildMenu:GetIsVisible() then
-            
+
                 local selected = false
                 input, selected = self.buildMenu:OverrideInput(input)
                 self.menuActive = not selected
-                
+
             else
 
                 -- If player wants to switch to this, open build menu immediately
@@ -675,17 +652,17 @@ if Client then
                 end
 
             end
-            
-        end    
-        
+
+        end
+
         return input
-        
+
     end
-    
+
     function CombatBuilder:OnUpdateRender()
-        UpdateGUI(self, self:GetParent())    
+        UpdateGUI(self, self:GetParent())
     end
-    
+
 end
 
 if Server then
@@ -693,15 +670,15 @@ if Server then
     function CombatBuilder:GetIsValidRecipient(recipient)
         return not recipient.isVirtual      --Don't give this to bot
     end
-    
+
     function CombatBuilder:GetDestroyOnKill()
         return true
     end
-    
+
     function CombatBuilder:GetSendDeathMessageOverride()
         return false
-    end 
-        
+    end
+
 end
 
 Shared.LinkClassToMap("CombatBuilder", CombatBuilder.kMapName, networkVars)

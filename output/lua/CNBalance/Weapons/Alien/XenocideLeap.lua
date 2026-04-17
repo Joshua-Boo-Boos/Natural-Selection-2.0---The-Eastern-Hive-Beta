@@ -72,14 +72,6 @@ end
 
 function XenocideLeap:OnDestroy()
 
-    if Server then
-        if self.XenocideSoundName then
-            self.XenocideSoundName:Stop()
-            DestroyEntity(self.XenocideSoundName)
-            self.XenocideSoundName = nil
-        end
-    end
-
     BiteLeap.OnDestroy(self)
 
     if Client then
@@ -186,7 +178,6 @@ function XenocideLeap:OnProcessMove(input)
                 player:Kill(player, self)
                 if self.XenocideSoundName then
                     self.XenocideSoundName:Stop()
-                    DestroyEntity(self.XenocideSoundName)
                     self.XenocideSoundName = nil
                 end
             end

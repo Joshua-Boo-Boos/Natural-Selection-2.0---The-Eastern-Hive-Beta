@@ -81,11 +81,8 @@ function FireMixin:OnDestroy()
 
     if Server then
 
-        if self.onFireSound then
-            self.onFireSound:Stop()
-            DestroyEntity(self.onFireSound)
-            self.onFireSound = nil
-        end
+        -- The onFireSound was already destroyed at this point, clear the reference.
+        self.onFireSound = nil
 
     end
 
@@ -240,7 +237,9 @@ function FireMixin:UpdateFireState()
 end
 
 function FireMixin:OnProcessMove()
-    self:UpdateFireState()
+    if Client and self.isOnFire then
+        self:UpdateFireState()
+    end
 end
 
 -- using a timed callback to bypass the parents update rate

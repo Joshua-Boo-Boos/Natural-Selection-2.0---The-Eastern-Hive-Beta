@@ -4,7 +4,7 @@
         bountyActive = true,
         resourceEfficiency = true,
         recentWinsBalance = true,
-        deadlockInitialTime = 2700,
+        deadlockInitialTime = 99999,  -- DISABLED (99999 = ~27h, effectively never). Set to 2100 (35min) to re-enable. CN uses 1800, old EN used 2700.
         deadlockRequireMinPlayers = true,
         deadlockMinPlayers = 10
      }, true)
@@ -123,6 +123,11 @@
 
          -- Clear out obstacles from the navmesh before we start repopualating the scene
          RemoveAllObstacles()
+
+         -- perf: clear cached babbler-by-owner lists to prevent stale references across rounds
+         if Babbler and Babbler.ClearBabblersByOwner then
+             Babbler.ClearBabblersByOwner()
+         end
 
          -- Build list of tech points
          local techPoints = EntityListToTable(Shared.GetEntitiesWithClassname("TechPoint"))
