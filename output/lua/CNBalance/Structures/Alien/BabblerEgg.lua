@@ -265,13 +265,6 @@ if Server then
         -- end
     end
 
-    -- Count babblers for an owner using the Babbler.lua per-owner cache (O(1) lookup)
-    -- instead of scanning all team babblers every time.
-    local function CountBabblersByOwner(owner)
-        if not owner then return 0 end
-        return Babbler.GetBabblerCountForOwner(owner:GetId())
-    end
-
     function BabblerEgg:TryBabblerHatch()
         local owner = self:GetOwner()
         if not owner then
@@ -280,7 +273,7 @@ if Server then
         end
 
         if self:GetIsBuilt()
-                and CountBabblersByOwner(owner) < kMaxBabblerCount
+                and (not owner.GetBabblerCount or owner:GetBabblerCount() < kMaxBabblerCount)
         then
             local otherTeam = GetEnemyTeamNumber(self:GetTeamNumber())
             local allEnemies = GetEntitiesWithMixinForTeamWithinRange("Live", otherTeam, self:GetOrigin(), kBabblerEggHatchRadius)
@@ -318,10 +311,10 @@ if Server then
         if not self:GetIsBuilt() then return end
 
         local owner = self:GetOwner()
-        if  owner and attacker then
+        if  owner and owner.GetBabblerCount and attacker then
             local spawned = 0
             for i=1 ,kBabblerExplodeAmount ,1 do
-                if CountBabblersByOwner(owner) >= kMaxBabblerCount then break end
+                if owner:GetBabblerCount() >= kMaxBabblerCount then break end
                 local babbler = self:HatchBabbler(owner)
                 babbler:SetMoveType(kBabblerMoveType.Attack, attacker, attacker:GetOrigin(), true)
                 spawned = spawned + 1

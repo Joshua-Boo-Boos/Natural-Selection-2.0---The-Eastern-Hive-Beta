@@ -57,5 +57,5 @@ function SporeMineAbility:GetDropMapName()
 end
 
 function SporeMineAbility:GetMaxStructures(biomass)
-    return biomass >= 8 and 2 or 1
+    return math.min(2, 1 + math.floor(biomass / 12))
 end

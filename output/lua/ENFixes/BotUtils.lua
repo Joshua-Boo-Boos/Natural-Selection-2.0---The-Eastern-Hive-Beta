@@ -1,8 +1,6 @@
 function GetBotWalkDistance(botPlayerOrPos, targetEntOrPos, targetLocationHint)
     PROFILE("GetBotWalkDistance")
 
-    if not botPlayerOrPos or not targetEntOrPos then return 0 end
-
     local botLocationName
     local botPos
 
@@ -64,17 +62,6 @@ function GetBotWalkDistance(botPlayerOrPos, targetEntOrPos, targetLocationHint)
     local exitDist = (targetPos - exitGatePos):GetLength()
 
     return enterDist + gatewayDistance + exitDist
-end
-
--- Nil-guard GetTeamBrain: vanilla asserts then calls team:GetTeamBrain()
--- which crashes during entity init before the brain is assigned.
-local _originalGetTeamBrain = GetTeamBrain
-function GetTeamBrain(teamNum)
-    local gamerules = GetGamerules()
-    if not gamerules then return nil end
-    local team = gamerules:GetTeam(teamNum)
-    if not team or not team.GetTeamBrain then return nil end
-    return team:GetTeamBrain()
 end
 
 -- Hopefully this fixes the bot problem regarding "attempt to index local 'gatewayDistTable' (a nil value)"

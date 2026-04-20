@@ -103,7 +103,6 @@ debug.appendtoenum(kTechId, "Rappel")
 debug.appendtoenum(kTechId, "AcidSpray")
 debug.appendtoenum(kTechId, "ProwlerStructureAbility")
 
-
 debug.appendtoenum(kTechId, "Silence")
 debug.appendtoenum(kTechId, "TempestHive")
 debug.appendtoenum(kTechId, "Echo")

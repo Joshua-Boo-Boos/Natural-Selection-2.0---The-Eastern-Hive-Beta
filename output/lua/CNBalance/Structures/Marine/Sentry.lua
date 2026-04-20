@@ -203,8 +203,7 @@ function Sentry:OnCreate()
     self:SetLagCompensated(false)
     self:SetPhysicsType(PhysicsType.Kinematic)
     self:SetPhysicsGroup(PhysicsGroup.MediumStructuresGroup)
-    -- perf: 10Hz is sufficient for sentry targeting (avg ROF is ~8/sec, turn speed is time-based)
-    self:SetUpdates(true, .1)
+    self:SetUpdates(true, .05)
 
 end
 
@@ -259,9 +258,12 @@ function Sentry:OnDestroy()
 
     ScriptActor.OnDestroy(self)
 
-    -- The attackSound was already destroyed at this point, clear the reference.
     if Server then
-        self.attackSound = nil
+        if self.attackSound then
+            self.attackSound:Stop()
+            DestroyEntity(self.attackSound)
+            self.attackSound = nil
+        end
     end
 
 end
@@ -431,6 +433,11 @@ if Server then
 
     end
 
+    -- checking at range 1.8 for overlapping the radius a bit. no LOS check here since i think it would become too expensive with multiple sentries
+    function Sentry:GetFindsSporesAt(position)
+        return #GetEntitiesWithinRange("SporeCloud", position, kSporesDustCloudRadius * 0.75) > 0
+    end
+
     function Sentry:Confuse(duration)
 
         if not self.confused then
@@ -446,10 +453,8 @@ if Server then
 
 
     local kSporesConfusionDelay = 0.2
-    local kSporeCheckRadius = kSporesDustCloudRadius * 0.75
 
-    -- perf: single spatial query per sentry instead of up to 5 per check
-    -- Check if any spore cloud intersects the line of fire from sentry to target
+    -- check for spores in our way every kSporesConfusionDelay seconds
     local function UpdateConfusedState(self, target)
 
         if not self.confused and target then
@@ -465,30 +470,25 @@ if Server then
                 local eyePos = self:GetEyePos()
                 local toTarget = target:GetOrigin() - eyePos
                 local distanceToTarget = toTarget:GetLength()
+                toTarget:Normalize()
 
-                -- One query: find all spore clouds within sentry range + spore radius
-                local sporeClouds = GetEntitiesWithinRange("SporeCloud", eyePos, self.kRange + kSporeCheckRadius)
+                local stepLength = 3
+                local numChecks = math.ceil(self.kRange/stepLength)
 
-                if #sporeClouds > 0 then
-                    toTarget:Normalize()
+                -- check every few meters for a spore in the way, min distance 3 meters, max 12 meters (but also check sentry eyepos)
+                for i = 0, numChecks do
 
-                    for _, spore in ipairs(sporeClouds) do
-                        -- Project spore position onto the sentry-to-target line
-                        local toSpore = spore:GetOrigin() - eyePos
-                        local projDist = toSpore:DotProduct(toTarget)
-
-                        -- Only check spores between sentry and target
-                        if projDist >= -kSporeCheckRadius and projDist <= distanceToTarget + kSporeCheckRadius then
-                            -- Perpendicular distance from spore center to the firing line
-                            local projPoint = eyePos + toTarget * math.max(0, math.min(projDist, distanceToTarget))
-                            local perpDist = (spore:GetOrigin() - projPoint):GetLength()
-
-                            if perpDist < kSporeCheckRadius then
-                                self:Confuse(self.kConfuseDuration)
-                                break
-                            end
-                        end
+                    -- stop when target has reached, any spores would be behind
+                    if distanceToTarget < (i * stepLength) then
+                        break
                     end
+
+                    local checkAtPoint = eyePos + toTarget * i * stepLength
+                    if self:GetFindsSporesAt(checkAtPoint) then
+                        self:Confuse(self.kConfuseDuration)
+                        break
+                    end
+
                 end
 
             end
@@ -507,8 +507,7 @@ if Server then
 
         local time = Shared.GetTime()
 
-        -- perf: battery state rarely changes, 1s check balances responsiveness vs cost
-        if self.lastBatteryCheckTime == nil or (time > self.lastBatteryCheckTime + 1) then
+        if self.lastBatteryCheckTime == nil or (time > self.lastBatteryCheckTime + 0.5) then
 
             -- Update if we're powered or not
             self.attachedToBattery = false
@@ -600,7 +599,7 @@ if Server then
 
             end
 
-            if not GetIsUnitActive(self) or self.confused or not self.attacking or not self.attachedToBattery then
+            if not GetIsUnitActive() or self.confused or not self.attacking or not self.attachedToBattery then
 
                 if self.attackSound:GetIsPlaying() then
                     self.attackSound:Stop()

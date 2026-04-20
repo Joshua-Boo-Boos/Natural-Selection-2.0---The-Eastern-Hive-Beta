@@ -249,9 +249,12 @@ function MarineSentry:OnDestroy()
 
     ScriptActor.OnDestroy(self)
     
-    -- The attackSound was already destroyed at this point, clear the reference.
     if Server then
-        self.attackSound = nil
+        if self.attackSound then
+            self.attackSound:Stop()
+            DestroyEntity(self.attackSound)
+            self.attackSound = nil
+        end
     end
     
 end

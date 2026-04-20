@@ -1,6 +1,6 @@
 
 function ClogAbility:GetMaxStructures(biomass)
-    return math.min(12, 6 + math.floor((biomass - 1) / 3) * 2)
+    return math.min(12, 6 + math.floor(biomass / 2))
 end
 
 local kGreaterDistance = 1.5

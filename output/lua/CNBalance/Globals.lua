@@ -55,25 +55,9 @@ function GetPlayersAboveLimit(team)
     return math.max(0,info.playerCount - kMatchMinPlayers)
 end
 
--- Respawn scaling is DISABLED. Base respawn times only (kMarineRespawnTime / kAlienSpawnTime).
--- To re-enable CN-style scaling, see the commented implementation below.
-function GetRespawnTimeExtend(player, teamIndex, _gameLength)
+-- MODIFIED: Function now returns 0 to disable all respawn time scaling
+-- Respawn times will always be the base values (kMarineRespawnTime = 9, kAlienSpawnTime = 10)
+function GetRespawnTimeExtend(player,teamIndex, _gameLength)
+    -- All scaling removed - return 0 for constant respawn times
     return 0
 end
-
---[[ CN-style respawn scaling (kept for reference):
-function GetRespawnTimeExtend(player, teamIndex, _gameLength)
-    local respawnExtension = 0
-    local teamExtension = math.max( GetPlayersAboveLimit(teamIndex) , 0 ) * 1
-    for k, v in pairs(kTechRespawnTimeExtension) do
-        if GetHasTech(player, k) then
-            teamExtension = teamExtension + v
-        end
-    end
-    local info = GetTeamInfoEntity(teamIndex)
-    if info and info.numInfantryPortals then
-        teamExtension = teamExtension + math.max(info.numInfantryPortals - 2, 0) * 1
-    end
-    return respawnExtension + teamExtension
-end
---]]

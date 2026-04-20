@@ -140,6 +140,7 @@ kShowAsClass["Alien"] =
     GUIEggDisplay = true, 
     GUIRegenerationFeedback = true, 
     GUIBioMassDisplay = true,
+    GUIUpgradeChamberDisplay = true, 
     GUIAuraDisplay = true,
     GUIHiveStatus = true,
     GUILifeformPopup = true,

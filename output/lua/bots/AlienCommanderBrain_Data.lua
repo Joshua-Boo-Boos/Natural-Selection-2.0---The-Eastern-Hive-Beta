@@ -5,20 +5,6 @@ Script.Load("lua/bots/AlienCommanderBrain_TechPathData.lua")
 Script.Load("lua/bots/AlienCommanderBrain_Utility.lua")
 Script.Load("lua/bots/AlienCommanderBrain_Senses.lua")
 
--- Restored from removed CNBalance/Alien_Upgrade.lua — required by bot tech-path logic
-if not GetHasPrereqs then
-    function GetHasPrereqs(teamNumber, techId)
-        local techTree = GetTechTree(teamNumber)
-        if techTree then
-            local techNode = techTree:GetTechNode(techId)
-            if techNode then
-                return techTree:GetHasTech(techNode:GetPrereq1()) and techTree:GetHasTech(techNode:GetPrereq2())
-            end
-        end
-        return false
-    end
-end
-
 local kAlienComActionTypes = enum({
 
     "WaitForHiveDrop", -- Waiting for Hive drop after decision, for a warning period. -- TODO: This blocks all other actions, use a "tres deficit/save" mechanism instead

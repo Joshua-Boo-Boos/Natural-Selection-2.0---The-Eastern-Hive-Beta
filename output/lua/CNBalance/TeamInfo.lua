@@ -459,13 +459,7 @@ end
 local kScalarFactorForPResShare = 0.5
 
 function TeamInfo:OnUpdate(deltaTime)
-    -- perf: throttled UpdateInfo from every tick to 0.25s
-    -- Network vars are quantized floats/ints; sub-frame precision is not needed.
-    local now = Shared.GetTime()
-    if not self.nextUpdateInfoTime or now >= self.nextUpdateInfoTime then
-        self.nextUpdateInfoTime = now + 0.25
-        self:UpdateInfo()
-    end
+    self:UpdateInfo()
     if Server then
         -- Every 30 seconds: Donors with >= 100 p-res give 5 * kScalarFactorForPResShare p-res (up to 5 donations)
         -- to the 5 lowest p-res players with < 95 p-res.

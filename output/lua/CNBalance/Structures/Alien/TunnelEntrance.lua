@@ -168,12 +168,6 @@ function TunnelEntrance:OnInitialized()
 
         self.onNormalInfestation = false
 
-        -- perf: initialize tech upgrade state and poll every 2s instead of every tick
-        self.hasShiftUpgrade = GetHasTech(self, kTechId.ShiftTunnel)
-        self.hasShadeUpgrade = GetHasTech(self, kTechId.ShadeTunnel)
-        self.hasCragUpgrade = GetHasTech(self, kTechId.CragTunnel)
-        self:AddTimedCallback(TunnelEntrance.UpdateTechUpgrades, 2.0)
-
     elseif Client then
 
         InitMixin(self, UnitStatusMixin)
@@ -934,19 +928,13 @@ function TunnelEntrance:OnResearchComplete(techId)
 end
 --
 
--- perf: tech checks moved to a 2-second timed callback (saves ~528 GetHasTech calls/sec)
-function TunnelEntrance:UpdateTechUpgrades()
-    self.hasShiftUpgrade = GetHasTech(self, kTechId.ShiftTunnel)
-    self.hasShadeUpgrade = GetHasTech(self, kTechId.ShadeTunnel)
-    self.hasCragUpgrade = GetHasTech(self, kTechId.CragTunnel)
-    return self:GetIsAlive()
-end
-
 local baseOnUpdate = TunnelEntrance.OnUpdate
 function TunnelEntrance:OnUpdate(deltaTime)
     baseOnUpdate(self,deltaTime)
     if Server then
-        -- camouflaged stays per-tick: depends on combat state which changes frequently
+        self.hasShiftUpgrade = GetHasTech(self,kTechId.ShiftTunnel)
+        self.hasShadeUpgrade = GetHasTech(self,kTechId.ShadeTunnel)
+        self.hasCragUpgrade = GetHasTech(self,kTechId.CragTunnel)
         self.camouflaged = self.hasShadeUpgrade and not self:GetIsInCombat()
     end
 end
@@ -963,8 +951,7 @@ end
 function TunnelEntrance:GetMatureMaxArmor()
     local armor = self:GetIsInfested() and kMatureInfestedTunnelEntranceArmor or kMatureTunnelEntranceArmor
     
-    -- fix: use cached value (updated every 2s by UpdateTechUpgrades) for consistency
-    if self.hasCragUpgrade then
+    if GetHasTech(self,kTechId.CragTunnel) then
         armor = armor + kCragTunnelArmorAdditive
     end
 

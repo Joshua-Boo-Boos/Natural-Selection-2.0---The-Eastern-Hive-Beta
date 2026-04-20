@@ -390,31 +390,20 @@ if Server then
                 self.shiftHiveBiomassPreserve = team:GetBioMassPreserve(kTechId.ShiftHive)
                 self.shadeHiveBiomassPreserve = team:GetBioMassPreserve(kTechId.ShadeHive)
                 self.cragHiveBiomassPreserve = team:GetBioMassPreserve(kTechId.CragHive)
-                -- perf: throttled structure count queries from every tick to 0.5s
-                -- These iterate all entities of each type; counts change at most a few times per minute.
-                local now = Shared.GetTime()
-                if not self.nextStructCountUpdate or now >= self.nextStructCountUpdate then
-                    self.nextStructCountUpdate = now + 0.5
-                    self.veilLevel = Clamp(GetBuiltStructureCount("Veil", team:GetTeamNumber()), 0, 3)
-                    self.spurLevel = Clamp(GetBuiltStructureCount("Spur", team:GetTeamNumber()), 0, 3)
-                    self.shellLevel = Clamp(GetBuiltStructureCount("Shell", team:GetTeamNumber()), 0, 3)
-                    self.shiftCount = GetBuiltStructureCount("Shift", team:GetTeamNumber())
-                    self.shadeCount = GetBuiltStructureCount("Shade", team:GetTeamNumber())
-                    self.cragCount = GetBuiltStructureCount("Crag", team:GetTeamNumber())
-                end
+                self.veilLevel = Clamp(GetBuiltStructureCount("Veil", team:GetTeamNumber()), 0, 3)
+                self.spurLevel = Clamp(GetBuiltStructureCount("Spur", team:GetTeamNumber()), 0, 3)
+                self.shellLevel = Clamp(GetBuiltStructureCount("Shell", team:GetTeamNumber()), 0, 3)
+                self.shiftCount = GetBuiltStructureCount("Shift", team:GetTeamNumber())
+                self.shadeCount = GetBuiltStructureCount("Shade", team:GetTeamNumber())
+                self.cragCount = GetBuiltStructureCount("Crag", team:GetTeamNumber())
             end
         end
         
-        -- perf: throttled location/lifeform/commander scans from every tick to 0.5s
-        -- These involve multiple GetEntitiesMatchAnyTypesForTeam calls that don't change at tick rate.
-        local now = Shared.GetTime()
-        if not self.nextSlotUpdate or now >= self.nextSlotUpdate then
-            self.nextSlotUpdate = now + 0.5
-            self:ResetAllLocationSlotsData()
-            self:UpdateCommanderData()
-            self:UpdateAllLocationsSlotData()
-            self:UpdateLifeformsData()
-        end
+        self:ResetAllLocationSlotsData()
+        self:UpdateCommanderData()
+        self:UpdateAllLocationsSlotData()
+        
+        self:UpdateLifeformsData()
         
     end
     
