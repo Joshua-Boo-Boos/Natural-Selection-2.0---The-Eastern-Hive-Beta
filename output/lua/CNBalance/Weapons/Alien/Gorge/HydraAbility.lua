@@ -4,5 +4,5 @@ function HydraStructureAbility:GetEnergyCost()
 end
 
 function HydraStructureAbility:GetMaxStructures(biomass)
-    return math.min(4, 2 + math.floor(biomass / 6))
+    return 3 + math.floor(biomass / 4)
 end

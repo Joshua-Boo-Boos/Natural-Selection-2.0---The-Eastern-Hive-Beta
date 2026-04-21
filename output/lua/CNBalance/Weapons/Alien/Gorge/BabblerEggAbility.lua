@@ -1,7 +1,7 @@
 local kDownCheck =  Vector(0, -50, 0)       --Shouldnt place that high as heel? 
 
 function BabblerEggAbility:GetMaxStructures(biomass)
-    return math.min(1, math.floor(biomass / 5))
+    return 1 + math.floor(biomass / 5)
 end
 
 local kExtents = Vector(0.3, 0.3, 0.3)
