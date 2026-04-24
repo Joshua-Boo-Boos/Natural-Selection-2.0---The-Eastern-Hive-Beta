@@ -151,7 +151,7 @@ kVokexDamageReduction = {
 }
 
 --700 450 50
-kOnosHealth = 700    kOnosArmor = 450    kOnosPointValue = 30 kOnosHealtPerBioMass = 50 
+kOnosHealth = 700    kOnosArmor = 525    kOnosPointValue = 30 kOnosHealtPerBioMass = 100
 kOnosBoneShieldDefaultReduction = 0.2
 kOnosBoneShieldDamageReduction = {
     --["HeavyMachineGun"] = 0.25,
@@ -191,7 +191,7 @@ kGorgeBaseCarapaceUpgradeAmount = 25    kGorgeCarapaceArmorPerBiomass = 1.25
 kProwlerBaseCarapaceUpgradeAmount = 20  kProwlerCarapaceArmorPerBiomass = 2.5 -- kProwlerCarapaceArmorPerBiomass was 1.25 but to compensate for the 10AP loss above make kProwlerCarapaceArmorPerBiomass = 2.5 --kProwlerArmorFullyUpgradedAmount = 28
 kLerkBaseCarapaceUpgradeAmount  = 25    kLerkCarapaceArmorPerBiomass  = 1.25
 kFadeBaseCarapaceUpgradeAmount  = 22.5    kFadeCarapaceArmorPerBiomass  = 2.5
-kOnosBaseCarapaceUpgradeAmount  = 180   kOnosCarapaceArmorPerBiomass  = 10
+kOnosBaseCarapaceUpgradeAmount  = 280   kOnosCarapaceArmorPerBiomass  = 15 -- 180 10
 kVokexBaseCarapaceUpgradeAmount = 22.5    kVokexCarapaceArmorPerBiomass = 2.5
 
 --4000 750 6000 1400

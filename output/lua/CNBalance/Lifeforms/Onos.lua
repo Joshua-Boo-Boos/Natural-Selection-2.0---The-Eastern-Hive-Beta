@@ -110,10 +110,12 @@ function Onos:GetMaxSpeed(possible)
 
     if GetHasCarapaceUpgrade(self) then
         local shellLevel = self:GetShellLevel()
-        -- chargeSpeed = chargeSpeed - shellLevel * 0.66
-        -- normalSpeed = normalSpeed - shellLevel * 0.2
-        chargeSpeed = chargeSpeed - shellLevel * 0.5
-        normalSpeed = normalSpeed - shellLevel * 0.15
+        chargeSpeed = chargeSpeed - shellLevel * 0.66
+        normalSpeed = normalSpeed - shellLevel * 0.2
+
+        -- Before the EHP buff and the Devour gives EHP and Knife damage multiplier against the Onos while devoured
+        -- chargeSpeed = chargeSpeed - shellLevel * 0.5
+        -- normalSpeed = normalSpeed - shellLevel * 0.15
     end
 
     if self:GetIsDevouring() then

@@ -363,7 +363,7 @@ kLerkCost = 21
 kLerkEggCost = 30
 kFadeCost = 37
 kFadeEggCost = 50
-kOnosCost = 60
+kOnosCost = 65
 kOnosEggCost = 100
 
 kTunnelEntranceCost = 7

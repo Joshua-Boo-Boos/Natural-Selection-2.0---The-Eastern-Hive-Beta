@@ -28,6 +28,8 @@ local networkVars =
 
 AddMixinNetworkVars(StompMixin, networkVars)
 
+local kDevourGiveEHPScalar = 2.5
+
 local function UpdateDevour(self)
 
     local onos = self:GetParent()    
@@ -52,6 +54,9 @@ local function UpdateDevour(self)
                     onos:AddEnergy(Devour.energyRate * deltaTime)
 
                     player:DeductHealth(damage, onos, self , true)
+
+                    -- ADD DEVOUR - GIVES EHP - function LiveMixin:AddHealth(health, playSound, noArmor, hideEffect, healer, useEHP)
+                    onos:AddHealth(kDevourGiveEHPScalar * damage, true, false, false, onos, true)
 
 					self.devouringScalar = 1 - player:GetHealthFraction()
                     player.devouringScalar = self.devouringScalar  
@@ -293,6 +298,19 @@ end
 
 function Devour:DevourPlayer(targetPlayer)
 
+    -- Make it so if the target player has a knife they do more damage to the onos when punching
+    local targetHasKnife = false
+    if targetPlayer.GetWeapons then
+        local weaponList = targetPlayer:GetWeapons()
+        for _, weapon in ipairs(weaponList) do
+            if weapon.isa then
+                if weapon:isa("Knife") then
+                    targetHasKnife = true
+                end
+            end
+        end
+    end
+
 	-- Look up and remember old values
     targetPlayer:DropAllWeapons()
 
@@ -317,7 +335,12 @@ function Devour:DevourPlayer(targetPlayer)
 	if owner then
 		owner:SwitchWeapon(1)
 	end
-    
+
+    if targetHasKnife then
+        devouredPlayer.hasKnife = true
+    else
+        devouredPlayer.hasKnife = false
+    end    
 end
 
 

@@ -21,6 +21,7 @@ local kPunchSoundRight = PrecacheAsset("sound/ns2plus.fev/common/marine/onos_pun
 local kWoundSound = PrecacheAsset("sound/NS2.fev/marine/common/wound")
 local kRange = 0.0001
 local kPunchSelfDamage = 5
+local kHasKnifePunchDamageScalar = 3
 
 local networkVars =
 {
@@ -147,8 +148,13 @@ function DevouredViewModel:OnTag(tagName)
 			local onos = Shared.GetEntity(parent:GetDevouringOnosId())
 			local coords = self:GetParent():GetViewCoords().origin + Vector(0,-40,0.6)
 			if onos then
-				self:DoDamage(kDevourPunchDamage, onos, coords, nil, "none")
-                parent:DeductHealth(kPunchSelfDamage, onos, self , true)
+				if parent.hasKnife == true then
+					self:DoDamage(kHasKnifePunchDamageScalar * kDevourPunchDamage, onos, coords, nil, "none")
+					parent:DeductHealth(kPunchSelfDamage, onos, self , true)
+				elseif not parent.hasKnife or parent.hasKnife == false then
+					self:DoDamage(kDevourPunchDamage, onos, coords, nil, "none")
+					parent:DeductHealth(kPunchSelfDamage, onos, self , true)
+				end
                 --[[if Server then
                     Print(ToString(Shared.GetTime()))
                 end--]]
