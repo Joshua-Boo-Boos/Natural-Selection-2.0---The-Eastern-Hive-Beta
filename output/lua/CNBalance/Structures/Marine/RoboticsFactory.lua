@@ -1,5 +1,11 @@
 
 
+local baseOnTag = RoboticsFactory.OnTag
+function RoboticsFactory:OnTag(tagName)
+    if not self:GetIsAlive() then return end
+    baseOnTag(self, tagName)
+end
+
 function RoboticsFactory:GetTechButtons(techId)
 
     local techButtons = {  kTechId.ARC, kTechId.None, kTechId.None, kTechId.None,
