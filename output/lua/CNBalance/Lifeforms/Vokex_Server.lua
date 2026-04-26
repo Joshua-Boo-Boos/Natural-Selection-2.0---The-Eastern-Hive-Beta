@@ -7,6 +7,8 @@
 -- //
 -- // ========= For more information, visit us at http://www.unknownworlds.com =====================
 
+Script.Load("lua/CNBalance/Weapons/Alien/ReadyRoomShadowStep.lua")
+
 function Vokex:InitWeapons()
 
     Alien.InitWeapons(self)

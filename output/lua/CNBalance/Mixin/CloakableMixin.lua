@@ -188,7 +188,7 @@ local function UpdateCloakState(self, deltaTime)
     UpdateDesiredCloakFraction(self, deltaTime)
 
     -- Animate towards desired/internal cloak fraction (so we never "snap")
-    local rate = (self.desiredCloakFraction > self.cloakFraction) and CloakableMixin.kCloakRate * (self.cloakRate / 3) or CloakableMixin.kUncloakRate
+    local rate = (self.desiredCloakFraction > self.cloakFraction) and CloakableMixin.kCloakRate * (math.max(self.cloakRate, 1) / 3) or CloakableMixin.kUncloakRate
 
     local newCloak = Clamp(Slerp(self.cloakFraction, self.desiredCloakFraction, deltaTime * rate), 0, 1)
 
