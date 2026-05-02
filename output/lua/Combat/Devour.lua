@@ -8,7 +8,13 @@ Devour.kMapName = "devour"
 local kAnimationGraph = PrecacheAsset("models/alien/onos/onos_view.animation_graph")
 
 Devour.kAttackAnimationLength = 0.9 -- short cooldown
-Devour.kEatCoolDown = 6.5           -- long cooldown
+
+-- Why a long cooldown? One Onos versus two Marines results in
+-- one marine being devoured for a while and the cooldown will elapse
+-- before the marine is released but the check stops a second marine
+-- from being devoured while the first marine is still being devoured?
+Devour.kEatCoolDown = 1.0           -- cooldown after marine is released or dies
+local kMinDevourHoldTime = 1.0      -- minimum time Onos must hold devour before manual release
 Devour.kInitialDamage = 50 --40
 Devour.damage = 5 --33 --40 per second
 Devour.energyRate = 0 --kEnergyUpdateRate * 14
@@ -18,21 +24,23 @@ local kAttackOriginDistance = 1.7
 local kAttackRange = 2 --1.7
 local kDevourUpdateRate = 0.183 --0.15
 
+local kDevourMarineManualReleaseSpeed = 4
+
 local networkVars =
 {
-    attackButtonPressed = "private compensated boolean",
+    attackButtonPressed = "boolean",
     eatingPlayerId = "entityid",
     devouringScalar = "float (0 to 1 by .01)",
-    timeDevourEnd = "private compensated time",
+    timeDevourEnd = "time",
 }
 
 AddMixinNetworkVars(StompMixin, networkVars)
 
-local kDevourGiveEHPScalar = 2.5
+local kDevourGiveEHPScalar = 2
 
 local function UpdateDevour(self)
 
-    local onos = self:GetParent()    
+    local onos = self:GetParent()
     
     if onos and (not onos:isa("Onos") or not onos:GetIsAlive()) then
     
@@ -58,7 +66,8 @@ local function UpdateDevour(self)
                     -- ADD DEVOUR - GIVES EHP - function LiveMixin:AddHealth(health, playSound, noArmor, hideEffect, healer, useEHP)
                     onos:AddHealth(kDevourGiveEHPScalar * damage, true, false, false, onos, true)
 
-					self.devouringScalar = 1 - player:GetHealthFraction()
+                    -- devouringScalar drives the "goop eaten" visual on the devoured player.
+                    self.devouringScalar = 1 - player:GetHealthFraction()
                     player.devouringScalar = self.devouringScalar  
 
                     self.lastDevourTime = timeNow
@@ -66,12 +75,14 @@ local function UpdateDevour(self)
                     self.devouringScalar = 0
                     self.eatingPlayerId = 0
                     self.lastDevourTime = nil
+                    self.timeDevourEnd = Shared.GetTime() + Devour.kEatCoolDown
                 end
 
             else
                 self.devouringScalar = 0
                 self.eatingPlayerId = 0
                 self.lastDevourTime = nil
+                self.timeDevourEnd = Shared.GetTime() + Devour.kEatCoolDown
             end
         end 
     end   
@@ -87,6 +98,8 @@ function Devour:OnCreate()
     self.devouringScalar = 0
     self.eatingPlayerId = 0
     self.timeDevourEnd = 0
+    self.timeDevourStart = 0
+    self.hasAttackedSinceLastPress = false
     
 	InitMixin(self, StompMixin)
 
@@ -105,37 +118,119 @@ local function ClearPlayerNow(player)
 	if player.Replace and player:GetIsAlive() then
 		local oldHealth = player:GetHealth()
 		local oldArmor = player:GetArmor()
-        local newvelocity = player:GetVelocity()
-        local playerExtents = player:GetExtents()
-        local trace = Shared.TraceCapsule(player:GetOrigin(),
-            player:GetOrigin() + GetNormalizedVector(newvelocity),
-            math.max(playerExtents.x, playerExtents.z), playerExtents.y,
-            CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
-            
-		newPlayer = player:Replace(player.previousMapName, player:GetTeamNumber(), false, trace.endPoint )
-		newPlayer:DevourEscape()
-		newPlayer:SetHealth(oldHealth)
-		newPlayer:SetArmor(oldArmor)
-        newPlayer:SetVelocity(newvelocity)
+        local playerHadWelder = player.hasWelder == true
+        local onos = Shared.GetEntity(player:GetDevouringOnosId())
+        local onosAlive = onos and onos:GetIsAlive() or false
+        if onos and onosAlive then
+            local onosViewDirection = onos:GetViewCoords().zAxis
+            local endPoint = onos:GetEyePos() + onosViewDirection * 1.7
+            -- The extents of the Marine are Vector(0.4, 1.7, 0.4)
+            local isBlockingWallTraceCapsule = Shared.TraceCapsule(onos:GetEyePos(), endPoint, 0.2, 1.7, CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
+            if isBlockingWallTraceCapsule.fraction == 1 then
+                local isEnoughSpaceTraceCapsule = Shared.TraceCapsule(endPoint, endPoint, 0.2, 1.7, CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
+                if isEnoughSpaceTraceCapsule.fraction == 1 then
+                    player:SetOrigin(endPoint)
+                    local newPlayer = player:Replace(player.previousMapName, player:GetTeamNumber(), false, endPoint)
+                    newPlayer:DevourEscape()
+                    newPlayer:SetHealth(oldHealth)
+                    newPlayer:SetArmor(oldArmor)
+                    newPlayer:DisableGroundMove(0.15)
+                    newPlayer:SetVelocity(onos:GetVelocity() + onosViewDirection * kDevourMarineManualReleaseSpeed)
 
-        newPlayer:DisableGroundMove(0.15)
-    
-        local oldWeapon1 = newPlayer:GetWeaponInHUDSlot(1)
-        if oldWeapon1 then                
-            newPlayer:RemoveWeapon(oldWeapon1)
-            DestroyEntity(oldWeapon1)
+                    local oldWeapon1 = newPlayer:GetWeaponInHUDSlot(1)
+                    if oldWeapon1 then
+                        newPlayer:RemoveWeapon(oldWeapon1)
+                        DestroyEntity(oldWeapon1)
+                    end
+
+                    local oldWeapon2 = newPlayer:GetWeaponInHUDSlot(2)
+                    if oldWeapon2 then
+                        newPlayer:SetActiveWeapon(oldWeapon2:GetMapName())
+                    end
+
+                    if playerHadWelder then
+                        if Server then
+                            if newPlayer.GetWeapons then
+                                local foundWelder = false
+                                local weapons = newPlayer:GetWeapons()
+                                for _, weapon in ipairs(weapons) do
+                                    if weapon:isa("Welder") then
+                                        foundWelder = true
+                                    end
+                                end
+                                if not foundWelder then
+                                    newPlayer:GiveItem(Welder.kMapName)
+                                end
+                            end
+                        end
+                    end
+
+                    newPlayer:TriggerEffects("combat_devour_escape", {effecthostcoords = newPlayer:GetCoords()})
+                    newPlayer:SetCorroded()
+
+                    -- Clear Devour weapon state by looking it up through the Onos
+                    local devourWeapon = onos:GetWeapon(Devour.kMapName)
+                    if devourWeapon then
+                        devourWeapon:TriggerEffects("combat_stop_effects")
+                        devourWeapon.devouringScalar = 0
+                        devourWeapon.eatingPlayerId = 0
+                        devourWeapon.lastDevourTime = nil
+                        devourWeapon.timeDevourEnd = Shared.GetTime() + Devour.kEatCoolDown
+                    end
+                end
+            end
+        elseif (onos and not onosAlive) or (not onos) then
+            -- Onos died or evolved (entity gone) — release player at current position
+            local newvelocity = player:GetVelocity()
+            local playerExtents = player:GetExtents()
+            local releaseOrigin = player:GetOrigin()
+            if onos then
+                local trace = Shared.TraceCapsule(player:GetOrigin(),
+                    player:GetOrigin() + GetNormalizedVector(newvelocity),
+                    math.max(playerExtents.x, playerExtents.z), playerExtents.y,
+                    CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
+                releaseOrigin = trace.endPoint
+            end
+            local newPlayer = player:Replace(player.previousMapName, player:GetTeamNumber(), false, releaseOrigin)
+            newPlayer:DevourEscape()
+            newPlayer:SetHealth(oldHealth)
+            newPlayer:SetArmor(oldArmor)
+            newPlayer:SetVelocity(newvelocity)
+            newPlayer:DisableGroundMove(0.15)
+
+            local oldWeapon1 = newPlayer:GetWeaponInHUDSlot(1)
+            if oldWeapon1 then
+                newPlayer:RemoveWeapon(oldWeapon1)
+                DestroyEntity(oldWeapon1)
+            end
+
+            local oldWeapon2 = newPlayer:GetWeaponInHUDSlot(2)
+            if oldWeapon2 then
+                newPlayer:SetActiveWeapon(oldWeapon2:GetMapName())
+            end
+
+            if playerHadWelder then
+                if Server then
+                    if newPlayer.GetWeapons then
+                        local foundWelder = false
+                        local weapons = newPlayer:GetWeapons()
+                        for _, weapon in ipairs(weapons) do
+                            if weapon:isa("Welder") then
+                                foundWelder = true
+                            end
+                        end
+                        if not foundWelder then
+                            newPlayer:GiveItem(Welder.kMapName)
+                        end
+                    end
+                end
+            end
+            newPlayer:TriggerEffects("combat_devour_escape", {effecthostcoords = newPlayer:GetCoords()})
+            newPlayer:SetCorroded()
         end
-
-        local oldWeapon2 = newPlayer:GetWeaponInHUDSlot(2)
-        if oldWeapon2 then
-            newPlayer:SetActiveWeapon(oldWeapon2:GetMapName())
-        end
-
-		newPlayer:TriggerEffects("combat_devour_escape", {effecthostcoords = newPlayer:GetCoords()})
-		newPlayer:SetCorroded()
 	end
 	return false
-	
+
 end
 
 function Devour:ClearPlayer(isOnosDying)
@@ -144,24 +239,29 @@ function Devour:ClearPlayer(isOnosDying)
     if onos and self.eatingPlayerId ~= 0 then
         local devouredplayer = Shared.GetEntity(self.eatingPlayerId)
         if devouredplayer then
-            local onosHorizontalFacing = GetNormalizedVectorXZ(onos:GetViewCoords().zAxis)
-            local exitVelocity = onos:GetVelocity() + onosHorizontalFacing * 6
-            exitVelocity.y = 0
-            
-            devouredplayer:SetOrigin(onos:GetOrigin() + Vector(onosHorizontalFacing.x * 0.25, Onos.YExtents, onosHorizontalFacing.z * 0.25))
-            
-            local playerVelocity = onosDied and Vector(0, 0, 0) or exitVelocity
-			devouredplayer:SetIsOnosDying(true)
-			devouredplayer:SetDevouringOnosId(0)
-            devouredplayer:SetVelocity(playerVelocity)
+            if onosDied then
+                local onosHorizontalFacing = GetNormalizedVectorXZ(onos:GetViewCoords().zAxis)
+                devouredplayer:SetOrigin(onos:GetOrigin() + Vector(onosHorizontalFacing.x * 0.25, Onos.YExtents, onosHorizontalFacing.z * 0.25))
+                local playerVelocity = Vector(0, 0, 0)
+                if devouredplayer.SetIsOnosDying then
+                    devouredplayer:SetIsOnosDying(true)
+                end
+                if devouredplayer.SetDevouringOnosId then
+                    devouredplayer:SetDevouringOnosId(0)
+                end
+                devouredplayer:SetVelocity(playerVelocity)
+                self:TriggerEffects("combat_stop_effects")
+                self.devouringScalar = 0
+                self.eatingPlayerId = 0
+                self.lastDevourTime = nil
+            else
+                if devouredplayer.SetIsOnosDying then
+                    devouredplayer:SetIsOnosDying(false)
+                end
+            end
             devouredplayer:AddTimedCallback(ClearPlayerNow, 0.01)
-        end 
+        end
     end
-	self:TriggerEffects("combat_stop_effects")
-    self.devouringScalar = 0
-    self.eatingPlayerId = 0
-    self.lastDevourTime = nil
-	
 end
 
 function Devour:GetDeathIconIndex()
@@ -218,6 +318,7 @@ function Devour:Attack(player)
                     energyCost = kDevourEnergyCost
                     
                     if Server then
+                        self.timeDevourStart = Shared.GetTime()
                         self:DevourPlayer(target)                  
                         self:AddTimedCallback(UpdateDevour, kDevourUpdateRate)
                     end
@@ -255,11 +356,12 @@ function Devour:OnPrimaryAttack(player)
             self:OnAttackEnd()
         end
     else
-        self:OnAttackEnd()
-        
-        --[[if player then
-            player:SwitchWeapon(1)
-        end--]]
+        -- Already devouring: allow manual release after minimum hold time
+        if Server and self.eatingPlayerId ~= 0 and Shared.GetTime() - self.timeDevourStart >= kMinDevourHoldTime then
+            self:ClearPlayer(false)
+        else
+            self:OnAttackEnd()
+        end
     end
     
 end
@@ -296,28 +398,62 @@ function Devour:OnUpdateAnimationInput(modelMixin)
     
 end
 
+-- This is required as the original DropAllWeapons Marine class method dropped the Welder too
+-- which breaks immersion if the Welder is to affect the Devour functionality but then is dropped
+-- when the player is devoured.
+function Devour:NewMarineDropAllWeapons(marinePlayer)
+    local weaponList = marinePlayer:GetHUDOrderedWeaponList()
+    
+    for w = 1, #weaponList do
+    
+        local weapon = weaponList[w]
+    
+        if weapon:isa("GrenadeThrower") then
+            weapon:DropItLikeItsHot( marinePlayer )
+            if weapon.grenadesLeft > 0 then
+                marinePlayer.grenadesLeft = weapon.grenadesLeft
+                marinePlayer.grenadeType = weapon.kMapName
+            end
+        elseif weapon:isa("LayMines") then
+            if weapon.minesLeft > 0 then
+                marinePlayer.minesLeft = weapon.minesLeft
+            end
+        elseif (not weapon:isa("Welder")) and weapon:GetIsDroppable() and LookupTechData(weapon:GetTechId(), kTechDataCostKey, 0) > 0 then
+            marinePlayer:Drop(weapon, true, true)
+        end
+        
+    end
+end
+
 function Devour:DevourPlayer(targetPlayer)
 
-    -- Make it so if the target player has a knife they do more damage to the onos when punching
+    -- Make it so if the target player has a knife or welder they do more damage to the onos when punching
     local targetHasKnife = false
+    local targetHasWelder = false
     if targetPlayer.GetWeapons then
         local weaponList = targetPlayer:GetWeapons()
         for _, weapon in ipairs(weaponList) do
             if weapon.isa then
+                -- It is not possible to have both at the same time
                 if weapon:isa("Knife") then
                     targetHasKnife = true
+                elseif weapon:isa("Welder") then
+                    targetHasWelder = true
                 end
             end
         end
     end
 
 	-- Look up and remember old values
-    targetPlayer:DropAllWeapons()
+    -- targetPlayer:DropAllWeapons() -- This is from before the Welder affected the Devour functionality
+    self:NewMarineDropAllWeapons(targetPlayer)
 
     local devouredPlayer = targetPlayer:Replace(DevouredPlayer.kMapName , targetPlayer:GetTeamNumber(), false, Vector(targetPlayer:GetOrigin()))
     devouredPlayer:SetMaxHealth(targetPlayer:GetMaxHealth())
     devouredPlayer:SetHealth(targetPlayer:GetHealth())
+    devouredPlayer:SetMaxArmor(targetPlayer:GetMaxArmor())
     devouredPlayer:SetArmor(targetPlayer:GetArmor())
+
     devouredPlayer.previousMapName = targetPlayer:GetMapName()
 	local onos = self:GetParent()
 	local onosId = onos:GetId()
@@ -338,10 +474,11 @@ function Devour:DevourPlayer(targetPlayer)
 
     if targetHasKnife then
         devouredPlayer.hasKnife = true
-    else
+        devouredPlayer.hasWelder = false
+    elseif targetHasWelder then
         devouredPlayer.hasKnife = false
+        devouredPlayer.hasWelder = true
     end    
 end
-
 
 Shared.LinkClassToMap("Devour", Devour.kMapName, networkVars)

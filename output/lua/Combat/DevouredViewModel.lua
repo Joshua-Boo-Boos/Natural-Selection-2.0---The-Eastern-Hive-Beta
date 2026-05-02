@@ -21,7 +21,8 @@ local kPunchSoundRight = PrecacheAsset("sound/ns2plus.fev/common/marine/onos_pun
 local kWoundSound = PrecacheAsset("sound/NS2.fev/marine/common/wound")
 local kRange = 0.0001
 local kPunchSelfDamage = 5
-local kHasKnifePunchDamageScalar = 3
+local kHasKnifePunchDamageScalar = 2
+local kHasWelderPunchDamageScalar = 1.35
 
 local networkVars =
 {
@@ -136,11 +137,28 @@ function DevouredViewModel:OnTag(tagName)
 	local parent = self:GetParent()
 	if parent then
 		local coords = parent:GetViewCoords()
-		if Client and parent and parent:GetIsLocalPlayer() then
-			if tagName == "attack_left_start" then
-				Shared.PlayPrivateSound(parent, kPunchSoundLeft, nil, OptionsDialogUI_GetMusicVolume() / 100, coords.origin + coords.xAxis - 0.1)
-			elseif tagName == "attack_right_start" then
-				Shared.PlayPrivateSound(parent, kPunchSoundRight, nil, OptionsDialogUI_GetMusicVolume() / 100, coords.origin + coords.xAxis + 0.1)
+		
+		-- if Client and parent and parent:GetIsLocalPlayer() then
+		-- 	if tagName == "attack_left_start" then
+		-- 		Shared.PlayPrivateSound(parent, kPunchSoundLeft, nil, OptionsDialogUI_GetMusicVolume() / 100, coords.origin + coords.xAxis - 0.1)
+		-- 	elseif tagName == "attack_right_start" then
+		-- 		Shared.PlayPrivateSound(parent, kPunchSoundRight, nil, OptionsDialogUI_GetMusicVolume() / 100, coords.origin + coords.xAxis + 0.1)
+		-- 	end
+		-- end
+
+		-- We want other players to be able to hear the punch sounds
+		local musicVol = OptionsDialogUI_GetMusicVolume and OptionsDialogUI_GetMusicVolume() or 100
+		if tagName == "attack_left_start" then
+			if parent.GetHealth then
+				if parent:GetHealth() > 0 then
+					StartSoundEffectOnEntity(kPunchSoundLeft, parent, 0.35 * musicVol / 100, parent)
+				end
+			end
+		elseif tagName == "attack_right_start" then
+			if parent.GetHealth then
+				if parent:GetHealth() > 0 then
+					StartSoundEffectOnEntity(kPunchSoundRight, parent, 0.35 * musicVol / 100, parent)
+				end
 			end
 		end
 		
@@ -148,10 +166,16 @@ function DevouredViewModel:OnTag(tagName)
 			local onos = Shared.GetEntity(parent:GetDevouringOnosId())
 			local coords = self:GetParent():GetViewCoords().origin + Vector(0,-40,0.6)
 			if onos then
-				if parent.hasKnife == true then
-					self:DoDamage(kHasKnifePunchDamageScalar * kDevourPunchDamage, onos, coords, nil, "none")
-					parent:DeductHealth(kPunchSelfDamage, onos, self , true)
-				elseif not parent.hasKnife or parent.hasKnife == false then
+				if parent.hasKnife == true or parent.hasWelder == true then
+					if parent.hasKnife then
+						self:DoDamage(kHasKnifePunchDamageScalar * kDevourPunchDamage, onos, coords, nil, "none")
+						parent:DeductHealth(kPunchSelfDamage, onos, self , true)
+					elseif parent.hasWelder then
+						self:DoDamage(kHasWelderPunchDamageScalar * kDevourPunchDamage, onos, coords, nil, "none")
+						onos:SetOnFire(parent, self, false)
+						parent:DeductHealth(kPunchSelfDamage, onos, self , true)
+					end
+				elseif (not parent.hasKnife or parent.hasKnife == false) and (not parent.hasWelder or parent.hasWelder == false) then
 					self:DoDamage(kDevourPunchDamage, onos, coords, nil, "none")
 					parent:DeductHealth(kPunchSelfDamage, onos, self , true)
 				end
