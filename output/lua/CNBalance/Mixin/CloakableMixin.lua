@@ -58,6 +58,14 @@ CloakableMixin.networkVars =
     maxCloakFraction = "float (0 to 1 by 0.01)",
 }
 
+local function InitCloakInstanceFields(self)
+    if self.cloakFraction        == nil then self.cloakFraction        = (self.fullyCloaked and 1 or 0) end
+    if self.desiredCloakFraction == nil then self.desiredCloakFraction = 0 end
+    if self.timeCloaked          == nil then self.timeCloaked          = 0 end
+    if self.timeUncloaked        == nil then self.timeUncloaked        = 0 end
+    if self.speedScalar          == nil then self.speedScalar          = 0 end
+end
+
 function CloakableMixin:__initmixin()
 
     PROFILE("CloakableMixin:__initmixin")
@@ -67,14 +75,9 @@ function CloakableMixin:__initmixin()
         self.fullyCloaked = false
     end
 
-    self.desiredCloakFraction = 0
-    self.timeCloaked = 0
-    self.timeUncloaked = 0
     self.maxCloakFraction = 1
 
-    -- when entity is created on client consider fully cloaked, so units wont show up for a short moment when going through a phasegate for example
-    self.cloakFraction = self.fullyCloaked and 1 or 0
-    self.speedScalar = 0
+    InitCloakInstanceFields(self)
 
 end
 
@@ -184,6 +187,15 @@ end
 
 local function UpdateCloakState(self, deltaTime)
     PROFILE("CloakableMixin:OnUpdate")
+
+    -- If cloakFraction is nil, __initmixin was never called on this instance.
+    -- Custom lifeforms (e.g. Vokex) whose OnInitialized skips InitMixin(self,
+    -- CloakableMixin) have network vars (set by the class system) but no
+    -- non-networked Lua fields.  Re-run initialisation here to set all of them.
+    if self.cloakFraction == nil then
+        InitCloakInstanceFields(self)
+    end
+
     -- Account for trigger cloak, uncloak, camouflage speed
     UpdateDesiredCloakFraction(self, deltaTime)
 

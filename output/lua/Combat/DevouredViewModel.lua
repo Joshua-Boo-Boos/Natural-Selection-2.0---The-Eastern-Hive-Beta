@@ -21,8 +21,8 @@ local kPunchSoundRight = PrecacheAsset("sound/ns2plus.fev/common/marine/onos_pun
 local kWoundSound = PrecacheAsset("sound/NS2.fev/marine/common/wound")
 local kRange = 0.0001
 local kPunchSelfDamage = 5
-local kHasKnifePunchDamageScalar = 2
-local kHasWelderPunchDamageScalar = 1.35
+local kHasKnifePunchDamageScalar = 1.75
+local kHasWelderPunchDamageScalar = 1.25
 
 local networkVars =
 {

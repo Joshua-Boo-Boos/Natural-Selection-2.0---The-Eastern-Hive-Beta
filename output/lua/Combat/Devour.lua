@@ -36,7 +36,7 @@ local networkVars =
 
 AddMixinNetworkVars(StompMixin, networkVars)
 
-local kDevourGiveEHPScalar = 2
+local kDevourGiveEHPScalar = 1
 
 local function UpdateDevour(self)
 
