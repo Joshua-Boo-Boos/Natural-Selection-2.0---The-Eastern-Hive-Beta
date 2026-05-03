@@ -22,8 +22,10 @@ function Vokex:InitWeaponsForReadyRoom()
     
     Alien.InitWeaponsForReadyRoom(self)
     
-    self:GiveItem(ReadyRoomShadowStep.kMapName)
-    self:SetActiveWeapon(ReadyRoomShadowStep.kMapName)
+    if ReadyRoomShadowStep then
+        self:GiveItem(ReadyRoomShadowStep.kMapName)
+        self:SetActiveWeapon(ReadyRoomShadowStep.kMapName)
+    end
     
 end
 
