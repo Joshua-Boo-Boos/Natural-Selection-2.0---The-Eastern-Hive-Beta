@@ -36,8 +36,6 @@ local networkVars =
 
 AddMixinNetworkVars(StompMixin, networkVars)
 
-local kDevourGiveEHPScalar = 1
-
 local function UpdateDevour(self)
 
     local onos = self:GetParent()
@@ -62,9 +60,6 @@ local function UpdateDevour(self)
                     onos:AddEnergy(Devour.energyRate * deltaTime)
 
                     player:DeductHealth(damage, onos, self , true)
-
-                    -- ADD DEVOUR - GIVES EHP - function LiveMixin:AddHealth(health, playSound, noArmor, hideEffect, healer, useEHP)
-                    onos:AddHealth(kDevourGiveEHPScalar * damage, true, false, false, onos, true)
 
                     -- devouringScalar drives the "goop eaten" visual on the devoured player.
                     self.devouringScalar = 1 - player:GetHealthFraction()
@@ -148,23 +143,6 @@ local function ClearPlayerNow(player)
                         newPlayer:SetActiveWeapon(oldWeapon2:GetMapName())
                     end
 
-                    if playerHadWelder then
-                        if Server then
-                            if newPlayer.GetWeapons then
-                                local foundWelder = false
-                                local weapons = newPlayer:GetWeapons()
-                                for _, weapon in ipairs(weapons) do
-                                    if weapon:isa("Welder") then
-                                        foundWelder = true
-                                    end
-                                end
-                                if not foundWelder then
-                                    newPlayer:GiveItem(Welder.kMapName)
-                                end
-                            end
-                        end
-                    end
-
                     newPlayer:TriggerEffects("combat_devour_escape", {effecthostcoords = newPlayer:GetCoords()})
                     newPlayer:SetCorroded()
 
@@ -209,22 +187,6 @@ local function ClearPlayerNow(player)
                 newPlayer:SetActiveWeapon(oldWeapon2:GetMapName())
             end
 
-            if playerHadWelder then
-                if Server then
-                    if newPlayer.GetWeapons then
-                        local foundWelder = false
-                        local weapons = newPlayer:GetWeapons()
-                        for _, weapon in ipairs(weapons) do
-                            if weapon:isa("Welder") then
-                                foundWelder = true
-                            end
-                        end
-                        if not foundWelder then
-                            newPlayer:GiveItem(Welder.kMapName)
-                        end
-                    end
-                end
-            end
             newPlayer:TriggerEffects("combat_devour_escape", {effecthostcoords = newPlayer:GetCoords()})
             newPlayer:SetCorroded()
         end
@@ -398,55 +360,10 @@ function Devour:OnUpdateAnimationInput(modelMixin)
     
 end
 
--- This is required as the original DropAllWeapons Marine class method dropped the Welder too
--- which breaks immersion if the Welder is to affect the Devour functionality but then is dropped
--- when the player is devoured.
-function Devour:NewMarineDropAllWeapons(marinePlayer)
-    local weaponList = marinePlayer:GetHUDOrderedWeaponList()
-    
-    for w = 1, #weaponList do
-    
-        local weapon = weaponList[w]
-    
-        if weapon:isa("GrenadeThrower") then
-            weapon:DropItLikeItsHot( marinePlayer )
-            if weapon.grenadesLeft > 0 then
-                marinePlayer.grenadesLeft = weapon.grenadesLeft
-                marinePlayer.grenadeType = weapon.kMapName
-            end
-        elseif weapon:isa("LayMines") then
-            if weapon.minesLeft > 0 then
-                marinePlayer.minesLeft = weapon.minesLeft
-            end
-        elseif (not weapon:isa("Welder")) and weapon:GetIsDroppable() and LookupTechData(weapon:GetTechId(), kTechDataCostKey, 0) > 0 then
-            marinePlayer:Drop(weapon, true, true)
-        end
-        
-    end
-end
-
 function Devour:DevourPlayer(targetPlayer)
 
-    -- Make it so if the target player has a knife or welder they do more damage to the onos when punching
-    local targetHasKnife = false
-    local targetHasWelder = false
-    if targetPlayer.GetWeapons then
-        local weaponList = targetPlayer:GetWeapons()
-        for _, weapon in ipairs(weaponList) do
-            if weapon.isa then
-                -- It is not possible to have both at the same time
-                if weapon:isa("Knife") then
-                    targetHasKnife = true
-                elseif weapon:isa("Welder") then
-                    targetHasWelder = true
-                end
-            end
-        end
-    end
-
 	-- Look up and remember old values
-    -- targetPlayer:DropAllWeapons() -- This is from before the Welder affected the Devour functionality
-    self:NewMarineDropAllWeapons(targetPlayer)
+    targetPlayer:DropAllWeapons()
 
     local devouredPlayer = targetPlayer:Replace(DevouredPlayer.kMapName , targetPlayer:GetTeamNumber(), false, Vector(targetPlayer:GetOrigin()))
     devouredPlayer:SetMaxHealth(targetPlayer:GetMaxHealth())
@@ -471,14 +388,7 @@ function Devour:DevourPlayer(targetPlayer)
 	if owner then
 		owner:SwitchWeapon(1)
 	end
-
-    if targetHasKnife then
-        devouredPlayer.hasKnife = true
-        devouredPlayer.hasWelder = false
-    elseif targetHasWelder then
-        devouredPlayer.hasKnife = false
-        devouredPlayer.hasWelder = true
-    end    
+   
 end
 
 Shared.LinkClassToMap("Devour", Devour.kMapName, networkVars)
