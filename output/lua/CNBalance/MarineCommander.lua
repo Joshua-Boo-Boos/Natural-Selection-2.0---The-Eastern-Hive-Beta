@@ -220,7 +220,17 @@ if Server then
 
         elseif GetIsEquipment(techId) or techId == kTechId.MineDeploy then
 
-            success = self:AttemptToBuild(techId, position, normal, orientation, pickVec, false, entity)
+            -- Prevent dropping/placing mines on infestation
+            if techId == kTechId.DropMines or techId == kTechId.MineDeploy then
+                local isOnInfestation = GetIsPointOnInfestation(position, self:GetTeamNumber())
+                if isOnInfestation then
+                    success = false
+                else
+                    success = self:AttemptToBuild(techId, position, normal, orientation, pickVec, false, entity)
+                end
+            else
+                success = self:AttemptToBuild(techId, position, normal, orientation, pickVec, false, entity)
+            end
 
             if success then
                 self:TriggerEffects("spawn_weapon", { effecthostcoords = Coords.GetTranslation(position) })

@@ -113,7 +113,6 @@ local function ClearPlayerNow(player)
 	if player.Replace and player:GetIsAlive() then
 		local oldHealth = player:GetHealth()
 		local oldArmor = player:GetArmor()
-        local playerHadWelder = player.hasWelder == true
         local onos = Shared.GetEntity(player:GetDevouringOnosId())
         local onosAlive = onos and onos:GetIsAlive() or false
         if onos and onosAlive then
@@ -271,9 +270,9 @@ function Devour:Attack(player)
         
         self.timeDevourEnd = Shared.GetTime() + Devour.kAttackAnimationLength
         
-        if target and HasMixin(target, "Live") and target:GetIsAlive() then            
+        if target and HasMixin(target, "Live") and target:GetIsAlive() then
             
-            if target:isa("Player") and not target:isa("Exo") then
+            if target:isa("Marine") or target:isa("JetpackMarine") then -- Only devour Marine or JetpackMarine entities
                 if GetAreEnemies(self,target) then
                     self.eatingPlayerId = target:GetId()
                     self.timeDevourEnd = Shared.GetTime() + Devour.kEatCoolDown
