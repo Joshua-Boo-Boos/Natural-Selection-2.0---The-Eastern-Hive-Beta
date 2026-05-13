@@ -505,3 +505,8 @@ kTranslateMessage["RESOURCES_MARINE"] = "军需补给点"
 kLocales["MATURITY_STATUS"]="Maturity:%.f%%"
 kLocales["RESOURCES_ALIEN"] = "Evolve Matter"
 kLocales["RESOURCES_MARINE"] = "Supply Point"
+
+kLocales["COMMANDERERROR_INFANTRY_PORTAL_GLOBAL_LIMIT"] = "Too many IPs on the map!"
+kLocales["COMMANDERERROR_MINE_LIMIT_REACHED"] = "Too many marine comm placed mines!"
+kLocales["COMMANDERERROR_MINE_ON_INFESTATION"] = "No marine comm mines on infestation!"
+kLocales["COMMANDERERROR_WHIP_LIMIT_REACHED"] = "Too many commander whips!"

@@ -6,14 +6,21 @@ local baseOnCreate = Whip.OnCreate
 function Whip:OnCreate()
     baseOnCreate(self)
     InitMixin(self, BiomassHealthMixin)
+    self.commanderPlaced = false
 end
 
 function Whip:GetExtraHealth(techLevel,extraPlayers,recentWins)
     return kWhipHealthPerBioMass * techLevel
 end
 
+function Whip:OnOwnerChanged(oldOwner, newOwner)
+    if Server then
+        self.commanderPlaced = newOwner ~= nil and newOwner:isa("AlienCommander")
+    end
+end
+
 if Server then
-    
+
     function Whip:UpdateRootState()
 
         local infested = true --self:GetGameEffectMask(kGameEffect.OnInfestation)
@@ -63,3 +70,5 @@ end
 function Whip:GetEyePos()
     return self:GetOrigin() + self:GetCoords().yAxis * 1.7
 end
+
+Shared.LinkClassToMap("Whip", Whip.kMapName, { commanderPlaced = "boolean" })

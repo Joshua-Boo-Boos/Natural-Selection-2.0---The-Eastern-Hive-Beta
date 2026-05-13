@@ -80,6 +80,8 @@ end
 
 if Server then
 
+    local baseProcessTechTreeAction = AlienCommander.ProcessTechTreeActionForEntity
+
     local function GetIsPheromone(techId)
         return techId == kTechId.ThreatMarker or techId == kTechId.LargeThreatMarker or techId ==  kTechId.NeedHealingMarker or techId == kTechId.WeakMarker or techId == kTechId.ExpandingMarker
     end
@@ -107,4 +109,26 @@ if Server then
         return false
 
     end
-end 
+
+    function AlienCommander:ProcessTechTreeActionForEntity(techNode, position, normal, pickVec, orientation, entity, trace, targetId)
+
+        local techId = techNode:GetTechId()
+
+        if techId == kTechId.Whip then
+            local commanderWhipCount = 0
+            local teamNumber = self:GetTeamNumber()
+            for _, whip in ientitylist(Shared.GetEntitiesWithClassname("Whip")) do
+                if whip.commanderPlaced and whip:GetTeamNumber() == teamNumber then
+                    commanderWhipCount = commanderWhipCount + 1
+                end
+            end
+            if commanderWhipCount >= kMaxAlienCommanderWhips then
+                return false, false
+            end
+        end
+
+        return baseProcessTechTreeAction(self, techNode, position, normal, pickVec, orientation, entity, trace, targetId)
+
+    end
+
+end

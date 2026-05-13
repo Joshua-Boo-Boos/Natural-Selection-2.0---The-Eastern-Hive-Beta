@@ -608,36 +608,27 @@ end
 
 function GetCommandStationIsBuilt(techId, origin, normal, commander)
 
-    -- check if there is a built command station in our team
     if not commander then
         return false
     end
 
+    local teamNumber = commander:GetTeamNumber()
+    if teamNumber == kTeamInvalid then
+        return false
+    end
+
+    -- Count only alive IPs (excludes any entities in a dying/transitional state)
+    local ipCount = 0
+    for _, ip in ipairs(GetEntitiesForTeam("InfantryPortal", teamNumber)) do
+        if ip:GetIsAlive() then
+            ipCount = ipCount + 1
+        end
+    end
+    if ipCount >= kMaxInfantryPortalsGlobal then
+        return false, "COMMANDERERROR_INFANTRY_PORTAL_GLOBAL_LIMIT"
+    end
+
     local spaceFree = GetHasRoomForCapsule(Vector(Player.kXZExtents, Player.kYExtents, Player.kXZExtents), origin + Vector(0, 0.1 + Player.kYExtents, 0), CollisionRep.Default, PhysicsMask.AllButPCsAndRagdolls)
-    
-    --if spaceFree then
-    --
-    --    local cs = GetEntitiesForTeamWithinRange("CommandStation", commander:GetTeamNumber(), origin, 15)
-    --    if cs and #cs > 0 then
-    --
-    --        local ccs = cs[1] -- Hmm...
-    --        local ips = GetEntitiesForTeamWithinRange("InfantryPortal", commander:GetTeamNumber(), ccs:GetOrigin(), 15)
-    --        if ips then
-    --
-    --            local ipCountValid = #ips < kMaxInfantryPortalsPerCommandStation
-    --            local built = ccs:GetIsBuilt()
-    --
-    --            if ipCountValid and built then
-    --                return true
-    --            elseif not ipCountValid then
-    --                return false, "INFANTRY_PORTAL_TOOMANYIPS"
-    --            end
-    --        end
-    --
-    --    end
-    --
-    --end
-    
 
     return spaceFree
 

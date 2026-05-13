@@ -325,15 +325,35 @@ function GetIsBuildLegal(techId, position, angle, snapRadius, player, ignoreEnti
     end
     
     BuildUtility_Print("GetPathingRequirementsMet legal: %s", ToString(legalBuild))
-    
+
+    -- Check commander whip limit, but only when on infestation (infestation error takes priority off-infestation)
+    if legalBuild and techId == kTechId.Whip and player then
+        if GetInfestationRequirementsMet(techId, legalPosition) then
+            -- On infestation: check whip limit so error shows even far from any hive
+            local commanderWhipCount = 0
+            for _, whip in ientitylist(Shared.GetEntitiesWithClassname("Whip")) do
+                if whip.commanderPlaced and whip:GetTeamNumber() == teamNumber then
+                    commanderWhipCount = commanderWhipCount + 1
+                end
+            end
+            if commanderWhipCount >= kMaxAlienCommanderWhips then
+                legalBuild = false
+                errorString = "COMMANDERERROR_WHIP_LIMIT_REACHED"
+            end
+        end
+        -- Off infestation: fall through so the infestation check below fires normally
+    end
+
+    BuildUtility_Print("commanderWhipLimit legal: %s", ToString(legalBuild))
+
     -- Check infestation requirements
     if legalBuild then
-    
+
         legalBuild = legalBuild and GetInfestationRequirementsMet(techId, legalPosition)
         if not legalBuild then
             errorString = "COMMANDERERROR_INFESTATION_REQUIRED"
         end
-        
+
     end
     
     if legalBuild then
@@ -440,5 +460,53 @@ function GetIsBuildLegal(techId, position, angle, snapRadius, player, ignoreEnti
     end
     
     return legalBuild, legalPosition, attachEntity, errorString
-    
+
+end
+
+function GetMineDeployIsValid(techId, legalPosition, normal, player)
+
+    if not player then
+        return true
+    end
+
+    local teamNumber = player:GetTeamNumber()
+    local mineCount = 0
+    for _, mine in ientitylist(Shared.GetEntitiesWithClassname("Mine")) do
+        if mine.commanderOwned and mine:GetTeamNumber() == teamNumber then
+            mineCount = mineCount + 1
+        end
+    end
+
+    if mineCount >= kMaxCommanderMines then
+        return false, "COMMANDERERROR_MINE_LIMIT_REACHED"
+    end
+
+    if GetIsPointOnInfestation(legalPosition) then
+        return false, "COMMANDERERROR_MINE_ON_INFESTATION"
+    end
+
+    return true
+
+end
+
+function GetAlienCommanderWhipIsValid(techId, legalPosition, normal, player)
+
+    if not player then
+        return true
+    end
+
+    local teamNumber = player:GetTeamNumber()
+    local commanderWhipCount = 0
+    for _, whip in ientitylist(Shared.GetEntitiesWithClassname("Whip")) do
+        if whip.commanderPlaced and whip:GetTeamNumber() == teamNumber then
+            commanderWhipCount = commanderWhipCount + 1
+        end
+    end
+
+    if commanderWhipCount >= kMaxAlienCommanderWhips then
+        return false, "COMMANDERERROR_WHIP_LIMIT_REACHED"
+    end
+
+    return true
+
 end

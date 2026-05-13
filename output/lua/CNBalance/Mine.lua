@@ -49,6 +49,7 @@ local kMineMaxShakeIntensity = 0.13
 local networkVars = {
     camouflaged = "boolean",
     showLaser = "boolean",
+    commanderOwned = "boolean",
 }
 
 AddMixinNetworkVars(BaseModelMixin, networkVars)
@@ -81,6 +82,7 @@ function Mine:OnCreate()
 
     self.camouflaged = false
     self.showLaser = false
+    self.commanderOwned = false
     if Client then
         InitMixin(self, MarineOutlineMixin)
     end
@@ -94,6 +96,12 @@ function Mine:OnCreate()
 
     end
 
+end
+
+function Mine:OnOwnerChanged(oldOwner, newOwner)
+    if Server then
+        self.commanderOwned = newOwner ~= nil and newOwner:isa("MarineCommander")
+    end
 end
 
 function Mine:OverrideCheckVisibilty()

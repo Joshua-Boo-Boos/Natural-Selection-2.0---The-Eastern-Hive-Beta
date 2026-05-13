@@ -186,6 +186,8 @@ function BuildTechData()
         [kTechDataModel] = Mine.kModelName,
         [kTechDataTooltipInfo] = "MINE_DEPLOY_TOOLTIP",
         [kTechDataSpawnHeightOffset] = kCommanderDropSpawnHeight,
+        [kTechDataNotOnInfestation] = kPreventMarineStructuresOnInfestation,
+        [kTechDataBuildRequiresMethod] = GetMineDeployIsValid,
     })
     --table.insert(techData, {
     --    [kTechDataId] = kTechId.GrenadeLauncherDetectionShot,
@@ -1485,6 +1487,7 @@ function BuildTechData()
         [kTechDataDisplayName] = "WHIP",
         [kTechDataCostKey] = kWhipCost,
         [kTechDataRequiresInfestation] = true,
+        [kTechDataBuildRequiresMethod] = GetAlienCommanderWhipIsValid,
         [kTechDataHotkey] = Move.W,
         [kTechDataBuildTime] = kWhipBuildTime,
         [kTechDataModel] = Whip.kModelName,

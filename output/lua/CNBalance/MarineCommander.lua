@@ -220,14 +220,16 @@ if Server then
 
         elseif GetIsEquipment(techId) or techId == kTechId.MineDeploy then
 
-            -- Prevent dropping/placing mines on infestation
-            if techId == kTechId.DropMines or techId == kTechId.MineDeploy then
+            if techId == kTechId.DropMines then
+                -- Prevent player-dropped mines landing on infestation
                 local isOnInfestation = GetIsPointOnInfestation(position, self:GetTeamNumber())
-                if isOnInfestation then
-                    success = false
-                else
+                if not isOnInfestation then
                     success = self:AttemptToBuild(techId, position, normal, orientation, pickVec, false, entity)
                 end
+            elseif techId == kTechId.MineDeploy then
+                -- Validation (infestation + limit cap) handled by GetMineDeployIsValid via AttemptToBuild,
+                -- which also sends a CommanderError message when placement is rejected.
+                success = self:AttemptToBuild(techId, position, normal, orientation, pickVec, false, entity)
             else
                 success = self:AttemptToBuild(techId, position, normal, orientation, pickVec, false, entity)
             end
