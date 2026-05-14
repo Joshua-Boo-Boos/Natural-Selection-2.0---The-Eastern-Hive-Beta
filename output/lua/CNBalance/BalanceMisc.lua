@@ -69,7 +69,7 @@ kFlameThrowerEntityBurnPResRewardEachInterval = 0.1
 -- Jetpack
 --kUpgradedJetpackUseFuelRate = 0.18
 kJetpackingAccel = 0.8
-kJetpackUseFuelRate = 0.18  --0.21
+kJetpackUseFuelRate = 0.21  --0.18
 kJetpackReplenishFuelRate = 0.24 --0.21
 
 kItemStayTime = 20

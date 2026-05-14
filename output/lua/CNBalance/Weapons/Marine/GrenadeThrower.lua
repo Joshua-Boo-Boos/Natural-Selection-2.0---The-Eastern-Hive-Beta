@@ -18,5 +18,5 @@
 --end
 
 function GrenadeThrower:GetCatalystSpeedBase()
-    return GetHasTech(self,kTechId.GrenadeTech) and 2 or 1        --Speeed boost
+    return GetHasTech(self,kTechId.GrenadeTech) and 2 or 1        -- Speed boost -- Consider changing this if cat-packed Marines throw hand grenades too fast
 end

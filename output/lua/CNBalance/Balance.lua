@@ -69,8 +69,8 @@ kMilitaryProtocolPlayerResourcesPerKill = {
     [kTechId.Skulk] = 0.8, [kTechId.Gorge] = 1.2, [kTechId.Prowler] = 1.5, [kTechId.Lerk] = 2, [kTechId.Fade] = 3,[kTechId.Vokex] = 3, [kTechId.Onos] = 5,
 }
 
-kMarineRespawnTime = 9
-kAlienSpawnTime = 10
+kMarineRespawnTime = 14 -- 9
+kAlienSpawnTime = 15 -- 10
 
 kEggGenerationRate = 12  --13
 kAlienEggsPerHive = 2
@@ -257,7 +257,7 @@ kFlamethrowerDropCost = 15
 kFlamethrowerDropCooldown = 0
 
 kFirePlayerDOTDelay = 1
-kPlayerFireDOTPerSecond = 4
+kPlayerFireDOTPerSecond = 8
 kDragonBreathPlayerFireDamagePerStack = { 0.7 , 0.8 , 0.9 , 1 }  kFlameThrowerPlayerFireDamagePerStack = { 5 , 5 , 5 , 5 }
 kPlayerFireDamageMaxStack = { 10, 14, 18, 22 } -- Was { 12, 16, 20, 24 }
 
@@ -734,24 +734,45 @@ function GetOriginFormBiomassLevel(count)
     return level
 end
 
-kTechRespawnTimeExtension = 
-{
-    --[kTechId.Armor1] = 0,[kTechId.Weapons1] = 0, [kTechId.Observatory] = 0,
-    --[kTechId.MinesTech] = 0,[kTechId.ShotgunTech] = 0,
-    [kTechId.Armor2] = 2, [kTechId.Weapons2] = 2,
-    [kTechId.Armor3] = 4, [kTechId.Weapons3] = 4,
-    --[kTechId.PhaseGate] = 0, [kTechId.AdvancedArmory] = 0,
-    [kTechId.ExosuitPrototypeLab] = 3, [kTechId.JetpackPrototypeLab] = 3,-- [kTechId.CannonPrototypeLab] = 2,
-    --[kTechId.DragonBreath] = 2, [kTechId.ArmorRegen] = 2,  [kTechId.MotionTrack] = 2, --[kTechId.MACEmpBlast] = 1,[kTechId.GrenadeLauncherUpgrade] = 1,
+-- Let's try reduced values but enable everything
+-- kTechRespawnTimeExtension = 
+-- {
+--     [kTechId.Armor1] = 0.5, [kTechId.Weapons1] = 0.5, [kTechId.Observatory] = 0.5,
+--     [kTechId.MinesTech] = 0.5, [kTechId.ShotgunTech] = 0.5,
+--     [kTechId.Armor2] = 0.5, [kTechId.Weapons2] = 0.5,
+--     [kTechId.Armor3] = 0.5, [kTechId.Weapons3] = 0.5,
+--     [kTechId.PhaseGate] = 0.5, [kTechId.AdvancedArmory] = 0.5,
+--     [kTechId.ExosuitPrototypeLab] = 0.5, [kTechId.JetpackPrototypeLab] = 0.5, [kTechId.CannonPrototypeLab] = 0.5,
+--     [kTechId.DragonBreath] = 0.5, [kTechId.ArmorRegen] = 0.5,  [kTechId.MotionTrack] = 0.5, [kTechId.MACEmpBlast] = 0.5, [kTechId.GrenadeLauncherUpgrade] = 0.5,
     
-    --[kTechId.BioMassOne] = 0, [kTechId.BioMassTwo] = 0, 
-    --[kTechId.BioMassThree] = 1, [kTechId.BioMassFour] = 1, 
-    [kTechId.BioMassFive] = 2, [kTechId.BioMassSix] = 2,
-    --[kTechId.TwoVeils] = 1,[kTechId.ThreeVeils] = 1,[kTechId.TwoShells] = 1,[kTechId.ThreeShells] = 1,[kTechId.TwoSpurs] = 1, [kTechId.ThreeSpurs] = 1,
-    [kTechId.BioMassSeven] = 3, [kTechId.BioMassEight] = 3,
-    [kTechId.BioMassNine] = 4, [kTechId.BioMassTen] = 4,
-    --[kTechId.BioMassEleven] = 1, [kTechId.BioMassTwelve] = 1,
-}
+--     [kTechId.BioMassOne] = 0.5, [kTechId.BioMassTwo] = 0.5, 
+--     [kTechId.BioMassThree] = 0.5, [kTechId.BioMassFour] = 0.5, 
+--     [kTechId.BioMassFive] = 0.5, [kTechId.BioMassSix] = 0.5,
+--     [kTechId.TwoVeils] = 0.5, [kTechId.ThreeVeils] = 0.5, [kTechId.TwoShells] = 0.5, [kTechId.ThreeShells] = 0.5, [kTechId.TwoSpurs] = 0.5, [kTechId.ThreeSpurs] = 0.5,
+--     [kTechId.BioMassSeven] = 0.5, [kTechId.BioMassEight] = 0.5,
+--     [kTechId.BioMassNine] = 0.5, [kTechId.BioMassTen] = 0.5,
+--     [kTechId.BioMassEleven] = 0.5, [kTechId.BioMassTwelve] = 0.5,
+-- }
+
+-- These are the original values
+-- kTechRespawnTimeExtension = 
+-- {
+--     --[kTechId.Armor1] = 0,[kTechId.Weapons1] = 0, [kTechId.Observatory] = 0,
+--     --[kTechId.MinesTech] = 0,[kTechId.ShotgunTech] = 0,
+--     [kTechId.Armor2] = 2, [kTechId.Weapons2] = 2,
+--     [kTechId.Armor3] = 4, [kTechId.Weapons3] = 4,
+--     --[kTechId.PhaseGate] = 0, [kTechId.AdvancedArmory] = 0,
+--     [kTechId.ExosuitPrototypeLab] = 3, [kTechId.JetpackPrototypeLab] = 3,-- [kTechId.CannonPrototypeLab] = 2,
+--     --[kTechId.DragonBreath] = 2, [kTechId.ArmorRegen] = 2,  [kTechId.MotionTrack] = 2, --[kTechId.MACEmpBlast] = 1,[kTechId.GrenadeLauncherUpgrade] = 1,
+    
+--     --[kTechId.BioMassOne] = 0, [kTechId.BioMassTwo] = 0, 
+--     --[kTechId.BioMassThree] = 1, [kTechId.BioMassFour] = 1, 
+--     [kTechId.BioMassFive] = 2, [kTechId.BioMassSix] = 2,
+--     --[kTechId.TwoVeils] = 1,[kTechId.ThreeVeils] = 1,[kTechId.TwoShells] = 1,[kTechId.ThreeShells] = 1,[kTechId.TwoSpurs] = 1, [kTechId.ThreeSpurs] = 1,
+--     [kTechId.BioMassSeven] = 3, [kTechId.BioMassEight] = 3,
+--     [kTechId.BioMassNine] = 4, [kTechId.BioMassTen] = 4,
+--     --[kTechId.BioMassEleven] = 1, [kTechId.BioMassTwelve] = 1,
+-- }
 
 kDOTPlayerDamageMaxLifeTime = 2
 

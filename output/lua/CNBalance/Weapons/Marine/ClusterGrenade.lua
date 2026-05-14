@@ -4,12 +4,12 @@ local kGrenadeMinShakeIntensity = 0.01
 local kGrenadeMaxShakeIntensity = 0.12
 
 function ClusterGrenade:Detonate(targetHit)
-    local grenadeTech = GetHasTech(self,kTechId.GrenadeTech)
-    ----
-        if grenadeTech then
+    -- local grenadeTech = GetHasTech(self,kTechId.GrenadeTech)
+    -- ----
+    --     if grenadeTech then
             self:CreateFragments()
-        end
-    -----
+    --     end
+    -- -----
     local hitEntities = GetEntitiesWithMixinWithinRange("Live", self:GetOrigin(), kClusterGrenadeDamageRadius)
     table.removevalue(hitEntities, self)
 

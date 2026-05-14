@@ -129,7 +129,7 @@ function PhaseGate:Phase(user)
                 local playerAboveLimit = GetPlayersAboveLimit(self:GetTeamNumber())
                 gateCount = gateCount or 2
                 
-                phaseTime = kPhaseCooldownBase * 1.19
+                phaseTime = kPhaseCooldownBase * 1.35 -- 1.19 scalar
                 -- phaseTime = kPhaseCooldownBase
                 --         + math.max(0, gateCount - 2) * kPhaseCooldownPerGate
                 --         + playerAboveLimit * kPhaseCooldownPerPlayerAboveLimit
