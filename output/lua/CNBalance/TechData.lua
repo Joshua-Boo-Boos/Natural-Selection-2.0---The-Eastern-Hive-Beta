@@ -1087,6 +1087,15 @@ function BuildTechData()
     })
 
     table.insert(techData, {
+        [kTechDataId] = kTechId.PrimalScream,
+        [kTechDataMapName] = PrimalScream and PrimalScream.kMapName or "primalscream",
+        [kTechDataCategory] = kTechId.Lerk,
+        [kTechDataDisplayName] = "PRIMAL_SCREAM",
+        [kTechDataTooltipInfo] = "PRIMAL_SCREAM_TOOLTIP",
+        [kTechDataCostKey] = kUmbraResearchCost,
+    })
+
+    table.insert(techData, {
         [kTechDataId] = kTechId.SwipeShadowStep,
         [kTechDataMapName] = SwipeShadowStep.kMapName,
         [kTechDataDamageType] = kSwipeDamageType,

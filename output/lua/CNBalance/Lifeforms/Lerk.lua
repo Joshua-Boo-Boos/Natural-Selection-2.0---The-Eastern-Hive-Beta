@@ -6,6 +6,23 @@ function Lerk:OnInitialized()
     if Client then
         InitMixin(self, RailgunTargetMixin)
     end
+    if Server then
+        local mapName = (PrimalScream and PrimalScream.kMapName) or "primalscream"
+        if GetHasTech(self, kTechId.PrimalScream) and not self:GetWeapon(mapName) then
+            -- Extra safety: ensure the team's biomass level is actually high
+            -- enough. This prevents the client HUD from lighting the ability
+            -- when the player spawns before the team's biomass/state is fully
+            -- propagated or if TechTree reports the tech prematurely.
+            local team = self:GetTeam()
+            local biomassLevel = 0
+            if team and team.GetBioMassLevel then
+                biomassLevel = team:GetBioMassLevel()
+            end
+            if biomassLevel >= 8 then
+                self:GiveItem(mapName, false)
+            end
+        end
+    end
 end
 
 function Lerk:ModifyDamageTaken(damageTable, attacker, doer, damageType, hitPoint) -- dud

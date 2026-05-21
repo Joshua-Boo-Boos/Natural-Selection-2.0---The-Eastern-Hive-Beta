@@ -20,6 +20,28 @@ if Client then
     local kHandleCooldown  = 1.0   -- seconds before retrying after a dead handle
     local kBalanceInterval = 0.2   -- volume-balance check rate (~5 Hz)
 
+    -- Which custom sound banks get the sound-slider volume balancing. The mod
+    -- originally only balanced ns2plus.fev; NS1_Sounds.fev (Primal Scream etc.)
+    -- must be included too so those sounds respect the sound-volume slider.
+    local function IsBalancedFev(name)
+        return name ~= nil
+           and string.find(name, "ns2plus.fev") ~= nil
+           -- ( string.find(name, "ns2plus.fev") ~= nil
+           -- or string.find(name, "NS1_Sounds.fev") ~= nil )
+    end
+
+    -- Per-bank extra volume multiplier (applied on top of the slider). The
+    -- NS1_Sounds.fev Primal Scream sounds are 20% quieter.
+    local function FevVolumeScale(name)
+        -- Attempting to get all affected Primal Scream entities to play the sound
+        -- at a fixed volume as bots are not playing the Primal Scream received sound
+        -- as far as I can tell
+        -- if name and string.find(name, "NS1_Sounds.fev") ~= nil then
+        --     return 0.8
+        -- end
+        return 1
+    end
+
     -- Safely destroy an FMOD instance (dead handles won't crash).
     local function SafeDestroy(self)
         local inst = self.soundEffectInstance
@@ -62,6 +84,17 @@ if Client then
             self.clientAssetIndex = self.assetIndex
             self.clientPlaying    = nil
             self.clientStartTime  = nil
+
+            -- Recompute balancing from the now-known asset. OnInitialized can
+            -- run before the networked assetIndex has synced (Shared.GetSoundName
+            -- returns nil then), which would leave balanceVoice = false and the
+            -- sound playing at full, unbalanced volume. Recomputing here -- where
+            -- assetIndex is valid -- guarantees correct volume balancing.
+            local changedAssetName = Shared.GetSoundName(self.assetIndex)
+            self.balanceVoice   = IsBalancedFev(changedAssetName)
+            self.fevVolumeScale = FevVolumeScale(changedAssetName)
+            self._balVol        = nil
+            self._balNextCheck  = 0
 
             if self.assetIndex ~= 0 then
 
@@ -152,7 +185,8 @@ if Client then
         baseOnInitialized(self)
 
         local assetName = Shared.GetSoundName(self.assetIndex)
-        self.balanceVoice  = assetName and string.find(assetName, "ns2plus.fev") ~= nil
+        self.balanceVoice  = IsBalancedFev(assetName)
+        self.fevVolumeScale = FevVolumeScale(assetName)
         self._balVol       = nil
         self._balNextCheck = 0
     end
@@ -177,6 +211,7 @@ if Client then
 
         local volume = OptionsDialogUI_GetSoundVolume() / 100
         volume = volume * (gMuteCustomVoices and 0 or 1)
+        volume = volume * (self.fevVolumeScale or 1)
 
         if self._balVol == volume then return end
         self._balVol = volume
@@ -218,10 +253,9 @@ if Client then
 
     -- ── Volume scaling for one-shot NS2.0-TEH sounds ────────────────
     local function GetVolume(soundEffectName, volume)
-        if soundEffectName
-           and string.find(soundEffectName, "ns2plus.fev") ~= nil
-        then
+        if IsBalancedFev(soundEffectName) then
             volume = (volume or 0.8) * OptionsDialogUI_GetSoundVolume() / 100
+            volume = volume * FevVolumeScale(soundEffectName)
         end
         return volume
     end

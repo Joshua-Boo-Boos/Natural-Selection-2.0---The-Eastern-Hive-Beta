@@ -1273,6 +1273,10 @@ local function UpdateConnections(self)
         local endPoint = Vector(self:PlotToMap(cEndPoint.x, cEndPoint.z))
 
         minimapConnection:Setup(startPoint, endPoint, self.minimap)
+        if minimapConnection.SetConnector then
+            minimapConnection:SetConnector(connector)
+        minimapConnection.clientIndex = self.clientIndex
+        end
         if(connector:GetTeamNumber() == kTeam2Index) then
             minimapConnection:UpdateAnimation_Alien(self.comMode == GUIMinimapFrame.kModeMini, getLineColor(tunnelEntranceIndex))
             tunnelEntranceIndex = tunnelEntranceIndex + 1

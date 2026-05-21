@@ -74,6 +74,16 @@ if Server then
         -- check if there is another tunnel entrance to connect with
         foundTunnel:SetOwnerClientId(self.ownerId)
 
+        -- Propagate a stable identifier (client index, which survives
+        -- lifeform evolution) so the tunnel's label still resolves to the
+        -- player's name after they Replace into another alien form. The
+        -- owner entity is alive here because we only get this far when the
+        -- gorge tunnel itself is alive/built.
+        local owner = self.ownerId and Shared.GetEntity(self.ownerId)
+        if owner and owner.GetClientIndex and foundTunnel.SetOwnerStableClientIndex then
+            foundTunnel:SetOwnerStableClientIndex(owner:GetClientIndex())
+        end
+
         local selfId = self:GetId()
 
         --Print(ToString(selfId).." self")
@@ -178,10 +188,15 @@ function GorgeTunnel:SetOwner(owner)
         end--]]
         
         if self.tunnelId and self.tunnelId ~= Entity.invalidId then
-            
+
             local tunnelEnt = Shared.GetEntity(self.tunnelId)
             tunnelEnt:SetOwnerClientId(self.ownerId)
-        
+
+            local newOwner = owner
+            if newOwner and newOwner.GetClientIndex and tunnelEnt.SetOwnerStableClientIndex then
+                tunnelEnt:SetOwnerStableClientIndex(newOwner:GetClientIndex())
+            end
+
         end
     
     end

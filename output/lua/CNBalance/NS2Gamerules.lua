@@ -391,4 +391,41 @@
          self.kRecentRoundStatus[11] = nil
          SaveConfigFile("NS2.0RoundStatus.json",self.kRecentRoundStatus)
      end
+
+     -- Override vanilla: cross-team voice is allowed only while the game state
+     -- is still <= PreGame. As soon as the state transitions to Countdown (after
+     -- shuffle + base spawn), cross-team voice is cut off mid-stream so plans don't
+     -- leak to the enemy when players hold the talk key through round start.
+     -- 'alltalk' (full all-talk) is preserved unconditionally.
+     function NS2Gamerules:GetCanPlayerHearPlayer(listenerPlayer, speakerPlayer, channelType)
+
+         local canHear = false
+
+         if Server.GetConfigSetting("alltalk")
+            or (Server.GetConfigSetting("pregamealltalk") and self:GetGameState() <= kGameState.PreGame) then
+             return true
+         end
+
+         -- Check if the listener has the speaker muted.
+         if listenerPlayer:GetClientMuted(speakerPlayer:GetClientIndex()) then
+             return false
+         end
+
+         -- If both players have the same team number, they can hear each other
+         if listenerPlayer:GetTeamNumber() == speakerPlayer:GetTeamNumber() then
+             if channelType == nil or channelType == VoiceChannel.Global then
+                 canHear = true
+             else
+                 canHear = listenerPlayer:GetDistance(speakerPlayer) < kMaxWorldSoundDistance
+             end
+         end
+
+         -- Cheats + dev mode override
+         if Shared.GetCheatsEnabled() and Shared.GetDevMode() then
+             canHear = true
+         end
+
+         return canHear
+
+     end
  end

@@ -347,6 +347,20 @@ function AlienTeam:OnUpdateBiomass(oldBiomass, newBiomass)
     end
 
     UpdateBiomassChanges(self,true,newBiomass)
+
+    -- Give PrimalScream ability to existing Lerks when BioMass 8 is reached
+    if oldBiomass < 8 and newBiomass >= 8 then
+        local mapName = (PrimalScream and PrimalScream.kMapName) or "primalscream"
+        local players = GetEntitiesForTeam("Player", self:GetTeamNumber())
+        for i = 1, #players do
+            local player = players[i]
+            if player and player.isa and player:isa("Lerk") then
+                if not player:GetWeapon(mapName) then
+                    player:GiveItem(mapName, false)
+                end
+            end
+        end
+    end
 end
 
 function AlienTeam:AddPlayer(player)
@@ -1120,6 +1134,7 @@ function AlienTeam:InitTechTree()
     -- lerk researches
     self.techTree:AddActivation(kTechId.Spores,              kTechId.BioMassFour, kTechId.None,kTechId.AllAliens)
     self.techTree:AddUnlockActivation(kTechId.Umbra,               kTechId.BioMassSix, kTechId.None,kTechId.AllAliens)
+    self.techTree:AddUnlockActivation(kTechId.PrimalScream,       kTechId.BioMassEight, kTechId.None,kTechId.AllAliens)
 
     -- fade researches
     self.techTree:AddUnlockActivation(kTechId.MetabolizeEnergy,        kTechId.BioMassTwo, kTechId.None,kTechId.AllAliens)

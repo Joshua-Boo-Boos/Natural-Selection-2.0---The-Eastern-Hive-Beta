@@ -16,6 +16,7 @@ ModLoader.SetupFileHook("lua/NS2Utility.lua", "lua/CNBalance/NS2Utility.lua", "p
 ModLoader.SetupFileHook("lua/NS2Utility_Server.lua", "lua/CNBalance/NS2Utility_Server.lua", "post" )
 ModLoader.SetupFileHook("lua/NS2ConsoleCommands_Server.lua", "lua/CNBalance/NS2ConsoleCommands_Server.lua", "post" )
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/NetworkMessages.lua", "post" )
+ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/PrimalScreamFX.lua", "post" )
 ModLoader.SetupFileHook("lua/NetworkMessages_Server.lua", "lua/CNBalance/NetworkMessages_Server.lua", "post" )
 
 ModLoader.SetupFileHook("lua/TechTreeConstants.lua", "lua/CNBalance/TechTreeConstants.lua", "post")
@@ -39,6 +40,9 @@ ModLoader.SetupFileHook("lua/GUIMinimapFrame.lua", "lua/CNBalance/GUI/GUIMinimap
 ModLoader.SetupFileHook("lua/Hud2/topBar/GUIHudTopBarObjectClasses.lua", "lua/CNBalance/GUI/GUIHudTopBarObjectClasses.lua", "replace")
 ModLoader.SetupFileHook("lua/GUIMinimap.lua", "lua/CNBalance/GUI/GUIMinimap.lua", "replace" )
 ModLoader.SetupFileHook("lua/GUIMinimapConnection.lua", "lua/CNBalance/GUI/GUIMinimapConnection.lua", "replace" )
+ModLoader.SetupFileHook("lua/MapConnector.lua", "lua/CNBalance/MapConnector.lua", "replace" )
+ModLoader.SetupFileHook("lua/MinimapConnectionMixin.lua", "lua/CNBalance/MinimapConnectionMixin.lua", "replace" )
+ModLoader.SetupFileHook("lua/GUITechMap.lua", "lua/CNBalance/GUI/GUITechMap.lua", "post" )
 ModLoader.SetupFileHook("lua/GUIWorldText.lua", "lua/CNBalance/GUI/GUIWorldText.lua", "post" )
 ModLoader.SetupFileHook("lua/GUIUnitStatus.lua", "lua/CNBalance/GUI/GUIUnitStatus.lua", "replace" )
 ModLoader.SetupFileHook("lua/TeamMessenger.lua", "lua/CNBalance/TeamMessenger.lua", "replace")
@@ -188,6 +192,9 @@ ModLoader.SetupFileHook("lua/GUIHiveStatus.lua", "lua/CNBalance/GUI/GUIHiveStatu
 
 ModLoader.SetupFileHook( "lua/CommAbilities/Alien/HallucinationCloud.lua", "lua/CNBalance/HallucinationCloud.lua", "post" )
 ModLoader.SetupFileHook( "lua/CommAbilities/Alien/BoneWall.lua", "lua/CNBalance/Structures/Alien/BoneWall.lua", "post" )
+
+-- Ensure we can hook EnzymeCloud to remove PrimalScream when enzyme is applied (post)
+ModLoader.SetupFileHook("lua/CommAbilities/Alien/EnzymeCloud.lua", "lua/CNBalance/CommAbilities/Alien/EnzymeCloud.lua", "post")
 
 ModLoader.SetupFileHook( "lua/AlienHallucination.lua", "lua/CNBalance/AlienHallucination.lua", "post" )
 ModLoader.SetupFileHook( "lua/Hallucination.lua", "lua/CNBalance/Hallucination.lua", "replace" )

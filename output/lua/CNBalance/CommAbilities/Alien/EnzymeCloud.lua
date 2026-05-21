@@ -1,0 +1,5 @@
+-- Real enzyme already overrides PrimalScream automatically: Alien.lua hooks
+-- TriggerEnzyme to clear enzymeIsFromPrimalScream on every non-PrimalScream
+-- caller. Vanilla EnzymeCloud:Perform calls TriggerEnzyme on each alien in
+-- range, so nothing extra needs to happen here. This file is kept as a
+-- no-op placeholder so the FileHooks entry stays valid.

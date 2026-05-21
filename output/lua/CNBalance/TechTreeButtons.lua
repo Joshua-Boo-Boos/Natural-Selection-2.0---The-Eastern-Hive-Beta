@@ -69,6 +69,9 @@ kTechIdToMaterialOffset[kTechId.ProwlerStructureAbility] = 102
 
 kTechIdToMaterialOffset[kTechId.ShadowStep] = 160
 kTechIdToMaterialOffset[kTechId.AcidRocket] = 209
+-- Use Umbra's icon slot for Primal Scream so the button renders an actual
+-- texture instead of falling through GetMaterialXYOffset's nil-return path.
+kTechIdToMaterialOffset[kTechId.PrimalScream] = 75
 kTechIdToMaterialOffset[kTechId.MetabolizeShadowStep] = 169
 --kTechIdToMaterialOffset[kTechId.MetabolizeShadowStepHealth] = 170
 kTechIdToMaterialOffset[kTechId.VortexShadowStep] = 222

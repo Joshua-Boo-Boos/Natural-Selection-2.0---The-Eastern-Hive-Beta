@@ -20,6 +20,12 @@ GUIAlienBuyMenu.kSlotTexture = PrecacheAsset("ui/alien_buyslot.dds")
 GUIAlienBuyMenu.kSlotLockedTexture = PrecacheAsset("ui/alien_buyslot_locked.dds")
 GUIAlienBuyMenu.kAbilityIcons = "ui/buildmenu.dds"
 
+-- Primal Scream has no slot in the shared ability-icon atlas, so the J-menu
+-- (evolve menu) ability ring used Umbra's slot. Use its dedicated standalone
+-- icon instead. 464x464 dds.
+local kPrimalScreamIconTexture = PrecacheAsset("ui/lerk/primal_scream.dds")
+local kPrimalScreamIconSize = 464
+
 local kLargeFont = Fonts.kAgencyFB_Large
 local kFont = Fonts.kAgencyFB_Small
 
@@ -328,10 +334,34 @@ end
 local function CreateAbilityIcon(self, alienGraphicItem, techId)
 
 	local graphicItem = GetGUIManager():CreateGraphicItem()
-	graphicItem:SetTexture(GUIAlienBuyMenu.kAbilityIcons)
 	graphicItem:SetSize(Vector(GUIAlienBuyMenu.kUpgradeButtonSize, GUIAlienBuyMenu.kUpgradeButtonSize, 0))
 	graphicItem:SetAnchor(GUIItem.Right, GUIItem.Top)
-	graphicItem:SetTexturePixelCoordinates(GUIUnpackCoords(GetTextureCoordinatesForIcon(techId, false)))
+
+	if techId == kTechId.PrimalScream then
+		-- The standalone dds has no internal padding (unlike the atlas cells),
+		-- so hide the base quad and draw a smaller, slightly-thinner, centered
+		-- child. It inherits the parent's alpha so it brightens/dims with the
+		-- menu state just like the atlas icons.
+		graphicItem:SetTexture("ui/transparent.dds")
+
+		local child = GetGUIManager():CreateGraphicItem()
+		child:SetTexture(kPrimalScreamIconTexture)
+		child:SetTexturePixelCoordinates(0, 0, kPrimalScreamIconSize, kPrimalScreamIconSize)
+		child:SetAnchor(GUIItem.Middle, GUIItem.Center)
+		child:SetInheritsParentAlpha(true)
+		child:SetColor(kIconColors[kAlienTeamType])
+		local ph = GUIAlienBuyMenu.kUpgradeButtonSize * 0.62   -- smaller in the J-menu
+		local pw = ph * 0.88 * 1.15   -- 15% wider horizontally
+		child:SetSize(Vector(pw, ph, 0))
+		child:SetPosition(Vector(-pw / 2, -ph / 2, 0))
+			graphicItem:AddChild(child)
+			-- Keep a reference to the child so we can toggle its color later
+			graphicItem.PrimalScreamChild = child
+	else
+		graphicItem:SetTexture(GUIAlienBuyMenu.kAbilityIcons)
+		graphicItem:SetTexturePixelCoordinates(GUIUnpackCoords(GetTextureCoordinatesForIcon(techId, false)))
+	end
+
 	graphicItem:SetColor(kIconColors[kAlienTeamType])
 
 	local highLight = GetGUIManager():CreateGraphicItem()
@@ -1319,10 +1349,40 @@ function GUIAlienBuyMenu:_UpdateAbilityIcons()
 
 	for index, abilityItem in ipairs(self.abilityIcons) do
 
-		if GetIsTechUnlocked(Client.GetLocalPlayer(), abilityItem.TechId) then
+		local localPlayer = Client.GetLocalPlayer()
+		local isUnlocked = GetIsTechUnlocked(localPlayer, abilityItem.TechId)
+
+		-- Extra client-side safeguard for Primal Scream: ensure the team's
+		-- biomass level has actually reached 8 before we light the J-menu
+		-- icon. This prevents the icon from showing enabled prematurely if
+		-- the tech tree state isn't fully propagated yet on the client.
+		if abilityItem.TechId == kTechId.PrimalScream then
+			local teamInfo = GetTeamInfoEntity(kTeam2Index)
+			local biomassLevel = 0
+			if teamInfo and teamInfo.GetBioMassLevel then
+				biomassLevel = teamInfo:GetBioMassLevel()
+			end
+			if biomassLevel < 8 then
+				isUnlocked = false
+			end
+		end
+
+		if isUnlocked then
 			abilityItem.Icon:SetColor(kIconColors[kAlienTeamType])
 		else
 			abilityItem.Icon:SetColor(Color(0,0,0,1))
+		end
+
+		-- If this is the standalone Primal Scream child icon, also toggle
+		-- the child's color (it doesn't inherit the parent's color). This
+		-- prevents the Primal Scream DDS from appearing lit when locked.
+		local primalChild = abilityItem.Icon.PrimalScreamChild
+		if primalChild then
+			if isUnlocked then
+				primalChild:SetColor(kIconColors[kAlienTeamType])
+			else
+				primalChild:SetColor(Color(0,0,0,1))
+			end
 		end
 
 		local mouseOver = self:_GetIsMouseOver(abilityItem.Icon)

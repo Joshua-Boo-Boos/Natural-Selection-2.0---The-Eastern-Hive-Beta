@@ -25,8 +25,73 @@ GUIAlienHUD.kInstantAlienHealthBall = GetAdvancedOption("instantalienhealth")
 local kSmokeTexture = PrecacheAsset("ui/alien_hud_health_smoke.dds")
 local kTextureName = PrecacheAsset("ui/alien_hud_health.dds")
 local kHealthArmorTextureName = PrecacheAsset("ui/alien_health_armor.dds")
+
+-- Custom standalone icon for Primal Scream (it has no slot in the shared
+-- kInventoryIconsTexture atlas, which otherwise defaults to cell 0,0 = the
+-- command station icon). 464x464 dds.
+local kPrimalScreamIconTexture = PrecacheAsset("ui/lerk/primal_scream.dds")
+local kPrimalScreamIconSize = 464
 local kHealthIconTextureCoordinates = {0, 0, 32, 32}
 local kArmorIconTextureCoordinates = {32, 32, 64, 64}
+
+-- Make the inventory slot icons (bottom HUD bar) render Primal Scream's
+-- standalone icon too. GUIInventory was Script.Load'd just above, so the
+-- class exists; we wrap LocalAdjustSlot.
+--
+-- The base atlas icons have built-in padding within their cell and are tinted
+-- by the active/inactive colour (bright when selected, dim when not). The
+-- standalone dds has no padding and is a flat silhouette. So for PrimalScream
+-- we keep the base slot item (and its number key) full-size for layout but
+-- hide its texture, and draw the icon as a smaller, slightly-thinner, centered
+-- CHILD. The child inherits the parent's alpha, so it brightens/dims with
+-- selection exactly like the other icons; we only tint it alien-orange.
+if GUIInventory and not GUIInventory.kPrimalScreamIconPatched then
+
+    GUIInventory.kPrimalScreamIconPatched = true
+
+    local baseLocalAdjustSlot = GUIInventory.LocalAdjustSlot
+    function GUIInventory:LocalAdjustSlot(index, hudSlot, techId, isActive, resetAnimations, alienStyle)
+
+        baseLocalAdjustSlot(self, index, hudSlot, techId, isActive, resetAnimations, alienStyle)
+
+        local inventoryItem = self.inventoryIcons[index]
+        if not inventoryItem or not inventoryItem.Graphic then return end
+
+        if techId == kTechId.PrimalScream then
+
+            inventoryItem.Graphic:SetTexture("ui/transparent.dds")
+
+            local child = inventoryItem.PrimalScreamIcon
+            if not child then
+                child = GetGUIManager():CreateGraphicItem()
+                child:SetTexture(kPrimalScreamIconTexture)
+                child:SetTexturePixelCoordinates(0, 0, kPrimalScreamIconSize, kPrimalScreamIconSize)
+                child:SetAnchor(GUIItem.Middle, GUIItem.Center)
+                child:SetInheritsParentAlpha(true)
+                child:SetColor(kIconColors[kAlienTeamType])
+                inventoryItem.Graphic:AddChild(child)
+                inventoryItem.PrimalScreamIcon = child
+            end
+
+            local h = GUIInventory.kItemSize.y * 0.92
+            local w = h * 0.88 * 1.15   -- 15% wider horizontally
+            child:SetSize(Vector(w, h, 0))
+            child:SetPosition(Vector(-w / 2, -h / 2, 0))
+            child:SetIsVisible(true)
+
+        else
+
+            if inventoryItem.PrimalScreamIcon then
+                inventoryItem.PrimalScreamIcon:SetIsVisible(false)
+            end
+            inventoryItem.Graphic:SetTexture(kInventoryIconsTexture)
+            inventoryItem.Graphic:SetTexturePixelCoordinates(GetTexCoordsForTechId(techId))
+
+        end
+
+    end
+
+end
 
 local kBackgroundNoiseTexture = PrecacheAsset("ui/alien_commander_bg_smoke.dds")
 local kBabblerTexture = PrecacheAsset("ui/babbler.dds")
@@ -996,16 +1061,49 @@ function GUIAlienHUD:UpdateAbilities(deltaTime)
         local cooldown = abilityData[currentIndex + 5] or 0
 
 
-        local x1, y1, x2, y2 = GetTexCoordsForTechId(techId)
-
         self.activeAbilityIcon:SetIsVisible(true)
-        self.activeAbilityIcon:SetTexturePixelCoordinates(x1,y1,x2,y2)
+
+        -- Resolve the icon texture + source coords. Primal Scream has no slot
+        -- in the shared atlas, so it uses its own standalone texture (whose
+        -- height differs from kInventoryIconTextureHeight, which matters for
+        -- the cooldown wipe below).
+        local x1, y1, x2, y2
+        local texHeight = kInventoryIconTextureHeight
+
+        -- Base display size for the active ability icon.
+        local baseW = GUIScale(kInventoryIconTextureWidth * 0.75)
+        local baseH = GUIScale(kInventoryIconTextureHeight * 0.75)
+        local iconW, iconH = baseW, baseH
+
+        if techId == kTechId.PrimalScream then
+            self.activeAbilityIcon:SetTexture(kPrimalScreamIconTexture)
+            self.activeAbilityCooldownIcon:SetTexture(kPrimalScreamIconTexture)
+            x1, y1, x2, y2 = 0, 0, kPrimalScreamIconSize, kPrimalScreamIconSize
+            texHeight = kPrimalScreamIconSize
+            -- The standalone icon has no internal padding (unlike the atlas
+            -- cells), so shrink it overall to match the visual weight of the
+            -- other ability icons (then 15% wider horizontally).
+            iconW = baseW * 0.70 * 0.85 * 1.15
+            iconH = baseH * 0.70
+        else
+            self.activeAbilityIcon:SetTexture(kInventoryIconsTexture)
+            self.activeAbilityCooldownIcon:SetTexture(kInventoryIconsTexture)
+            x1, y1, x2, y2 = GetTexCoordsForTechId(techId)
+        end
+
+        self.activeAbilityIcon:SetSize(Vector(iconW, iconH, 0))
+        self.activeAbilityIcon:SetPosition(Vector(-iconW / 2, -iconH / 2, 0))
+        self.activeAbilityIcon:SetTexturePixelCoordinates(x1, y1, x2, y2)
 
         if cooldown > 0 then
-            local offset = kInventoryIconTextureHeight * ( 0.925 - 0.925 * cooldown ) -- [1,0] -> [0, 0.95]
+            local fraction = 0.925 - 0.925 * cooldown -- [1,0] -> [0, 0.925]
+            -- The cooldown overlay is a child of the icon, so size it relative
+            -- to the icon's actual display size and wipe the texture coords by
+            -- the source texture's height.
+            local texOffset = texHeight * fraction
             self.activeAbilityCooldownIcon:SetIsVisible(true)
-            self.activeAbilityCooldownIcon:SetSize(Vector(GUIScale(kInventoryIconTextureWidth*0.75), GUIScale(( kInventoryIconTextureHeight - offset )*0.75), 0))
-            self.activeAbilityCooldownIcon:SetTexturePixelCoordinates(x1,y1,x2,y2 - offset)
+            self.activeAbilityCooldownIcon:SetSize(Vector(iconW, iconH * (1 - fraction), 0))
+            self.activeAbilityCooldownIcon:SetTexturePixelCoordinates(x1,y1,x2,y2 - texOffset)
         else
             self.activeAbilityCooldownIcon:SetIsVisible(false)
         end
@@ -1026,6 +1124,22 @@ function GUIAlienHUD:UpdateAbilities(deltaTime)
         self.activeAbilityIcon:SetColor(setColor)
         self.energyBall:GetLeftSide():SetColor(setColor)
         self.energyBall:GetRightSide():SetColor(setColor)
+
+        -- Primal Scream: only tint the standalone icon if the team's biomass
+        -- is actually high enough. This is an additional client-side guard
+        -- to avoid the HUD showing the ability as active when BioMass < 8.
+        if techId == kTechId.PrimalScream and totalPower >= minimumPower then
+            local teamInfo = GetTeamInfoEntity(kTeam2Index)
+            local biomassLevel = 0
+            if teamInfo and teamInfo.GetBioMassLevel then
+                biomassLevel = teamInfo:GetBioMassLevel()
+            end
+            if biomassLevel >= 8 then
+                self.activeAbilityIcon:SetColor(kIconColors[kAlienTeamType])
+            else
+                self.activeAbilityIcon:SetColor(Color(0,0,0,1))
+            end
+        end
 
     else
         self.activeAbilityIcon:SetIsVisible(false)

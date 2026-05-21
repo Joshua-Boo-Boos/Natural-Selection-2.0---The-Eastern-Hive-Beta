@@ -612,7 +612,28 @@ function Vokex:OnUpdateAnimationInput(modelMixin)
 
     Player.OnUpdateAnimationInput(self, modelMixin)
 
-    local attackSpeed = self:GetIsEnzymed() and kEnzymeAttackSpeed or kDefaultAttackSpeed
+    -- Server has the authoritative primal flag; the client reads the
+    -- networked window from PrimalScreamFX.lua (the mixin field never syncs).
+    local isPrimal
+    if Server then
+        isPrimal = self.enzymeIsFromPrimalScream == true
+    elseif GetIsClientPrimalScreamed then
+        isPrimal = GetIsClientPrimalScreamed(self:GetId())
+    else
+        isPrimal = false
+    end
+
+    local attackSpeed = kDefaultAttackSpeed
+    if self.GetIsEnzymed and self:GetIsEnzymed() then
+        if isPrimal then
+            -- PrimalScream is exactly 50% of the enzyme attack-speed boost.
+            local kPrimalScreamFraction = 0.5
+            local enzymeBoost = (kEnzymeAttackSpeed - kDefaultAttackSpeed)
+            attackSpeed = kDefaultAttackSpeed + enzymeBoost * kPrimalScreamFraction
+        else
+            attackSpeed = kEnzymeAttackSpeed
+        end
+    end
     attackSpeed = attackSpeed * ( self.electrified and kElectrifiedAttackSpeed or 1 )
     if self.ModifyAttackSpeed then
 

@@ -1583,13 +1583,26 @@ function Babbler:GetIsDetectedOverride()
 end
 
 function Babbler:GetIsCamouflaged()
+
+    -- Prefer the live parent's camo state when the babbler is clinged to one
+    -- (covers the clinged-to-gorge case).
     if self.clinged then
         local parent = self:GetParent()
         if parent and HasMixin(parent, "Cloakable") then
             return parent:GetIsCamouflaged()
         end
     end
-    
+
+    -- Fall through to the owning entity. This handles two cases:
+    --   * Babbler is clinged but has no parent (Embryo gestation re-attach path).
+    --   * Babbler is loose / following / orbiting its camouflaged owner.
+    -- Cloaking with a camouflaged owner matches the player's expectation that
+    -- the swarm follows the gorge into stealth.
+    local owner = self:GetOwner()
+    if owner and HasMixin(owner, "Cloakable") then
+        return owner:GetIsCamouflaged()
+    end
+
     return false
 end
 
