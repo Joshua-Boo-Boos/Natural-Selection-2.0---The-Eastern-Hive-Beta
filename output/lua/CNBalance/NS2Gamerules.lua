@@ -4,9 +4,10 @@
         bountyActive = true,
         resourceEfficiency = true,
         recentWinsBalance = true,
-        deadlockInitialTime = 2700,
+        deadlockEnabled = true,        -- master on/off switch for the deadlock decay system
+        deadlockInitialTime = 2400,    -- deadlock starts 40 minutes (2400s) into the round
         deadlockRequireMinPlayers = true,
-        deadlockMinPlayers = 10
+        deadlockMinPlayers = 10        -- combined human players on Marine + Alien teams; spectators/ready room/bots do not count
      }, true)
 
      NS2Gamerules.kRecentRoundStatus = LoadConfigFile("NS2.0RoundStatus.json",{
@@ -46,6 +47,7 @@
              if self.gameState == kGameState.Started then
 
                  self.gameStartTime = Shared.GetTime()
+                 self._lastDeadlockTickTime = nil
 
                  self.gameInfo:SetStartTime(self.gameStartTime)
 

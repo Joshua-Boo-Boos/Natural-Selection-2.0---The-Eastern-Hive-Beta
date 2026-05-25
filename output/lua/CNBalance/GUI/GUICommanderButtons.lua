@@ -1,5 +1,147 @@
 
 local kCommanderIcons = PrecacheAsset("ui/alien_hivestatus_commicons.dds")
+
+local kLifeformEggButtonIcons =
+{
+    [kTechId.ProwlerEgg] =
+    {
+        UseBuildMenuIcon = true,
+    },
+
+    [kTechId.VokexEgg] =
+    {
+        Texture = kCommanderIcons,
+        TextureCoords = { 432, 0, 504, 68 },
+        Scale = 0.809875,
+        Offset = Vector(-4, -7, 0),
+    }
+}
+
+local kLifeformEggIconEnabledColor = Color(1, 0.62, 0.06, 1)
+local kLifeformEggIconDisabledColor = Color(0.35, 0.35, 0.35, 1)
+local kLifeformEggIconScale = 0.775
+
+local function GetLifeformEggButtonColor(buttonItem)
+
+    local color = buttonItem:GetColor()
+    if color.a <= 0 then
+        return color
+    end
+
+    if color.r < 0.5 and color.g < 0.5 and color.b < 0.5 then
+        return kLifeformEggIconDisabledColor
+    end
+
+    if color.r > 0.8 and color.g < 0.2 and color.b < 0.2 then
+        return kLifeformEggIconDisabledColor
+    end
+
+    return Color(kLifeformEggIconEnabledColor.r, kLifeformEggIconEnabledColor.g, kLifeformEggIconEnabledColor.b, color.a)
+
+end
+
+local function GetCommanderButtonTechId(buttonIndex)
+
+    local player = Client.GetLocalPlayer()
+    if not player or not player.menuTechButtons or buttonIndex > table.icount(player.menuTechButtons) then
+        return kTechId.None
+    end
+
+    if buttonIndex == 4 then
+        local selectedEnts = player:GetSelection()
+        if selectedEnts and selectedEnts[1] then
+            return selectedEnts[1]:GetTechId()
+        end
+    end
+
+    return player.menuTechButtons[buttonIndex]
+
+end
+
+local function UpdateLifeformEggButtonIcon(self, buttonIndex)
+
+    local buttonItem = self.buttons and self.buttons[buttonIndex]
+    if not buttonItem then
+        return
+    end
+
+    local techId = GetCommanderButtonTechId(buttonIndex)
+    local iconInfo = kLifeformEggButtonIcons[techId]
+    if not iconInfo then
+        buttonItem:SetTexture("ui/buildmenu.dds")
+
+        if buttonItem.lifeformEggIcon then
+            buttonItem.lifeformEggIcon:SetIsVisible(false)
+        end
+
+        return
+    end
+
+    local icon = buttonItem.lifeformEggIcon
+    if not icon then
+        icon = GUIManager:CreateGraphicItem()
+        icon:SetAnchor(GUIItem.Middle, GUIItem.Center)
+        icon:SetInheritsParentAlpha(true)
+        buttonItem:AddChild(icon)
+        buttonItem.lifeformEggIcon = icon
+    end
+
+    local iconSize = buttonItem:GetSize() * (iconInfo.Scale or kLifeformEggIconScale)
+    local iconColor = GetLifeformEggButtonColor(buttonItem)
+
+    buttonItem:SetTexture("ui/transparent.dds")
+    buttonItem:SetTexturePixelCoordinates(0, 0, 1, 1)
+    buttonItem:SetColor(Color(iconColor.r, iconColor.g, iconColor.b, iconColor.a))
+
+    if iconInfo.UseBuildMenuIcon then
+        icon:SetTexture("ui/buildmenu.dds")
+        icon:SetTexturePixelCoordinates(GUIUnpackCoords(GetTextureCoordinatesForIcon(techId)))
+    elseif iconInfo.TextureCoords then
+        icon:SetTexture(iconInfo.Texture)
+        icon:SetTexturePixelCoordinates(GUIUnpackCoords(iconInfo.TextureCoords))
+    else
+        icon:SetTexture(iconInfo.Texture)
+        icon:SetTexturePixelCoordinates(0, 0, iconInfo.SourceWidth, iconInfo.SourceHeight)
+    end
+    icon:SetSize(iconSize)
+    icon:SetPosition(-iconSize * 0.5 + (iconInfo.Offset or Vector(0, 0, 0)))
+    icon:SetColor(iconColor)
+    icon:SetIsVisible(true)
+
+end
+
+local function SyncLifeformEggButtonIconColors(self)
+
+    if not self.buttons then
+        return
+    end
+
+    for i = 1, #self.buttons do
+        local buttonItem = self.buttons[i]
+        local techId = GetCommanderButtonTechId(i)
+        local iconInfo = kLifeformEggButtonIcons[techId]
+        if iconInfo then
+            local iconColor = GetLifeformEggButtonColor(buttonItem)
+            buttonItem:SetColor(iconColor)
+
+            if buttonItem.lifeformEggIcon then
+                buttonItem.lifeformEggIcon:SetColor(iconColor)
+            end
+        elseif buttonItem.lifeformEggIcon and buttonItem.lifeformEggIcon:GetIsVisible() then
+            buttonItem.lifeformEggIcon:SetIsVisible(false)
+        end
+    end
+
+end
+
+local baseUpdateButtonStatus = GUICommanderButtons.UpdateButtonStatus
+function GUICommanderButtons:UpdateButtonStatus(buttonIndex)
+
+    baseUpdateButtonStatus(self, buttonIndex)
+    UpdateLifeformEggButtonIcon(self, buttonIndex)
+
+end
+
 local function ResetTeamCountIcon(element)
     element.count = 0
     element:SetColor(GUIMarineHUD.kCountNoUsed)
@@ -150,6 +292,8 @@ local kErrorColor = Color(1, 0, 0, 1)
 local baseUpdate = GUICommanderButtons.Update
 function GUICommanderButtons:Update(deltaTime)
     baseUpdate(self,deltaTime)
+    SyncLifeformEggButtonIconColors(self)
+
     local player = Client.GetLocalPlayer()
     local teamInfo = GetTeamInfoEntity(player:GetTeamNumber())
     if teamInfo then

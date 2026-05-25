@@ -51,3 +51,15 @@ function PlayerUI_GetDeadlockTimeLeft()
     return 99999
 
 end
+
+local basePlayerUI_GetTooltipDataFromTechId = PlayerUI_GetTooltipDataFromTechId
+function PlayerUI_GetTooltipDataFromTechId(techId, hotkeyIndex)
+
+    local tooltipData = basePlayerUI_GetTooltipDataFromTechId(techId, hotkeyIndex)
+    if tooltipData and tooltipData.resourceType == nil then
+        tooltipData.resourceType = 0
+    end
+
+    return tooltipData
+
+end

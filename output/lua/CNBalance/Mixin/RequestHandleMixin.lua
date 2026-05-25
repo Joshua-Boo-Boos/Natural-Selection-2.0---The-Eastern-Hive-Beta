@@ -72,25 +72,41 @@ if Server then
         CreateEntity(NutrientMist.kMapName,self:GetOrigin(),self:GetTeamNumber())
     end
 
+    -- Returning TRUE here makes PlayingTeam:TriggerAlert swallow the request so
+    -- the "player needs health/ammo" sound is NOT played to the commander;
+    -- returning FALSE lets the alert (and its sound) reach the commander.
+    --
+    -- Rule: if the marine is NOT on the auto-med/auto-ammo cooldown, the auto
+    -- system will service the request itself (the scheduled MedSelf/AmmoSelf
+    -- fires shortly), so there's no need to bother the commander -> suppress.
+    -- If the marine IS still on cooldown (auto can't help yet) OR the team has
+    -- Military Protocol researched, the request always reaches the commander.
     function RequestHandleMixin:HandleManualAlert(techId)
 
         if self.kIgnoreRequest then return false end
-        
+
+        local now = Shared.GetTime()
+        local hasMilitaryProtocol = GetHasTech(self, kTechId.MilitaryProtocol)
+
         if techId == kTechId.MarineAlertNeedMedpack then
-            self:AddTimedCallback(self.MedSelf,kAlertHandleDelay)
-            --return true
+            self:AddTimedCallback(self.MedSelf, kAlertHandleDelay)
+            local onMedCooldown = now < self.timeLastPrimaryRequestHandle
+            local playCommanderSound = onMedCooldown or hasMilitaryProtocol
+            return not playCommanderSound
         end
 
         if techId == kTechId.MarineAlertNeedAmmo then
-            self:AddTimedCallback(self.AmmoSelf,kAlertHandleDelay)
-            --return true
+            self:AddTimedCallback(self.AmmoSelf, kAlertHandleDelay)
+            local onAmmoCooldown = now < self.timeLastAutoAmmoPack
+            local playCommanderSound = onAmmoCooldown or hasMilitaryProtocol
+            return not playCommanderSound
         end
 
         if techId == kTechId.AlienAlertNeedMist then
             self:AddTimedCallback(self.MistSelf,kAlertHandleDelay)
             --return true
         end
-        
+
         return false
     end
 end

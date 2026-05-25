@@ -50,8 +50,8 @@ kSubMachineGunWeight = 0.08
 kLightMachineGunWeight = 0.13
 kRevolverWeight = 0
 
-kMaxInfantryPortalsPerCommandStation = 9
-kMaxInfantryPortalsGlobal = 9
+kMaxInfantryPortalsPerCommandStation = 12 -- Was 9
+kMaxInfantryPortalsGlobal = 12 -- Was 9
 kMaxCommanderMines = 12
 kMaxAlienCommanderWhips = 6
 kNumMines = 2 -- Was 4 mines for 20 p-res

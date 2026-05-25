@@ -20,26 +20,24 @@ if Client then
     local kHandleCooldown  = 1.0   -- seconds before retrying after a dead handle
     local kBalanceInterval = 0.2   -- volume-balance check rate (~5 Hz)
 
-    -- Which custom sound banks get the sound-slider volume balancing. The mod
-    -- originally only balanced ns2plus.fev; NS1_Sounds.fev (Primal Scream etc.)
-    -- must be included too so those sounds respect the sound-volume slider.
+    -- ns2plus.fev (commander/voice) sounds get balanced to the sound-volume
+    -- slider directly (volume = slider). Match is case-insensitive.
     local function IsBalancedFev(name)
-        return name ~= nil
-           and string.find(name, "ns2plus.fev") ~= nil
-           -- ( string.find(name, "ns2plus.fev") ~= nil
-           -- or string.find(name, "NS1_Sounds.fev") ~= nil )
+        if name == nil then return false end
+        return string.find(string.lower(name), "ns2plus.fev", 1, true) ~= nil
     end
 
-    -- Per-bank extra volume multiplier (applied on top of the slider). The
-    -- NS1_Sounds.fev Primal Scream sounds are 20% quieter.
-    local function FevVolumeScale(name)
-        -- Attempting to get all affected Primal Scream entities to play the sound
-        -- at a fixed volume as bots are not playing the Primal Scream received sound
-        -- as far as I can tell
-        -- if name and string.find(name, "NS1_Sounds.fev") ~= nil then
-        --     return 0.8
-        -- end
-        return 1
+    -- Primal Scream sounds must also follow the sound-volume slider, but they
+    -- keep their server-set base loudness (self.volume) and the slider scales
+    -- THAT (volume = self.volume * slider). We detect them by the "primalscream"
+    -- substring rather than the bank name: Shared.GetSoundName may return only
+    -- the event path (e.g. "Lerk/PrimalScream") without the .fev bank prefix,
+    -- so a bank-name match is unreliable -- but the event name always contains
+    -- "PrimalScream". Both events ("Lerk/PrimalScream" and
+    -- "Aliens/PrimalScreamReceiving") match. Case-insensitive.
+    local function IsPrimalScreamSound(name)
+        if name == nil then return false end
+        return string.find(string.lower(name), "primalscream", 1, true) ~= nil
     end
 
     -- Safely destroy an FMOD instance (dead handles won't crash).
@@ -91,8 +89,8 @@ if Client then
             -- sound playing at full, unbalanced volume. Recomputing here -- where
             -- assetIndex is valid -- guarantees correct volume balancing.
             local changedAssetName = Shared.GetSoundName(self.assetIndex)
-            self.balanceVoice   = IsBalancedFev(changedAssetName)
-            self.fevVolumeScale = FevVolumeScale(changedAssetName)
+            self.balanceVoice    = IsBalancedFev(changedAssetName)
+            self.primalScreamSnd = IsPrimalScreamSound(changedAssetName)
             self._balVol        = nil
             self._balNextCheck  = 0
 
@@ -185,15 +183,15 @@ if Client then
         baseOnInitialized(self)
 
         local assetName = Shared.GetSoundName(self.assetIndex)
-        self.balanceVoice  = IsBalancedFev(assetName)
-        self.fevVolumeScale = FevVolumeScale(assetName)
+        self.balanceVoice    = IsBalancedFev(assetName)
+        self.primalScreamSnd = IsPrimalScreamSound(assetName)
         self._balVol       = nil
         self._balNextCheck = 0
     end
 
     -- ── Volume-balance for NS2.0-TEH entity-based sounds ────────────
     local function CustomBalanceVoice(self)
-        if not self.balanceVoice then return end
+        if not self.balanceVoice and not self.primalScreamSnd then return end
         if not self.playing then
             self._balVol = nil
             return
@@ -209,9 +207,16 @@ if Client then
         if now < self._balNextCheck then return end
         self._balNextCheck = now + kBalanceInterval
 
-        local volume = OptionsDialogUI_GetSoundVolume() / 100
-        volume = volume * (gMuteCustomVoices and 0 or 1)
-        volume = volume * (self.fevVolumeScale or 1)
+        local slider = OptionsDialogUI_GetSoundVolume() / 100
+        local volume
+        if self.primalScreamSnd then
+            -- Keep the server-set base loudness (self.volume, e.g. 0.16) and let
+            -- the sound slider scale it: at 100% slider it plays at the base
+            -- volume, at 50% it plays at half, etc.
+            volume = (self.volume or 0.16) * slider
+        else
+            volume = slider * (gMuteCustomVoices and 0 or 1)
+        end
 
         if self._balVol == volume then return end
         self._balVol = volume
@@ -255,7 +260,6 @@ if Client then
     local function GetVolume(soundEffectName, volume)
         if IsBalancedFev(soundEffectName) then
             volume = (volume or 0.8) * OptionsDialogUI_GetSoundVolume() / 100
-            volume = volume * FevVolumeScale(soundEffectName)
         end
         return volume
     end

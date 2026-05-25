@@ -28,8 +28,8 @@ local kPrimalScreamCastSound = PrecacheAsset("sound/NS1_Sounds.fev/Lerk/PrimalSc
 local kReceiveSound = PrecacheAsset("sound/NS1_Sounds.fev/Aliens/PrimalScreamReceiving")
 
 -- The volume levels of both Primal Scream sounds
-local kPrimalScreamVolume = 0.16
-local kPrimalScreamReceivedVolume = 0.16
+local kPrimalScreamVolume = 0.24
+local kPrimalScreamReceivedVolume = 0.24
 
 -- Drive the bite animation on the lerk's first-person view each cast.
 local kViewModelName  = PrecacheAsset("models/alien/lerk/lerk_view.model")

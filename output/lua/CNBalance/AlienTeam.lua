@@ -1013,7 +1013,9 @@ function AlienTeam:InitTechTree()
 
     self.techTree:AddUpgradeNode(kTechId.GorgeEgg, kTechId.BioMassTwo)
     self.techTree:AddUpgradeNode(kTechId.LerkEgg, kTechId.BioMassFour)
+    self.techTree:AddUpgradeNode(kTechId.ProwlerEgg, kTechId.BioMassFour)
     self.techTree:AddUpgradeNode(kTechId.FadeEgg, kTechId.BioMassEight)
+    self.techTree:AddUpgradeNode(kTechId.VokexEgg, kTechId.BioMassEight)
     self.techTree:AddUpgradeNode(kTechId.OnosEgg, kTechId.BioMassNine)
 
     -- Special alien structures. These tech nodes are modified at run-time, depending when they are built, so don't modify prereqs.
@@ -1159,7 +1161,7 @@ function AlienTeam:InitTechTree()
     self.techTree:AddActivation(kTechId.AcidSpray,           kTechId.BioMassFive,  kTechId.None,kTechId.AllAliens)
     
     -- vokex researches
-    self.techTree:AddPassive(kTechId.ShadowStep,           kTechId.None)
+    self.techTree:AddUnlockActivation(kTechId.ShadowStep,             kTechId.BioMassOne, kTechId.None,kTechId.AllAliens)
     self.techTree:AddUnlockActivation(kTechId.MetabolizeShadowStep,        kTechId.BioMassTwo, kTechId.None,kTechId.AllAliens)
     self.techTree:AddUnlockActivation(kTechId.AcidRocket,                        kTechId.BioMassSix,  kTechId.None,kTechId.AllAliens)
     --self.techTree:AddActivation(kTechId.MetabolizeShadowStepHealth,        kTechId.BioMassFive, kTechId.None,kTechId.AllAliens)

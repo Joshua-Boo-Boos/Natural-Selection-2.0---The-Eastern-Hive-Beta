@@ -1033,7 +1033,7 @@ function BuildTechData()
         [kTechDataGestateName] = Prowler.kMapName,
         [kTechDataGestateTime] = kProwlerGestateTime,
         [kTechDataDisplayName] = "PROWLER",
-        [kTechDataTooltipInfo] = "PROWLER_TOOLTIP",
+        [kTechDataTooltipInfo] = "PROWLER_EGG_TOOLTIP",
         [kTechDataModel] = Prowler.kModelName,
         [kTechDataCostKey] = kProwlerCost,
         [kTechDataMaxHealth] = Prowler.kHealth,
@@ -1067,7 +1067,7 @@ function BuildTechData()
         [kTechDataGestateName] = Vokex.kMapName,
         [kTechDataGestateTime] = kVokexGestateTime,
         [kTechDataDisplayName] = "VOKEX",
-        [kTechDataTooltipInfo] = "VOKEX_TOOLTIP",
+        [kTechDataTooltipInfo] = "VOKEX_EGG_TOOLTIP",
         [kTechDataModel] = Vokex.kModelName,
         [kTechDataCostKey] = kVokexCost,
         [kTechDataMaxHealth] = Vokex.kHealth,
@@ -1080,8 +1080,6 @@ function BuildTechData()
     table.insert(techData, {
         [kTechDataId] = kTechId.ShadowStep,
         [kTechDataCategory] = kTechId.Vokex,
-        [kTechDataCostKey] = kShadowStepResearchCost,
-        [kTechDataResearchTimeKey] = kShadowStepResearchTime,
         [kTechDataDisplayName] = "SHADOWSTEP",
         [kTechDataTooltipInfo] = "SHADOWSTEP_TOOLTIP",
     })
@@ -1272,6 +1270,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1288,6 +1287,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1305,6 +1305,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1322,6 +1323,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1339,6 +1341,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1356,6 +1359,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1372,6 +1376,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1388,6 +1393,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
@@ -1423,6 +1429,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
         [kTechDataObstacleRadius] = 1.25,
         [kTechDataAllowConsumeDrop] = true,
@@ -1442,6 +1449,7 @@ function BuildTechData()
         [kTechDataMaxArmor] = kTunnelEntranceArmor,
         [kTechDataBuildTime] = kTunnelBuildTime,
         [kTechDataModel] = TunnelEntrance.kModelName,
+        [kTechDataRequiresInfestation] = true,
         [kTechDataPointValue] = kTunnelEntrancePointValue,
         [kTechDataAllowConsumeDrop] = true,
     })
@@ -1484,6 +1492,46 @@ function BuildTechData()
         [kTechDataMaxExtents] = Vector(1.75/2, 1, 1.75/2),
         [kTechDataRequiresInfestation] = true,
         [kTechDataAllowConsumeDrop] = true,
+    })
+
+    -- Commander-dropped Prowler egg (Biomass 4). Mirrors the vanilla lifeform-egg
+    -- entries (GorgeEgg/LerkEgg/...). The egg stays an "Egg" entity (UpgradeToTechId
+    -- only sets the techId); GetGestateTechId (Egg.lua post-hook) maps it to Prowler.
+    table.insert(techData,{
+        [kTechDataId] = kTechId.ProwlerEgg,
+        [kTechDataHint] = "EGG_HINT",
+        [kTechDataMapName] = Egg.kMapName,
+        [kTechDataDisplayName] = "PROWLER_EGG",
+        [kTechDataTooltipInfo] = "PROWLER_EGG_TOOLTIP",
+        [kTechDataMaxHealth] = Egg.kHealth,
+        [kTechDataMaxArmor] = Egg.kArmor,
+        [kTechDataModel] = Egg.kModelName,
+        [kTechDataPointValue] = kEggPointValue,
+        [kTechDataResearchTimeKey] = kEggGestateTime,
+        [kTechDataCostKey] = kProwlerEggCost,
+        [kTechDataMaxExtents] = Vector(1.75/2, .664/2, 1.275/2),
+        [kTechDataRequiresInfestation] = true,
+        [kTechDataResearchAllowedMethod] = GetLifeformEggAllowed,
+        [kTechDataOneAtATime] = true,
+    })
+
+    -- Commander-dropped Vokex egg (Biomass 8).
+    table.insert(techData,{
+        [kTechDataId] = kTechId.VokexEgg,
+        [kTechDataHint] = "EGG_HINT",
+        [kTechDataMapName] = Egg.kMapName,
+        [kTechDataDisplayName] = "VOKEX_EGG",
+        [kTechDataTooltipInfo] = "VOKEX_EGG_TOOLTIP",
+        [kTechDataMaxHealth] = Egg.kHealth,
+        [kTechDataMaxArmor] = Egg.kArmor,
+        [kTechDataModel] = Egg.kModelName,
+        [kTechDataPointValue] = kEggPointValue,
+        [kTechDataResearchTimeKey] = kEggGestateTime,
+        [kTechDataCostKey] = kVokexEggCost,
+        [kTechDataMaxExtents] = Vector(1.75/2, .664/2, 1.275/2),
+        [kTechDataRequiresInfestation] = true,
+        [kTechDataResearchAllowedMethod] = GetLifeformEggAllowed,
+        [kTechDataOneAtATime] = true,
     })
 
     table.insert(techData,{

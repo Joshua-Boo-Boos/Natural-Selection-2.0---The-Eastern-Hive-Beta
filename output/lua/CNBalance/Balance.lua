@@ -414,6 +414,7 @@ kSporesResearchTime = 60
 
 -- Prowler
 kProwlerCost = 15 --14 The problem is that if the Prowler is 21 p-res then it's meant to be as powerful as a Lerk. Maybe I should make the Prowler weaker and reduce the p-res cost?
+kProwlerEggCost = 25 -- commander-dropped Prowler egg (sits between Gorge egg 15 and Lerk egg 30)
 kProwlerGestateTime = 6
 kProwlerUpgradeCost = 2
 
