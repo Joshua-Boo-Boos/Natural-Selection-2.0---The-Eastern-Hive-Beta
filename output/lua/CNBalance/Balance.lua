@@ -69,8 +69,8 @@ kMilitaryProtocolPlayerResourcesPerKill = {
     [kTechId.Skulk] = 0.8, [kTechId.Gorge] = 1.2, [kTechId.Prowler] = 1.5, [kTechId.Lerk] = 2, [kTechId.Fade] = 3,[kTechId.Vokex] = 3, [kTechId.Onos] = 5,
 }
 
-kMarineRespawnTime = 14 -- 9
-kAlienSpawnTime = 15 -- 10
+kMarineRespawnTime = 9 -- 9
+kAlienSpawnTime = 10 -- 10
 
 kEggGenerationRate = 12  --13
 kAlienEggsPerHive = 2
