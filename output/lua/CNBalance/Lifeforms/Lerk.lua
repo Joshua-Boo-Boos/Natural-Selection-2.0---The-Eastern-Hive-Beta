@@ -8,6 +8,14 @@ if Server then
     -- delays that path for a moment.
     local function GivePrimalScreamIfReady(self)
 
+        -- Never grant Primal Scream in the ready room (mirrors how the Prowler
+        -- doesn't get its Rappel weapon there -- see Prowler_Server.lua's
+        -- InitWeaponsForReadyRoom). The ready room unlocks all tech, which would
+        -- otherwise hand every ready-room Lerk the ability.
+        if self:GetTeamNumber() == kTeamReadyRoom then
+            return
+        end
+
         local mapName = (PrimalScream and PrimalScream.kMapName) or "primalscream"
         if self:GetWeapon(mapName) then
             return

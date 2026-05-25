@@ -70,7 +70,9 @@ kTechIdToMaterialOffset[kTechId.ProwlerStructureAbility] = 102
 kTechIdToMaterialOffset[kTechId.ShadowStep] = 160
 kTechIdToMaterialOffset[kTechId.AcidRocket] = 209
 kTechIdToMaterialOffset[kTechId.Vokex] = 209
-kTechIdToMaterialOffset[kTechId.VokexEgg] = 209
+-- Vokex egg borrows the Fade's atlas icon (offset 30, same as Fade / FadeEgg).
+-- The commander egg button additionally mirrors it horizontally (GUICommanderButtons).
+kTechIdToMaterialOffset[kTechId.VokexEgg] = 30
 -- Use Umbra's icon slot for Primal Scream so the button renders an actual
 -- texture instead of falling through GetMaterialXYOffset's nil-return path.
 kTechIdToMaterialOffset[kTechId.PrimalScream] = 75

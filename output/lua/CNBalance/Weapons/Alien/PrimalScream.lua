@@ -13,6 +13,9 @@
 -- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
 Script.Load("lua/Weapons/Alien/Ability.lua")
+-- Spikes are the Lerk's secondary attack. Pull in the same mixin LerkBite uses so
+-- the Lerk can fire spikes (right-click) while Primal Scream is the equipped weapon.
+Script.Load("lua/Weapons/Alien/SpikesMixin.lua")
 
 class 'PrimalScream' (Ability)
 
@@ -46,9 +49,15 @@ local networkVars =
     lastPrimalScreamTime  = "time",
 }
 
+-- Merge SpikesMixin's network fields (shootingSpikes, silenced) into the spec.
+AddMixinNetworkVars(SpikesMixin, networkVars)
+
 function PrimalScream:OnCreate()
 
     Ability.OnCreate(self)
+
+    -- Spikes secondary attack (same mixin LerkBite uses).
+    InitMixin(self, SpikesMixin)
 
     self.primaryAttacking     = false
     self.primaryAttackLatched = false
@@ -74,6 +83,11 @@ end
 
 function PrimalScream:GetHUDSlot()
     return 4
+end
+
+-- Tells SpikesMixin which tech the secondary attack reports as (matches LerkBite).
+function PrimalScream:GetSecondaryTechId()
+    return kTechId.Spikes
 end
 
 function PrimalScream:GetDeathIconIndex()
@@ -184,15 +198,22 @@ function PrimalScream:OnUpdateAnimationInput(modelMixin)
 
     PROFILE("PrimalScream:OnUpdateAnimationInput")
 
-    modelMixin:SetAnimationInput("ability", "bite")
+    -- When the spikes (secondary) are firing, leave the activity to SpikesMixin's
+    -- OnUpdateAnimationInput (which sets "secondary"); otherwise drive the scream's
+    -- bite animation. Mirrors LerkBite's handling.
+    if not self:GetIsSecondaryBlocking() then
 
-    local activityString = "none"
-    if self.lastPrimalScreamTime > 0
-       and Shared.GetTime() - self.lastPrimalScreamTime < kBiteDuration then
-        activityString = "primary"
+        modelMixin:SetAnimationInput("ability", "bite")
+
+        local activityString = "none"
+        if self.lastPrimalScreamTime > 0
+           and Shared.GetTime() - self.lastPrimalScreamTime < kBiteDuration then
+            activityString = "primary"
+        end
+
+        modelMixin:SetAnimationInput("activity", activityString)
+
     end
-
-    modelMixin:SetAnimationInput("activity", activityString)
 
 end
 

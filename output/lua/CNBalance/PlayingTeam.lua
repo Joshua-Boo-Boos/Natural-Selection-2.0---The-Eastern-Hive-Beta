@@ -231,8 +231,63 @@ local function extGetIsResearchRelevant(techId)
     return oldGetIsResearchRelevant(techId)
 end
 
-local kDeadlockDecayInterval = 15
-local kDeadlockPeriodMinutes = 5
+local kDeadlockDecayInterval = 15   -- seconds per decay tick
+local kDeadlockPeriodMinutes = 5    -- minutes per escalating band
+local kDeadlockMinScale = 0.50      -- floor: a structure never drops below 50% of its base max EHP
+-- Per-15s-tick reduction for each consecutive 5-minute band. Constant +0.25% step,
+-- so cumulative reduction reaches exactly 50% at T+20 (20 ticks/band):
+--   20*(0.25 + 0.50 + 0.75 + 1.00)% = 50%.
+local kDeadlockPeriodRates = { 0.0025, 0.005, 0.0075, 0.010 }
+
+-- Absolute deadlock scale as a function of seconds elapsed since the deadlock
+-- start time T. Returns the fraction of base max EHP a structure should have RIGHT
+-- NOW. Being a pure function of elapsed time, it gives brand-new structures the
+-- correct catch-up value: one placed at T+12 is scaled to exactly what it would be
+-- had it existed since T.
+local function ComputeDeadlockScale(elapsedSeconds)
+    local ticks = math.floor(math.max(0, elapsedSeconds) / kDeadlockDecayInterval)
+    local ticksPerBand = (kDeadlockPeriodMinutes * 60) / kDeadlockDecayInterval -- 20
+    local reduction = 0
+    for band = 1, #kDeadlockPeriodRates do
+        local bandTicks = math.min(ticks - (band - 1) * ticksPerBand, ticksPerBand)
+        if bandTicks <= 0 then break end
+        reduction = reduction + bandTicks * kDeadlockPeriodRates[band]
+    end
+    return math.max(kDeadlockMinScale, 1 - reduction)
+end
+
+-- Force a single structure's max health/armor to (base * scale). The pre-deadlock
+-- base maxima are captured ONCE (first time we touch the structure) so the scale is
+-- always applied against the true originals instead of compounding each pass.
+local function ApplyDeadlockScaleToStructure(target, scale)
+
+    if not target.SetMaxHealth or not target.GetMaxHealth then return end
+    if target.CanTakeDamage and not target:CanTakeDamage() then return end
+
+    if not target.deadlockBaseMaxHealth then
+        target.deadlockBaseMaxHealth = target:GetMaxHealth()
+        target.deadlockBaseMaxArmor = (target.GetMaxArmor and target:GetMaxArmor()) or 0
+    end
+
+    local newMaxHealth = math.max(1, math.floor(target.deadlockBaseMaxHealth * scale + 0.5))
+    if target:GetMaxHealth() ~= newMaxHealth then
+        target:SetMaxHealth(newMaxHealth)
+        if target.GetHealth and target:GetHealth() > newMaxHealth then
+            if target.SetHealth then target:SetHealth(newMaxHealth) else target.health = newMaxHealth end
+        end
+    end
+
+    if target.SetMaxArmor and target.GetMaxArmor then
+        local newMaxArmor = math.max(0, math.floor(target.deadlockBaseMaxArmor * scale + 0.5))
+        if target:GetMaxArmor() ~= newMaxArmor then
+            target:SetMaxArmor(newMaxArmor)
+            if target.GetArmor and target:GetArmor() > newMaxArmor then
+                if target.SetArmor then target:SetArmor(newMaxArmor) else target.armor = newMaxArmor end
+            end
+        end
+    end
+
+end
 
 function PlayingTeam:OnGameStateChanged(_state)
     if _state == kGameState.Started then
@@ -296,87 +351,83 @@ function PlayingTeam:UpdateDeadlock()
             return
         end
         
-        -- Escalating decay, measured from the configured deadlock start time T
-        -- (T = round start + deadlockInitialTime, from NS2.0Config.json). Every
-        -- 15 seconds we remove a fixed percentage of each structure's ORIGINAL
-        -- max EHP. The per-tick percentage steps up every 5 minutes by a CONSTANT
-        -- difference of 0.25%, chosen so the cumulative reduction reaches exactly
-        -- 50% at T+20 (each band is 20 ticks; 20*(0.25+0.50+0.75+1.00)% = 50%):
-        --   [T,    T+5)  : 0.25%/tick  (20 ticks =  5% total, cumulative  5%)
-        --   [T+5,  T+10) : 0.50%/tick  (20 ticks = 10% total, cumulative 15%)
-        --   [T+10, T+15) : 0.75%/tick  (20 ticks = 15% total, cumulative 30%)
-        --   [T+15, T+20) : 1.00%/tick  (20 ticks = 20% total, cumulative 50%)
-        -- At T+20 max EHP is exactly the 50% floor, where it stays for the rest of
-        -- the round (the floor clamp holds it there).
-        local kMinScale = 0.50   -- minimum floor: 50% of original max EHP, reached at T+20
-        local kDeadlockPeriodRates = { 0.0025, 0.005, 0.0075, 0.010 }
+        -- Escalating decay measured from the configured deadlock start time T
+        -- (T = round start + deadlockInitialTime, NS2.0Config.json). The per-15s
+        -- reduction steps up by a constant 0.25% every 5 minutes, reaching the 50%
+        -- floor exactly at T+20 (see ComputeDeadlockScale / kDeadlockPeriodRates):
+        --   [T,T+5) 0.25%   [T+5,T+10) 0.50%   [T+10,T+15) 0.75%   [T+15,T+20) 1.00%
+        --
+        -- We apply an ABSOLUTE scale (base max EHP * scale) to EVERY structure --
+        -- both teams AND neutral ones (e.g. unsocketed power nodes) -- with no
+        -- opt-outs, so chairs, RTs, power nodes and hives are all affected. Because
+        -- the scale is a pure function of elapsed time, a structure placed mid-
+        -- deadlock (say at T+12) is immediately set to the same max-EHP % it would
+        -- have had if it had existed since T (catch-up).
+        --
+        -- ===================== OLD DEADLOCK STRUCTURE PASS (commented for reference / toggle) =====================
+        -- The previous version iterated structures PER TEAM and skipped any with
+        -- kIgnoreDeadlock (so chairs, RTs, power nodes and hives were NOT affected),
+        -- and it reduced max EHP incrementally each 15s tick instead of to an
+        -- absolute time-based target (so newly-placed structures started at full
+        -- health with no catch-up). To restore it, comment out the new block below
+        -- and uncomment this one.
+        --
+        -- local kMinScale = 0.50
+        -- local kDeadlockPeriodRatesOld = { 0.0025, 0.005, 0.0075, 0.010 }
+        -- local damageFraction = 0
+        -- if now > self.deadlockDamageInterval then
+        --     self.deadlockDamageInterval = now + kDeadlockDecayInterval
+        --     local lastDeadlockTickTime = gamerules and gamerules._lastDeadlockTickTime or nil
+        --     local shouldApplyDamage = not lastDeadlockTickTime or now >= lastDeadlockTickTime + kDeadlockDecayInterval
+        --     if shouldApplyDamage then
+        --         if gamerules then gamerules._lastDeadlockTickTime = now end
+        --         local minutesSinceDeadlockStart = math.max(0, (now - self.deadlockTime) / 60)
+        --         local deadlockPeriod = math.max(1, math.floor(minutesSinceDeadlockStart / kDeadlockPeriodMinutes) + 1)
+        --         damageFraction = kDeadlockPeriodRatesOld[math.min(deadlockPeriod, #kDeadlockPeriodRatesOld)]
+        --     end
+        -- end
+        -- if damageFraction > 0 then
+        --     for teamNum = kTeam1Index, kTeam2Index do
+        --         for _, target in ipairs(GetEntitiesWithMixinForTeam("Construct", teamNum)) do
+        --             if not target.kIgnoreDeadlock and target.SetMaxHealth then
+        --                 if not target.CanTakeDamage or target:CanTakeDamage() then
+        --                     if not target.originalMaxHealth then
+        --                         target.originalMaxHealth = target:GetMaxHealth()
+        --                         target.originalMaxArmor = target:GetMaxArmor()
+        --                         target.originalEHP = target.originalMaxHealth + target.originalMaxArmor * kHealthPointsPerArmor
+        --                     end
+        --                     local origEHP = target.originalEHP or (target:GetMaxHealth() + target:GetMaxArmor() * kHealthPointsPerArmor)
+        --                     local currentMaxEHP = target:GetMaxHealth() + target:GetMaxArmor() * kHealthPointsPerArmor
+        --                     local newMaxEHP = math.max(currentMaxEHP - origEHP * damageFraction, origEHP * kMinScale)
+        --                     local scale = newMaxEHP / origEHP
+        --                     local newMaxHealth = math.max(1, math.floor((target.originalMaxHealth or target:GetMaxHealth()) * scale + 0.5))
+        --                     local newMaxArmor = math.max(0, math.floor((target.originalMaxArmor or target:GetMaxArmor()) * scale + 0.5))
+        --                     target:SetMaxHealth(newMaxHealth)
+        --                     target:SetMaxArmor(newMaxArmor)
+        --                     if target.GetHealth and target:GetHealth() > newMaxHealth then
+        --                         if target.SetHealth then target:SetHealth(newMaxHealth) else target.health = newMaxHealth end
+        --                     end
+        --                     if target.GetArmor and target:GetArmor() > newMaxArmor then
+        --                         if target.SetArmor then target:SetArmor(newMaxArmor) else target.armor = newMaxArmor end
+        --                     end
+        --                 end
+        --             end
+        --         end
+        --     end
+        -- end
+        -- =========================================================================================================
 
-        local damageFraction = 0
-        if now > self.deadlockDamageInterval then
-            self.deadlockDamageInterval = now + kDeadlockDecayInterval
-
-            local gamerules = GetGamerules()
-            local lastDeadlockTickTime = gamerules and gamerules._lastDeadlockTickTime or nil
-            local shouldApplyDamage = not lastDeadlockTickTime or now >= lastDeadlockTickTime + kDeadlockDecayInterval
-
-            if shouldApplyDamage then
-                if gamerules then
-                    gamerules._lastDeadlockTickTime = now
-                end
-
-                -- Which 5-minute band are we in, counting from T? Band 1 = [T, T+5),
-                -- band 2 = [T+5, T+10), etc. Clamp to the strongest (last) rate.
-                local minutesSinceDeadlockStart = math.max(0, (now - self.deadlockTime) / 60)
-                local deadlockPeriod = math.max(1, math.floor(minutesSinceDeadlockStart / kDeadlockPeriodMinutes) + 1)
-                damageFraction = kDeadlockPeriodRates[math.min(deadlockPeriod, #kDeadlockPeriodRates)]
+        -- Both teams call UpdateDeadlock; throttle the structure pass so it runs a
+        -- couple of times a second globally (cheap, and catches new structures fast).
+        local runStructurePass = (not gamerules) or (not gamerules._nextDeadlockScale) or (now >= gamerules._nextDeadlockScale)
+        if runStructurePass then
+            if gamerules then
+                gamerules._nextDeadlockScale = now + 0.5
             end
-        end
 
-        if damageFraction > 0 then
-            for teamNum = kTeam1Index, kTeam2Index do
-                for _, target in ipairs(GetEntitiesWithMixinForTeam("Construct", teamNum)) do
-                    if not target.kIgnoreDeadlock and target.SetMaxHealth then
-                        if not target.CanTakeDamage or target:CanTakeDamage() then
-
-                            -- store original max values on first application
-                            if not target.originalMaxHealth then
-                                target.originalMaxHealth = target:GetMaxHealth()
-                                target.originalMaxArmor = target:GetMaxArmor()
-                                target.originalEHP = target.originalMaxHealth + target.originalMaxArmor * kHealthPointsPerArmor
-                            end
-
-                            local origEHP = target.originalEHP or (target:GetMaxHealth() + target:GetMaxArmor() * kHealthPointsPerArmor)
-                            local currentMaxEHP = target:GetMaxHealth() + target:GetMaxArmor() * kHealthPointsPerArmor
-
-                            -- reduce current max EHP by the time-scaled % of original EHP, but never below the floor (50%)
-                            local newMaxEHP = math.max(currentMaxEHP - origEHP * damageFraction, origEHP * kMinScale)
-                            local scale = newMaxEHP / origEHP
-
-                            local newMaxHealth = math.max(1, math.floor((target.originalMaxHealth or target:GetMaxHealth()) * scale + 0.5))
-                            local newMaxArmor = math.max(0, math.floor((target.originalMaxArmor or target:GetMaxArmor()) * scale + 0.5))
-
-                            target:SetMaxHealth(newMaxHealth)
-                            target:SetMaxArmor(newMaxArmor)
-
-                            -- clamp current health/armor to new maxima (only reduce if above)
-                            if target.GetHealth and target:GetHealth() > newMaxHealth then
-                                if target.SetHealth then
-                                    target:SetHealth(newMaxHealth)
-                                else
-                                    target.health = newMaxHealth
-                                end
-                            end
-                            if target.GetArmor and target:GetArmor() > newMaxArmor then
-                                if target.SetArmor then
-                                    target:SetArmor(newMaxArmor)
-                                else
-                                    target.armor = newMaxArmor
-                                end
-                            end
-
-                        end
-                    end
-                end
+            local scale = ComputeDeadlockScale(now - self.deadlockTime)
+            for _, target in ipairs(GetEntitiesWithMixin("Construct")) do
+                ApplyDeadlockScaleToStructure(target, scale)
             end
         end
 

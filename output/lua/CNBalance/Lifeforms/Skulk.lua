@@ -20,11 +20,22 @@ local baseOnKill = Skulk.OnKill
 function Skulk:OnKill(attacker,doer,point, direction)
     baseOnKill(self,attacker,doer,point, direction)
 
+    -- OLD BEHAVIOR (kept for reference / toggle): once the Xenocide tech was
+    -- unlocked, EVERY dying Skulk dropped an enzyme cloud.
+    -- local xenocide = GetIsTechUnlocked(self,kTechId.Xenocide)
+    -- if xenocide then
+    --     CreateEntity(EnzymeCloud.kMapName, self:GetOrigin(), self:GetTeamNumber())
+    -- end
+
+    -- NEW BEHAVIOR: a Skulk that actually carries the Xenocide weapon explodes on
+    -- death, so it should NOT also drop an enzyme cloud. Only spawn the enzyme
+    -- cloud for Xenocide-teched Skulks that are NOT carrying the Xenocide weapon.
     local xenocide = GetIsTechUnlocked(self,kTechId.Xenocide)
-    if xenocide then
+    local hasXenocideWeapon = self:GetWeapon((XenocideLeap and XenocideLeap.kMapName) or "xenocide") ~= nil
+    if xenocide and not hasXenocideWeapon then
         CreateEntity(EnzymeCloud.kMapName, self:GetOrigin(), self:GetTeamNumber())
     end
-    
+
     --if not attacker or not attacker:isa("Player") then return end
     --if not HasMixin(attacker, "ParasiteAble") then return end
     --

@@ -10,10 +10,11 @@ local kLifeformEggButtonIcons =
 
     [kTechId.VokexEgg] =
     {
-        Texture = kCommanderIcons,
-        TextureCoords = { 432, 0, 504, 68 },
-        Scale = 0.809875,
-        Offset = Vector(-4, -7, 0),
+        -- Reuse the Fade egg's centered build-menu icon (VokexEgg's atlas offset is
+        -- set to the Fade cell in TechTreeButtons), but flip it horizontally so the
+        -- Vokex egg's Fade icon faces the other way.
+        UseBuildMenuIcon = true,
+        MirrorHorizontal = true,
     }
 }
 
@@ -95,7 +96,12 @@ local function UpdateLifeformEggButtonIcon(self, buttonIndex)
 
     if iconInfo.UseBuildMenuIcon then
         icon:SetTexture("ui/buildmenu.dds")
-        icon:SetTexturePixelCoordinates(GUIUnpackCoords(GetTextureCoordinatesForIcon(techId)))
+        local x1, y1, x2, y2 = GUIUnpackCoords(GetTextureCoordinatesForIcon(techId))
+        if iconInfo.MirrorHorizontal then
+            -- Swap left/right texture coords to flip the icon horizontally.
+            x1, x2 = x2, x1
+        end
+        icon:SetTexturePixelCoordinates(x1, y1, x2, y2)
     elseif iconInfo.TextureCoords then
         icon:SetTexture(iconInfo.Texture)
         icon:SetTexturePixelCoordinates(GUIUnpackCoords(iconInfo.TextureCoords))
