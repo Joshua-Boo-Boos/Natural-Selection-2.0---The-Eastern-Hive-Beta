@@ -59,6 +59,21 @@ function TunnelEntranceAbility:GetIsPositionValid(position, player, normal, last
         return false
     end
 
+    -- Gorge tunnels follow the same rule as commander tunnels: flat on the floor
+    -- only, and on a location a bot can actually path to. (TunnelExitAbility
+    -- inherits this method, so both entrance and exit are covered.)
+    if GetIsTunnelPlacementValid and not GetIsTunnelPlacementValid(position, normal) then
+        return false
+    end
+
+    -- Gorge tunnels follow the same rule as commander tunnels: flat on the floor
+    -- only, with enough open room for the fully-built tunnel (big enough for an
+    -- Onos to enter) and on a location bots can actually path to. (TunnelExitAbility
+    -- inherits this method, so both entrance and exit are covered.)
+    if GetIsTunnelPlacementValid and not GetIsTunnelPlacementValid(position, normal) then
+        return false
+    end
+
     local extents = GetExtents(self:GetDropStructureId())
     local maxExtent = math.max(extents.x,extents.y,extents.z)
     if math.abs(normal.y) < 0.95 then

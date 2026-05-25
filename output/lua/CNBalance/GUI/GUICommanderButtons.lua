@@ -12,9 +12,12 @@ local kLifeformEggButtonIcons =
     {
         -- Reuse the Fade egg's centered build-menu icon (VokexEgg's atlas offset is
         -- set to the Fade cell in TechTreeButtons), but flip it horizontally so the
-        -- Vokex egg's Fade icon faces the other way.
+        -- Vokex egg's Fade icon faces the other way. Scale = 1.0 makes the child icon
+        -- fill the whole button so it renders at the same size as the Fade egg's
+        -- (full-button) standard icon, rather than the smaller default egg-icon scale.
         UseBuildMenuIcon = true,
         MirrorHorizontal = true,
+        Scale = 1.0,
     }
 }
 

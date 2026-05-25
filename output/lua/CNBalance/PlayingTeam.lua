@@ -231,13 +231,13 @@ local function extGetIsResearchRelevant(techId)
     return oldGetIsResearchRelevant(techId)
 end
 
-local kDeadlockDecayInterval = 15   -- seconds per decay tick
-local kDeadlockPeriodMinutes = 5    -- minutes per escalating band
-local kDeadlockMinScale = 0.50      -- floor: a structure never drops below 50% of its base max EHP
--- Per-15s-tick reduction for each consecutive 5-minute band. Constant +0.25% step,
--- so cumulative reduction reaches exactly 50% at T+20 (20 ticks/band):
---   20*(0.25 + 0.50 + 0.75 + 1.00)% = 50%.
-local kDeadlockPeriodRates = { 0.0025, 0.005, 0.0075, 0.010 }
+local kDeadlockDecayInterval = 15     -- seconds per decay tick
+local kDeadlockPeriodMinutes = 1.25   -- minutes per escalating band
+local kDeadlockMinScale = 0.50        -- floor: a structure never drops below 50% of its base max EHP
+-- Per-15s-tick reduction for each consecutive 1.25-minute band (5 ticks/band).
+-- Constant +1% step, so cumulative reduction reaches exactly 50% at T+5 minutes:
+--   5*(1 + 2 + 3 + 4)% = 50%.
+local kDeadlockPeriodRates = { 0.01, 0.02, 0.03, 0.04 }
 
 -- Absolute deadlock scale as a function of seconds elapsed since the deadlock
 -- start time T. Returns the fraction of base max EHP a structure should have RIGHT
@@ -353,15 +353,15 @@ function PlayingTeam:UpdateDeadlock()
         
         -- Escalating decay measured from the configured deadlock start time T
         -- (T = round start + deadlockInitialTime, NS2.0Config.json). The per-15s
-        -- reduction steps up by a constant 0.25% every 5 minutes, reaching the 50%
-        -- floor exactly at T+20 (see ComputeDeadlockScale / kDeadlockPeriodRates):
-        --   [T,T+5) 0.25%   [T+5,T+10) 0.50%   [T+10,T+15) 0.75%   [T+15,T+20) 1.00%
+        -- reduction steps up by a constant 1% every 1.25 minutes, reaching the 50%
+        -- floor exactly at T+5 minutes (see ComputeDeadlockScale / kDeadlockPeriodRates):
+        --   [T,T+1.25) 1%   [T+1.25,T+2.5) 2%   [T+2.5,T+3.75) 3%   [T+3.75,T+5) 4%
         --
         -- We apply an ABSOLUTE scale (base max EHP * scale) to EVERY structure --
         -- both teams AND neutral ones (e.g. unsocketed power nodes) -- with no
         -- opt-outs, so chairs, RTs, power nodes and hives are all affected. Because
         -- the scale is a pure function of elapsed time, a structure placed mid-
-        -- deadlock (say at T+12) is immediately set to the same max-EHP % it would
+        -- deadlock (say at T+3) is immediately set to the same max-EHP % it would
         -- have had if it had existed since T (catch-up).
         --
         -- ===================== OLD DEADLOCK STRUCTURE PASS (commented for reference / toggle) =====================

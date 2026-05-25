@@ -253,6 +253,46 @@ local function GetIsTunnelTech(techId)
     return techId >= kTechId.BuildTunnelEntryOne and techId <= kTechId.BuildTunnelExitFour or techId == kTechId.Tunnel or techId == kTechId.TunnelExit or techId == kTechId.TunnelRelocate
 end
 
+-- Shared placement validation for ALL tunnels (commander + gorge). A tunnel is
+-- only valid when it sits flat on the floor and ON walkable ground that bots can
+-- actually stand on / path to (so no tunnels embedded in walls, jammed into
+-- ceilings, or perched on ledges / shipping-container tops above the navmesh).
+-- Returns (valid, errorString).
+local kTunnelFloorNormalMin = 0.95   -- surface must point essentially straight up
+-- The tunnel spot must be essentially ON the bot navmesh, not merely near it.
+-- These are tight so a ledge/roof a metre or so above adjacent walkable ground is
+-- rejected (its nearest navmesh point is below/beside it, beyond these limits).
+local kTunnelMaxNavDistXZ = 0.75   -- max horizontal gap to the nearest navmesh point
+local kTunnelMaxNavDistY  = 0.75   -- max vertical  gap to the nearest navmesh point
+
+function GetIsTunnelPlacementValid(position, normal)
+
+    -- 1) Horizontal floor only -- reject walls, ceilings and steep slopes.
+    if not normal or normal.y < kTunnelFloorNormalMin then
+        return false, "COMMANDERERROR_INVALID_PLACEMENT"
+    end
+
+    -- 2) Reachable by bots: the spot must sit right on the navigation mesh, at the
+    --    same height (so an Onos bot can actually stand there and enter). The
+    --    nearest navmesh point must be close BOTH horizontally and vertically --
+    --    an elevated ledge/roof fails because its nearest walkable ground is below
+    --    or off to the side. Run wherever the pathing mesh is available (the server
+    --    is authoritative; the client uses it for an accurate ghost when present).
+    if Pathing and Pathing.GetClosestPoint then
+        local navPoint = Pathing.GetClosestPoint(position)
+        if not navPoint then
+            return false, "COMMANDERERROR_INVALID_PLACEMENT"
+        end
+        local toMesh = navPoint - position
+        if toMesh:GetLengthXZ() > kTunnelMaxNavDistXZ or math.abs(toMesh.y) > kTunnelMaxNavDistY then
+            return false, "COMMANDERERROR_INVALID_PLACEMENT"
+        end
+    end
+
+    return true
+
+end
+
 --
 --Returns true or false if build attachments are fulfilled, as well as possible attach entity
 --to be hooked up to. If snap radius passed, then snap build origin to it when nearby. Otherwise
@@ -457,8 +497,22 @@ function GetIsBuildLegal(techId, position, angle, snapRadius, player, ignoreEnti
                 errorString = "COMMANDERERROR_INVALID_PLACEMENT"
             end
         end
+
+        -- Horizontal-floor / open-space / bot-reachability validation (shared with
+        -- gorge tunnels). Trace straight down to find the floor normal at the spot.
+        if legalBuild then
+            local traceStart = legalPosition + Vector(0, 0.5, 0)
+            local downTrace = Shared.TraceRay(traceStart, legalPosition - Vector(0, 1.0, 0),
+                CollisionRep.Default, PhysicsMask.AllButPCs, EntityFilterAll())
+            local floorNormal = (downTrace.fraction < 1) and downTrace.normal or nil
+            local valid, err = GetIsTunnelPlacementValid(legalPosition, floorNormal)
+            if not valid then
+                legalBuild = false
+                errorString = err or "COMMANDERERROR_INVALID_PLACEMENT"
+            end
+        end
     end
-    
+
     return legalBuild, legalPosition, attachEntity, errorString
 
 end

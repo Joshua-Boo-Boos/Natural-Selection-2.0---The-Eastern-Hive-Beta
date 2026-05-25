@@ -27,6 +27,12 @@ function GorgeTunnel:GetTechId()
     return kTechId.Tunnel
 end
 
+-- Gorge tunnels take twice as long to build as the shared tunnel build time.
+-- (Commander tunnels are the TunnelEntrance class, so they are unaffected.)
+function GorgeTunnel:GetTotalConstructionTime()
+    return LookupTechData(self:GetTechId(), kTechDataBuildTime, kDefaultBuildTime) * 2
+end
+
 function GorgeTunnel:OnDestroy()
     
     TunnelEntrance.OnDestroy(self)
