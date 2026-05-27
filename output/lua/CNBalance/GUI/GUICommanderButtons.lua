@@ -36,8 +36,11 @@ local function GetLifeformEggButtonColor(buttonItem)
         return kLifeformEggIconDisabledColor
     end
 
+    -- Bright-red button = tech/biomass met but not enough team res to afford the
+    -- upgrade. Keep the icon RED (matching the standard egg icons) instead of
+    -- greying it out, so the Vokex/Prowler egg icons show "can't afford" properly.
     if color.r > 0.8 and color.g < 0.2 and color.b < 0.2 then
-        return kLifeformEggIconDisabledColor
+        return color
     end
 
     return Color(kLifeformEggIconEnabledColor.r, kLifeformEggIconEnabledColor.g, kLifeformEggIconEnabledColor.b, color.a)
