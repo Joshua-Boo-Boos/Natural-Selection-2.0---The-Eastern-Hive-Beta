@@ -118,11 +118,18 @@ local function ClearPlayerNow(player)
         if onos and onosAlive then
             local onosViewDirection = onos:GetViewCoords().zAxis
             local endPoint = onos:GetEyePos() + onosViewDirection * 1.7
-            -- The extents of the Marine are Vector(0.4, 1.7, 0.4)
+            -- The extents of the Marine are Vector(0.4, 1.7, 0.4). The clearance
+            -- capsule uses a slightly TALLER body (1.9 instead of 1.7) to add a
+            -- small head-room margin -- without this, releasing while the Onos
+            -- looks slightly up could drop the marine into a ceiling tile. We
+            -- also explicitly reject startsolid because a zero-distance
+            -- TraceCapsule with start==end can report fraction==1 even when the
+            -- capsule is already overlapping geometry.
             local isBlockingWallTraceCapsule = Shared.TraceCapsule(onos:GetEyePos(), endPoint, 0.2, 1.7, CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
             if isBlockingWallTraceCapsule.fraction == 1 then
-                local isEnoughSpaceTraceCapsule = Shared.TraceCapsule(endPoint, endPoint, 0.2, 1.7, CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
-                if isEnoughSpaceTraceCapsule.fraction == 1 then
+                -- 1.7 was the value used but now 1.7 + 0.2 (this is to help stop a marine from being manually released into a wall) = 1.9
+                local isEnoughSpaceTraceCapsule = Shared.TraceCapsule(endPoint, endPoint, 0.2, 1.9, CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
+                if isEnoughSpaceTraceCapsule.fraction == 1 and not isEnoughSpaceTraceCapsule.startsolid then
                     player:SetOrigin(endPoint)
                     local newPlayer = player:Replace(player.previousMapName, player:GetTeamNumber(), false, endPoint)
                     newPlayer:DevourEscape()
