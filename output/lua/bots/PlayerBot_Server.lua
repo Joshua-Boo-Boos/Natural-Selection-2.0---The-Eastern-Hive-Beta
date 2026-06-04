@@ -26,11 +26,18 @@ Script.Load("lua/bots/BotMotion.lua")
 Script.Load("lua/bots/MarineBrain.lua")
 Script.Load("lua/bots/MinigunBrain.lua")
 Script.Load("lua/bots/RailgunBrain.lua")
+-- TEH: Load CommonAlienActions first (defines CreateAlienEvolveAction), then override
+-- it via TEHBotManager BEFORE any alien brain data tables are built. Brain data tables
+-- call CreateAlienEvolveAction at script-load time, so the override must be in place first.
+Script.Load("lua/bots/CommonAlienActions.lua")
+Script.Load("lua/bots/TEHBotManager.lua")
 Script.Load("lua/bots/SkulkBrain.lua")
 Script.Load("lua/bots/GorgeBrain.lua")
 Script.Load("lua/bots/LerkBrain.lua")
 Script.Load("lua/bots/FadeBrain.lua")
 Script.Load("lua/bots/OnosBrain.lua")
+Script.Load("lua/bots/ProwlerBrain.lua")
+Script.Load("lua/bots/VokexBrain.lua")
 
 
 local kBotPersonalSettings =
@@ -293,6 +300,7 @@ end
 -- Just delete the bot brain when the game is reset, will trigger _LazilyInitBrain on next update
 function PlayerBot:Reset()
     self.brain = nil
+    self.teh_assignedLifeform = nil  -- Clear lifeform assignment on round reset; TEHBotManager will re-assign 20s into the next round
 
     local player = self:GetPlayer()
     if IsValid(player) then
@@ -323,6 +331,12 @@ function PlayerBot:_LazilyInitBrain()
 
         elseif player:isa("Onos") then
             self.brain = OnosBrain()
+
+        elseif player:isa("Prowler") then
+            self.brain = ProwlerBrain()
+
+        elseif player:isa("Vokex") then
+            self.brain = VokexBrain()
 
         elseif player:isa("Exo") then   --FIXME Need to distinguish Minigun v Railgun
 

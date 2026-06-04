@@ -1026,6 +1026,15 @@ end
 
 local kValidatePlaceMines = function( bot, brain, marine, action )
     if not IsValid(action.structure) or not marine:GetWeaponInHUDSlot(4) then
+        brain.teh_mineTargetSetTime  = nil
+        brain.teh_mineTargetStructId = nil
+        return false
+    end
+
+    -- Timeout: give up after 12 seconds of trying to reach this structure
+    if brain.teh_mineTargetSetTime and Shared.GetTime() - brain.teh_mineTargetSetTime > 12.0 then
+        brain.teh_mineTargetSetTime  = nil
+        brain.teh_mineTargetStructId = nil
         return false
     end
 
@@ -2147,16 +2156,10 @@ kMarineBrainObjectiveActions =
         -- Log("MarineBrain - PlaceMines")
 
         local name = kMarineBrainObjectiveTypes[kMarineBrainObjectiveTypes.PlaceMines]
-        local teamBrain = GetTeamBrain( marine:GetTeamNumber() )
+        local teamBrain = GetTeamBrain(marine:GetTeamNumber())
+        local teamNumber = marine:GetTeamNumber()
         local weight = 0
         local key = nil
-
-        local nearbyMemories = teamBrain:GetMemoriesAtLocation(marine:GetLocationName(), marine:GetTeamNumber())
-        local numMines = 0
-        local wantedMines = 0
-        local bestWeight = 0
-        local bestStructure = nil
-        local bestPos = nil
 
         local hasMine = marine:GetWeaponInHUDSlot(4) ~= nil
 
@@ -2164,59 +2167,100 @@ kMarineBrainObjectiveActions =
             return kNilAction
         end
 
-        for _, mem in ipairs(nearbyMemories) do
+        -- TEH: Search all marine structures across the entire map for mine placement.
+        -- Priority 1 (uncovered):   Extractor or PhaseGate with 0 mines nearby
+        -- Priority 2 (low cover):   Extractor or PhaseGate with 1-3 mines nearby
+        -- Priority 3 (fallback):    Armory or InfantryPortal with 0 mines nearby
+        -- Structures with >= 4 mines are considered saturated and skipped entirely.
+        -- Only one bot may be assigned to each structure key at a time.
 
-            local t = mem.btype
+        local kMineRadius        = 5.0   -- radius around a structure to count its mines
+        local kMineCapPerStruct  = 4     -- hard cap; saturated structures are fully ignored
 
-            if t == kMinimapBlipType.Extractor or t == kMinimapBlipType.InfantryPortal or t == kMinimapBlipType.PhaseGate or t == kMinimapBlipType.Observatory then
-                -- one mine for each structure and two for the gate (may not be placed on those structures specifically)
-                wantedMines = wantedMines + (t == kMinimapBlipType.PhaseGate and 2 or 1)
+        local uncoveredPrimary  = {}  -- Extractor / PhaseGate with 0 mines
+        local lowCoverPrimary   = {}  -- Extractor / PhaseGate with 1–3 mines
+        local uncoveredFallback = {}  -- Armory / InfantryPortal with 0 mines
 
-                local numAssigned = teamBrain:GetNumAssignedToEntity("mine-" .. mem.entId)
-                local sweight = kMinePriority[t]
+        local function CountMinesNear(struct)
+            return #GetEntitiesWithinRange("Mine", struct:GetOrigin(), kMineRadius)
+        end
 
-                if sweight > bestWeight and numAssigned < 1 then
-                    bestWeight = sweight
-                    bestStructure = Shared.GetEntity(mem.entId)
+        local function ClassifyStructure(struct, isPrimary)
+            if not struct:GetIsBuilt() or not struct:GetIsAlive() then return end
+            local mineCount = CountMinesNear(struct)
+            if mineCount >= kMineCapPerStruct then return end  -- saturated, skip
+
+            local structKey = "mine-" .. struct:GetId()
+            -- Only one bot assigned per structure at a time
+            if teamBrain:GetNumAssignedToEntity(structKey) >= 1 then return end
+
+            if isPrimary then
+                if mineCount == 0 then
+                    table.insert(uncoveredPrimary, struct)
+                else
+                    table.insert(lowCoverPrimary, struct)
+                end
+            else
+                if mineCount == 0 then
+                    table.insert(uncoveredFallback, struct)
                 end
             end
+        end
 
-            -- assume it's a mine
-            if t == kMinimapBlipType.SensorBlip then
-                numMines = numMines + 1
+        local extractors   = GetEntitiesForTeam("Extractor",      teamNumber)
+        local phaseGates   = GetEntitiesForTeam("PhaseGate",       teamNumber)
+        local armories     = GetEntitiesForTeam("Armory",          teamNumber)
+        local ipList       = GetEntitiesForTeam("InfantryPortal",  teamNumber)
+
+        for _, s in ipairs(extractors) do ClassifyStructure(s, true)  end
+        for _, s in ipairs(phaseGates) do ClassifyStructure(s, true)  end
+        for _, s in ipairs(armories)   do ClassifyStructure(s, false) end
+        for _, s in ipairs(ipList)     do ClassifyStructure(s, false) end
+
+        -- Pick the closest structure in priority order
+        local function ClosestOf(list)
+            local best, bestDist = nil, math.huge
+            for _, struct in ipairs(list) do
+                local dist = GetBotWalkDistance(marine, struct)
+                if dist < bestDist then bestDist = dist; best = struct end
             end
-
+            return best
         end
 
-        -- hard cap how many mines we want in main base
-        if marine:GetLocationName() == teamBrain.initialTechPointLoc then
-            wantedMines = 4
-        end
+        local bestStructure =
+            ClosestOf(uncoveredPrimary) or
+            ClosestOf(lowCoverPrimary)  or
+            ClosestOf(uncoveredFallback)
 
-        if bestStructure and numMines < wantedMines then
-
-            local ang = math.random() * math.pi * 2
-            local kPlaceDist = bestStructure:GetExtents():GetLengthXZ() + 1.25
-
-            local point = Vector(math.sin(ang) * kPlaceDist, 0, math.cos(ang) * kPlaceDist) + bestStructure:GetOrigin()
-            bestPos = Pathing.GetClosestPoint(point)
-
-            weight = GetMarineObjectiveBaselineWeight(kMarineBrainObjectiveTypes.PlaceMines)
-            key = "mine-" .. bestStructure:GetId()
-        else
+        if not bestStructure then
             return kNilAction
         end
 
-        return 
+        -- Track the current target and set the placement-attempt timer
+        local structId = bestStructure:GetId()
+        if brain.teh_mineTargetStructId ~= structId then
+            brain.teh_mineTargetStructId = structId
+            brain.teh_mineTargetSetTime  = Shared.GetTime()
+        end
+
+        local ang        = math.random() * math.pi * 2
+        local kPlaceDist = bestStructure:GetExtents():GetLengthXZ() + 1.25
+        local point      = Vector(math.sin(ang) * kPlaceDist, 0, math.cos(ang) * kPlaceDist) + bestStructure:GetOrigin()
+        local bestPos    = Pathing.GetClosestPoint(point)
+
+        weight = GetMarineObjectiveBaselineWeight(kMarineBrainObjectiveTypes.PlaceMines)
+        key    = "mine-" .. structId
+
+        return
         {
-            name = name, 
-            weight = weight, 
+            name       = name,
+            weight     = weight,
             fastUpdate = true,
-            structure = bestStructure,
-            pos = bestPos,
-            key = key,
-            validate = kValidatePlaceMines,
-            perform = kExecPlaceMines
+            structure  = bestStructure,
+            pos        = bestPos,
+            key        = key,
+            validate   = kValidatePlaceMines,
+            perform    = kExecPlaceMines
         }
 
     end, -- PLACE MINES
@@ -2233,7 +2277,9 @@ kMarineBrainObjectiveActions =
         local armoryDist = armoryData.distance
         local resources = marine:GetResources()
         
-        if not sdb:Get("welder") and (armory and armory:GetIsBuilt()) then
+        -- TEH: Respect per-spawn welder decision (60% chance set in BuyWeapons respawn block; default true if not yet decided)
+        local wantsWelder = (brain.teh_buyWelder ~= false)
+        if wantsWelder and not sdb:Get("welder") and (armory and armory:GetIsBuilt()) then
             if armoryDist < 50 and resources >= LookupTechData(kTechId.Welder, kTechDataCostKey) then
                 weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyWelder )
             end
@@ -2267,7 +2313,7 @@ kMarineBrainObjectiveActions =
         local weight = 0.0
         local resources = marine:GetResources()
 
-        local globalBuyCapRatio = 1/3 -- How many exos are allowed (minigun or railgun) on the team at a time.
+        local globalBuyCapRatio = 1.0 -- TEH: All marine bots can aspire to buy an Exo when available
         local exoRailgunRatio = 1/3 -- How many railguns are allowed of the global cap
         local exoCounts = sdb:Get("exoCounts")
 
@@ -2358,6 +2404,20 @@ kMarineBrainObjectiveActions =
         PROFILE("MarineBrain - BuyWeapons")
         -- Log("MarineBrain - BuyWeapons")
 
+        -- TEH: Detect respawn (player entity change) and make per-spawn decisions once per life
+        if brain.teh_lastPlayerId ~= marine:GetId() then
+            brain.teh_lastPlayerId         = marine:GetId()
+            brain.teh_buyWelder            = math.random() < 0.60  -- 60% chance to buy welder this life
+            brain.teh_buyMines             = math.random() < 0.40  -- 40% chance to buy mines this life
+            bot.decidedIfSavingForExo      = nil
+            bot.decidedIfSavingForJetpack  = nil
+            brain.activeWeaponPurchaseTechId = nil
+            brain.teh_weaponDecisionMade   = nil
+            brain.teh_jpWeaponChoice       = nil
+            bot.wantsExo                   = false
+            bot.wantsJetpack               = false
+        end
+
         local name = kMarineBrainObjectiveTypes[kMarineBrainObjectiveTypes.BuyWeapons]
         local sdb = brain:GetSenses()
         local primaryWep = marine:GetWeaponInHUDSlot(1)
@@ -2443,49 +2503,91 @@ kMarineBrainObjectiveActions =
             --        fubared otherwise...that, or make Aliens more sucky?
                 
                     
-                if roundTimeMinutes > 2 then    --BOT-TODO Tune this, or just remove (although, logical purpose of it _IS_ valid...)
-                --ignore thing which cannot be reached (Pres) within X timespan
-                    
-                --BOT-TODO Come up with a better way to select Exo/JPs ...using math.random() is HORRIBLE and devoid of contextuality...
-                    if not bot.decidedIfSavingForExo then
-                        bot.decidedIfSavingForExo = true
-                        bot.wantsExo = math.random() < 0.4
-                    end
-                    
-                    if not bot.decidedIfSavingForJetpack then
-                        bot.decidedIfSavingForJetpack = true
-                        bot.wantsJetpack = not bot.wantsExo and math.random() < 0.3
-                    end
-                    
-                    
-                    -- always try to reserve enough for an exo
-                    if bot.wantsExo then
-                        resources = resources - LookupTechData(kTechId.DualMinigunExosuit, kTechDataCostKey)
-                    end
-                    
-                    if bot.wantsJetpack then
-                        resources = resources - LookupTechData(kTechId.Jetpack, kTechDataCostKey)
-                    end
+                -- TEH: Always want Exo when available; otherwise always want Jetpack.
+                -- These decisions MUST happen before the weapon roll so the correct branch is taken.
+                if not bot.decidedIfSavingForExo then
+                    bot.decidedIfSavingForExo = true
+                    bot.wantsExo = techTree ~= nil and techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit)
+                end
 
+                if not bot.decidedIfSavingForJetpack then
+                    bot.decidedIfSavingForJetpack = true
+                    bot.wantsJetpack = (not bot.wantsExo) and
+                        (techTree ~= nil and techTree:GetIsTechAvailable(kTechId.JetpackTech, true))
                 end
-                
-                --BOT-TODO Revise below, and use some kind of lookup table via TeamBrain (or similar) which marks what all other Marines have, try to bias towards to fill "gaps"
-                for _, techId in ipairs(availableWeapons) do
-                    
-                    if resources >= LookupTechData(techId, kTechDataCostKey) then
-                        
-                        canAffordWeaponTechId = techId
-                        --Continue checking the other weapons with a 50% chance each
-                        if math.random() > 0.5 then     --BOT-FIXME This is fucking garbage...at a minimum it should use BotPersona ...at least that'll add SOME distribution (see PlayerBot_Server.lua - line 212)
-                            break
+
+                -- Reserve resources for Exo or Jetpack as appropriate
+                if bot.wantsExo then
+                    resources = resources - LookupTechData(kTechId.DualMinigunExosuit, kTechDataCostKey)
+                end
+
+                if bot.wantsJetpack then
+                    resources = resources - LookupTechData(kTechId.Jetpack, kTechDataCostKey)
+                end
+
+                -- TEH: Make per-spawn weapon selection once
+                if not brain.teh_weaponDecisionMade then
+                    brain.teh_weaponDecisionMade = true
+
+                    if bot.wantsExo then
+                        -- Exo bots save all resources for the Exo; no weapon purchase
+                        brain.teh_jpWeaponChoice = nil
+
+                    else
+                        -- Separate available weapons: Cannon ("Gauss Rifle") tracked separately;
+                        -- advancedWeapons = HMG, Flamethrower, GL (not Cannon, not Shotgun)
+                        local advancedWeapons = {}
+                        local hasCannon = availableWeapons[kTechId.Cannon] ~= nil
+                        for _, techId in ipairs(availableWeapons) do
+                            if techId ~= kTechId.Shotgun and techId ~= kTechId.Cannon then
+                                table.insert(advancedWeapons, techId)
+                            end
                         end
-                        
+
+                        local roll = math.random()
+
+                        if marine:isa("JetpackMarine") or bot.wantsJetpack then
+                            -- With Jetpack: 33% Cannon (Gauss Rifle), 33% Shotgun, 33% Advanced Armory weapon
+                            if roll < 0.333 then
+                                brain.teh_jpWeaponChoice = hasCannon and kTechId.Cannon or nil
+                            elseif roll < 0.666 then
+                                brain.teh_jpWeaponChoice = availableWeapons[kTechId.Shotgun] and kTechId.Shotgun or nil
+                            else
+                                if #advancedWeapons > 0 then
+                                    brain.teh_jpWeaponChoice = advancedWeapons[math.random(#advancedWeapons)]
+                                elseif availableWeapons[kTechId.Shotgun] then
+                                    brain.teh_jpWeaponChoice = kTechId.Shotgun
+                                else
+                                    brain.teh_jpWeaponChoice = nil
+                                end
+                            end
+                        else
+                            -- Rifle bot: 50% Shotgun, 50% Advanced Armory weapon (not Cannon)
+                            if roll < 0.5 and availableWeapons[kTechId.Shotgun] then
+                                brain.teh_jpWeaponChoice = kTechId.Shotgun
+                            elseif #advancedWeapons > 0 then
+                                brain.teh_jpWeaponChoice = advancedWeapons[math.random(#advancedWeapons)]
+                            elseif availableWeapons[kTechId.Shotgun] then
+                                brain.teh_jpWeaponChoice = kTechId.Shotgun
+                            else
+                                brain.teh_jpWeaponChoice = nil  -- No weapons unlocked yet; will re-check next frame
+                                brain.teh_weaponDecisionMade = nil
+                            end
+                        end
                     end
-                    
                 end
-                
-                --Set the desired Weapon, on next weight-compute time, the armory checks will be done
-                --While this does effectively defer the this action, it reduces need/complexity to NOT check for armory this pass (since we cache desired TechID)
+
+                -- Apply the per-spawn weapon choice.
+                -- Check against actual resources (NOT the Exo/JP-reserved 'resources' variable)
+                -- so bots buy weapons regardless of whether an Exo or Jetpack is available.
+                local choice = brain.teh_jpWeaponChoice
+                if choice ~= nil then
+                    if marine:GetResources() >= LookupTechData(choice, kTechDataCostKey) then
+                        canAffordWeaponTechId = choice
+                    end
+                end
+                -- If choice == nil, keep default Rifle (no extra weapon purchased this life)
+
                 brain.activeWeaponPurchaseTechId = canAffordWeaponTechId
 
             end
@@ -2519,8 +2621,19 @@ kMarineBrainObjectiveActions =
         local techTree = GetTechTree(marine:GetTeamNumber())
         
         if proto and protoDist and not marine:isa("JetpackMarine") and techTree:GetIsTechAvailable(kTechId.JetpackTech, true) and resources >= LookupTechData(kTechId.Jetpack, kTechDataCostKey) then
+            -- TEH: All bots (who don't want an Exo) always want a Jetpack
+            if not bot.decidedIfSavingForJetpack then
+                bot.decidedIfSavingForJetpack = true
+                -- Also make the Exo decision here in case BuyWeapons hasn't run yet
+                -- (e.g. no weapons are available but Prototype Lab is alive for Jetpack)
+                if not bot.decidedIfSavingForExo then
+                    bot.decidedIfSavingForExo = true
+                    bot.wantsExo = techTree ~= nil and techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit)
+                end
+                bot.wantsJetpack = not bot.wantsExo
+            end
             weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyJetpack )
-                    
+
             if bot.wantsJetpack then
                 weight = weight + 5 -- gimme gimme gimme
             end
@@ -2552,8 +2665,8 @@ kMarineBrainObjectiveActions =
         local techTree = GetTechTree(marine:GetTeamNumber())
         local lastBuyMines = brain.lastBoughtMines or 0.0
 
-        -- Don't buy mines if we're saving for exos, we don't have enough money for an advanced weapon, or we've recently bought a mine
-        local shouldBuyMines = (lastBuyMines + 60) < Shared.GetTime() and resources >= 20 and not bot.wantsExo
+        -- TEH: Per-spawn random chance to buy mines (decided in BuyWeapons respawn block; default true if not yet decided)
+        local shouldBuyMines = (brain.teh_buyMines ~= false) and resources >= 20
 
         if armory and techTree:GetHasTech(kTechId.MinesTech, true) and not marine:GetWeaponInHUDSlot(4) and (GetWarmupActive() or shouldBuyMines) then
             weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyMines )
