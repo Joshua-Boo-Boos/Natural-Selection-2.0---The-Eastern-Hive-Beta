@@ -31,6 +31,9 @@ local kHealthArmorTextureName = PrecacheAsset("ui/alien_health_armor.dds")
 -- command station icon). 464x464 dds.
 local kPrimalScreamIconTexture = PrecacheAsset("ui/lerk/primal_scream.dds")
 local kPrimalScreamIconSize = 464
+local kMotionTrackerIconTexture = PrecacheAsset("ui/motion_tracker/inventory_icon_motion_tracker.dds")
+local kMotionTrackerIconWidth = 128
+local kMotionTrackerIconHeight = 64
 local kHealthIconTextureCoordinates = {0, 0, 32, 32}
 local kArmorIconTextureCoordinates = {32, 32, 64, 64}
 
@@ -79,10 +82,30 @@ if GUIInventory and not GUIInventory.kPrimalScreamIconPatched then
             child:SetPosition(Vector(-w / 2, -h / 2, 0))
             child:SetIsVisible(true)
 
+            if inventoryItem.MotionTrackerIcon then
+                inventoryItem.MotionTrackerIcon:SetIsVisible(false)
+            end
+
+        elseif techId == kTechId.MotionTracker then
+
+            inventoryItem.Graphic:SetTexture(kMotionTrackerIconTexture)
+            inventoryItem.Graphic:SetTexturePixelCoordinates(0, 0, kMotionTrackerIconWidth, kMotionTrackerIconHeight)
+
+            if inventoryItem.MotionTrackerIcon then
+                inventoryItem.MotionTrackerIcon:SetIsVisible(false)
+            end
+
+            if inventoryItem.PrimalScreamIcon then
+                inventoryItem.PrimalScreamIcon:SetIsVisible(false)
+            end
+
         else
 
             if inventoryItem.PrimalScreamIcon then
                 inventoryItem.PrimalScreamIcon:SetIsVisible(false)
+            end
+            if inventoryItem.MotionTrackerIcon then
+                inventoryItem.MotionTrackerIcon:SetIsVisible(false)
             end
             inventoryItem.Graphic:SetTexture(kInventoryIconsTexture)
             inventoryItem.Graphic:SetTexturePixelCoordinates(GetTexCoordsForTechId(techId))

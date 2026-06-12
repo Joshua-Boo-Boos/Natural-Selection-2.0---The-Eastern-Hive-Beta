@@ -10,7 +10,7 @@ function Welder:OnCreate()
 end
 
 function Welder:GetReplacementWeaponMapName()
-    return Axe.kMapName or Knife.kMapName
+    return self.replaceWithKnife and Knife.kMapName or Axe.kMapName
 end
 
 function Welder:GetObseleteWeaponNames()

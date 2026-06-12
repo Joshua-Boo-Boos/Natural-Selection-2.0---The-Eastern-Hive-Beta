@@ -18,6 +18,7 @@ ModLoader.SetupFileHook("lua/NS2ConsoleCommands_Server.lua", "lua/CNBalance/NS2C
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/NetworkMessages.lua", "post" )
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/PrimalScreamFX.lua", "post" )
 ModLoader.SetupFileHook("lua/NetworkMessages_Server.lua", "lua/CNBalance/NetworkMessages_Server.lua", "post" )
+ModLoader.SetupFileHook("lua/DamageMixin.lua", "lua/CNBalance/Mixin/DamageMixin.lua", "post" )
 
 ModLoader.SetupFileHook("lua/TechTreeConstants.lua", "lua/CNBalance/TechTreeConstants.lua", "post")
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/TechData.lua", "post")
@@ -146,6 +147,7 @@ ModLoader.SetupFileHook("lua/MAC.lua", "lua/CNBalance/Structures/Marine/MAC.lua"
 
 ModLoader.SetupFileHook("lua/Marine.lua", "lua/CNBalance/Marine.lua", "post")
 ModLoader.SetupFileHook("lua/MarineSpectator.lua", "lua/CNBalance/MarineSpectator.lua", "post")
+ModLoader.SetupFileHook("lua/Spectator.lua", "lua/CNBalance/Spectator.lua", "post")
 ModLoader.SetupFileHook("lua/JetpackMarine.lua", "lua/CNBalance/JetpackMarine.lua", "post")
 ModLoader.SetupFileHook("lua/Exo.lua", "lua/CNBalance/Exo.lua", "post")
 ModLoader.SetupFileHook("lua/Exosuit.lua", "lua/CNBalance/Exosuit.lua", "post")

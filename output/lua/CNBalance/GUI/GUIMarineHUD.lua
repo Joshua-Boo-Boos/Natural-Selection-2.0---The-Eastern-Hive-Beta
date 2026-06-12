@@ -126,6 +126,7 @@ function GUIMarineHUD:Reset()
 end
 
 local kErrorColor = Color(1, 0, 0, 1)
+
 local baseUpdate = GUIMarineHUD.Update
 function GUIMarineHUD:Update(deltaTime)
     baseUpdate(self,deltaTime)

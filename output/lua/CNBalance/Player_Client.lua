@@ -63,3 +63,33 @@ function PlayerUI_GetTooltipDataFromTechId(techId, hotkeyIndex)
     return tooltipData
 
 end
+
+local basePlayerUI_GetInventoryTechIds = PlayerUI_GetInventoryTechIds
+function PlayerUI_GetInventoryTechIds()
+    local inventoryTechIds = basePlayerUI_GetInventoryTechIds()
+
+    local player = Client.GetLocalPlayer()
+    if inventoryTechIds and player and player.GetWeaponInHUDSlot then
+        for i = 1, #inventoryTechIds do
+            local inventoryItem = inventoryTechIds[i]
+            local weapon = player:GetWeaponInHUDSlot(inventoryItem.HUDSlot)
+            if weapon and weapon:isa("MotionTracker") then
+                inventoryItem.TechId = kTechId.MotionTracker
+            end
+        end
+    end
+
+    return inventoryTechIds
+end
+
+local baseUpdateClientEffects = Player.UpdateClientEffects
+function Player:UpdateClientEffects(deltaTime, isLocal)
+    baseUpdateClientEffects(self, deltaTime, isLocal)
+
+    if isLocal and not self:isa("Alien") and not self:isa("Spectator") then
+        local useShader = Player.screenEffects.darkVision
+        if useShader then
+            useShader:SetActive(false)
+        end
+    end
+end

@@ -102,6 +102,10 @@ local function GetCanFire(self, player)
 
     if not player then return false end
 
+    if player:GetTeamNumber() == kTeamReadyRoom then
+        return false
+    end
+
     if player:GetEnergy() < kPrimalEnergyCost then
         return false
     end

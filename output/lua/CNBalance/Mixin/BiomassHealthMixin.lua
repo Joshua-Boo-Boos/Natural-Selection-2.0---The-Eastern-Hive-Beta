@@ -57,8 +57,12 @@ if Server then
         if newExtraHealth ~= self.extraHealth  then
             -- maxHealth is a integer
             local healthDelta = math.round(newExtraHealth - self.extraHealth)
-            self:AdjustMaxHealth(math.max(self:GetMaxHealth() + healthDelta,1))
+            local newMaxHealth = math.max(self:GetMaxHealth() + healthDelta,1)
+            if LiveMixin and LiveMixin.kMaxHealth then
+                newMaxHealth = math.min(newMaxHealth, LiveMixin.kMaxHealth)
+            end
             self.extraHealth = newExtraHealth
+            self:AdjustMaxHealth(newMaxHealth)
         end
     end
 

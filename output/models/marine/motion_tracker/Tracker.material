@@ -1,0 +1,5 @@
+shader = "shaders/ViewModel.surface_shader"
+albedoMap = "models/marine/motion_tracker/Tracker.png"
+specularMap = "models/marine/motion_tracker/Tracker_Specular.png"
+normalMap = "models/marine/motion_tracker/Tracker_Normal.png"
+emissiveMap = "models/marine/motion_tracker/Tracker_Emissive"

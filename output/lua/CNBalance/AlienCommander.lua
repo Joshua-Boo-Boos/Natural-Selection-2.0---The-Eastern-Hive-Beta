@@ -131,4 +131,36 @@ if Server then
 
     end
 
+    local baseProcessTechTreeActionRoot = AlienCommander.ProcessTechTreeAction
+    function AlienCommander:ProcessTechTreeAction(techId, pickVec, orientation, worldCoordsSpecified, targetId, shiftDown)
+
+        -- Relocating a tunnel requires a selected entrance that already has a partner entrance.
+        -- A lone / still-under-construction entrance has no other entrance, which would trip an
+        -- assert() in the base ProcessTechTreeAction and crash the server. Abort gracefully instead.
+        if techId == kTechId.TunnelRelocate then
+
+            local selectedEntrance
+            local multipleSelected = false
+            local selection = self:GetSelection()
+            for i = 1, #selection do
+                if selection[i]:isa("TunnelEntrance") then
+                    if selectedEntrance then
+                        multipleSelected = true
+                        break
+                    else
+                        selectedEntrance = selection[i]
+                    end
+                end
+            end
+
+            if multipleSelected or not selectedEntrance or not selectedEntrance:GetOtherEntrance() then
+                return false, false
+            end
+
+        end
+
+        return baseProcessTechTreeActionRoot(self, techId, pickVec, orientation, worldCoordsSpecified, targetId, shiftDown)
+
+    end
+
 end

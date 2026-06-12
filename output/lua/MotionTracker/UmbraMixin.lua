@@ -1,0 +1,1 @@
+-- Motion Tracker deals no damage; no umbra modifier needed.

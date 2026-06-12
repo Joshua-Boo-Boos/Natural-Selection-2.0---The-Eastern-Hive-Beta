@@ -42,7 +42,12 @@ if Server then
         local armorDelta = math.floor(newMatureArmor - self.maturityArmor)
 
         self.maturityArmor = self.maturityArmor + armorDelta
-        return self:GetMaxArmor() + armorDelta
+
+        local newMaxArmor = self:GetMaxArmor() + armorDelta
+        -- Clamp to 0 so AdjustMaxArmor's assert(setMax >= 0) can't be tripped by a negative delta
+        -- (mirrors the math.max clamp used for max health above).
+        newMaxArmor = math.max(newMaxArmor, 0)
+        return newMaxArmor
 
     end
 

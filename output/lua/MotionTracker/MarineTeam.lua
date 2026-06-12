@@ -1,0 +1,12 @@
+-- Motion Tracker tech-tree registration lives in lua/CNBalance/MarineTeam.lua.
+--
+-- CNBalance (.entry Priority 1) hooks lua/MarineTeam.lua and is applied AFTER
+-- this file (MotionTracker .entry Priority 10), fully replacing MarineTeam:InitTechTree.
+-- Any node added here was therefore discarded, which is why the armory buy used to
+-- fail silently (no tech node for Player:ProcessBuyAction to validate) while the
+-- buy-menu icon still showed (icon comes from kTechIdInfo / Armory:GetItemList,
+-- not the tech tree).
+--
+-- The MotionTracker buy node and DropMotionTracker activation are now added inside
+-- CNBalance/MarineTeam.lua:InitTechTree, just before SetComplete(). This file is
+-- intentionally a no-op to avoid a fragile, load-order-dependent override.

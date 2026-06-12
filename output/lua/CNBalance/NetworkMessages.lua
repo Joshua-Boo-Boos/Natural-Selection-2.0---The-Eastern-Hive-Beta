@@ -99,3 +99,27 @@ local kGorgeBuildStructureMessage =
 }
 
 Shared.RegisterNetworkMessage("GorgeBuildStructure", kGorgeBuildStructureMessage)
+
+if Server then
+
+    function SendDamageMessage(attacker, targetEntityId, amount, point, overkill, weapon, type)
+
+        if amount > 0 then
+
+            local damageType = type or kDamageMessageType.Default
+            local msg = BuildDamageMessage(targetEntityId, amount, point, damageType)
+
+            Server.SendNetworkMessage(attacker, "Damage", msg, true)
+
+            for _, spectator in ientitylist(Shared.GetEntitiesWithClassname("Spectator")) do
+                local owner = Server.GetOwner(spectator)
+                if owner and attacker == owner:GetSpectatingPlayer() then
+                    Server.SendNetworkMessage(spectator, "Damage", msg, false)
+                end
+            end
+
+        end
+
+    end
+
+end

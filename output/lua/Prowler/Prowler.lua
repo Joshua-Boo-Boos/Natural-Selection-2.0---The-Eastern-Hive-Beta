@@ -657,11 +657,11 @@ function Prowler:GetCarapaceBonusPerBiomass()
 end
 
 
-function Prowler:ModifyDamageTaken(damageTable, attacker, doer, damageType, hitPoint) -- dud
+function Prowler:ModifyDamageTaken(damageTable, attacker, doer, damageType, hitPoint)
+    if not doer then return end
     local reduction = kProwlerDamageReduction[doer:GetClassName()]
     if reduction then
         damageTable.damage = damageTable.damage * reduction
-        return
     end
 end
 

@@ -12,11 +12,15 @@ if Server then
         -- doesn't get its Rappel weapon there -- see Prowler_Server.lua's
         -- InitWeaponsForReadyRoom). The ready room unlocks all tech, which would
         -- otherwise hand every ready-room Lerk the ability.
+        local mapName = (PrimalScream and PrimalScream.kMapName) or "primalscream"
         if self:GetTeamNumber() == kTeamReadyRoom then
+            local weapon = self:GetWeapon(mapName)
+            if weapon then
+                self:RemoveWeapon(weapon)
+            end
             return
         end
 
-        local mapName = (PrimalScream and PrimalScream.kMapName) or "primalscream"
         if self:GetWeapon(mapName) then
             return
         end

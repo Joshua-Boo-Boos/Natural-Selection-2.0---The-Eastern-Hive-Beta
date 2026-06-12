@@ -2325,8 +2325,8 @@ kMarineBrainObjectiveActions =
             totalRailgunsAllowed = 0
         end
 
-        local shouldBuyExo = totalExosAllowed > 0 and
-            totalExosAllowed > 0 and
+        -- TEH: Only bots who explicitly decided to save for an Exo this life may buy one.
+        local shouldBuyExo = bot.wantsExo and
             not marine:isa("JetpackMarine") and
             not HasGoodWeapon(marine) and
             resources >= LookupTechData(kTechId.DualMinigunExosuit, kTechDataCostKey) and
@@ -2505,15 +2505,19 @@ kMarineBrainObjectiveActions =
                     
                 -- TEH: Always want Exo when available; otherwise always want Jetpack.
                 -- These decisions MUST happen before the weapon roll so the correct branch is taken.
+                -- TEH: 25% per bot save for Exo; of the rest, 40% save for Jetpack.
+                -- Decisions are locked for the life; without percentage caps ALL bots
+                -- would set teh_jpWeaponChoice=nil and never buy any weapon.
                 if not bot.decidedIfSavingForExo then
                     bot.decidedIfSavingForExo = true
-                    bot.wantsExo = techTree ~= nil and techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit)
+                    local exoAvail = techTree ~= nil and techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit)
+                    bot.wantsExo = exoAvail and math.random() < 0.25
                 end
 
                 if not bot.decidedIfSavingForJetpack then
                     bot.decidedIfSavingForJetpack = true
-                    bot.wantsJetpack = (not bot.wantsExo) and
-                        (techTree ~= nil and techTree:GetIsTechAvailable(kTechId.JetpackTech, true))
+                    local jpAvail = techTree ~= nil and techTree:GetIsTechAvailable(kTechId.JetpackTech, true)
+                    bot.wantsJetpack = (not bot.wantsExo) and jpAvail and math.random() < 0.40
                 end
 
                 -- Reserve resources for Exo or Jetpack as appropriate
@@ -2621,21 +2625,19 @@ kMarineBrainObjectiveActions =
         local techTree = GetTechTree(marine:GetTeamNumber())
         
         if proto and protoDist and not marine:isa("JetpackMarine") and techTree:GetIsTechAvailable(kTechId.JetpackTech, true) and resources >= LookupTechData(kTechId.Jetpack, kTechDataCostKey) then
-            -- TEH: All bots (who don't want an Exo) always want a Jetpack
+            -- TEH: Fallback decision in case BuyWeapons hasn't run yet (no armory/weapons available).
+            -- Uses same 25%/40% probabilities as BuyWeapons to keep decisions consistent.
             if not bot.decidedIfSavingForJetpack then
                 bot.decidedIfSavingForJetpack = true
-                -- Also make the Exo decision here in case BuyWeapons hasn't run yet
-                -- (e.g. no weapons are available but Prototype Lab is alive for Jetpack)
                 if not bot.decidedIfSavingForExo then
                     bot.decidedIfSavingForExo = true
-                    bot.wantsExo = techTree ~= nil and techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit)
+                    local exoAvail = techTree ~= nil and techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit)
+                    bot.wantsExo = exoAvail and math.random() < 0.25
                 end
-                bot.wantsJetpack = not bot.wantsExo
+                bot.wantsJetpack = (not bot.wantsExo) and math.random() < 0.40
             end
-            weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyJetpack )
-
             if bot.wantsJetpack then
-                weight = weight + 5 -- gimme gimme gimme
+                weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyJetpack ) + 5
             end
         end
         
@@ -2666,7 +2668,7 @@ kMarineBrainObjectiveActions =
         local lastBuyMines = brain.lastBoughtMines or 0.0
 
         -- TEH: Per-spawn random chance to buy mines (decided in BuyWeapons respawn block; default true if not yet decided)
-        local shouldBuyMines = (brain.teh_buyMines ~= false) and resources >= 20
+        local shouldBuyMines = (brain.teh_buyMines ~= false) and resources >= LookupTechData(kTechId.LayMines, kTechDataCostKey)
 
         if armory and techTree:GetHasTech(kTechId.MinesTech, true) and not marine:GetWeaponInHUDSlot(4) and (GetWarmupActive() or shouldBuyMines) then
             weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyMines )

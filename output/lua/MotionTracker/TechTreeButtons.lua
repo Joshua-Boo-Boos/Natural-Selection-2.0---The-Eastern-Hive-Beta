@@ -1,0 +1,4 @@
+-- Intentionally do not register Motion Tracker in the buildmenu atlas.
+-- Its inventory and armory icons are loaded as standalone textures in
+-- GUIInventory.lua and GUIMarineBuyMenu.lua so atlas offsets cannot select the
+-- wrong icon cell.

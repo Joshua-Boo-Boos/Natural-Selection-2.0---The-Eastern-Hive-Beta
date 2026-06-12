@@ -1,12 +1,21 @@
 -- VokexBrain_Data.lua
 -- Combat AI data for Vokex bots.
--- Vokex uses SwipeShadowStep (melee swipe + ShadowStep blink) as primary weapon.
--- This file defines kVokexBrainActions (attack logic overriding FadeBrain's SwipeBlink check).
--- kVokexBrainObjectives is re-used from kFadeBrainObjectives since the objectives
--- (retreat to hive, explore, respond to threats, etc.) are identical for Vokex.
+-- The Vokex is the alien equivalent of the Fade. Its weapons:
+--   * SwipeShadowStep ("swipeshadowstep") — melee swipe (primary) + ShadowStep
+--     dash (secondary). Always carried.
+--   * AcidRocket ("acidrocket")           — ranged projectile (primary), Tier-2 tech.
+-- Movement is ShadowStep (a blink-style dash, triggered by Move.SecondaryAttack
+-- while holding either weapon — costs energy) or plain walking when close / low energy.
+-- This file defines kVokexBrainActions; kVokexBrainObjectives is reused from
+-- kFadeBrainObjectives (retreat to hive, explore, respond to threats, etc.).
 
-local kVokexMeleeRange   = 1.8    -- SwipeShadowStep.kRange = 1.6 + fuzzy margin
-local kVokexEngageRange  = 50.0   -- maximum range at which a Vokex will engage
+local kVokexMeleeRange       = 1.8    -- SwipeShadowStep.kRange = 1.6 + fuzzy margin
+local kVokexEngageRange      = 50.0   -- maximum range at which a Vokex will engage
+local kVokexAcidRange        = 18.0   -- max range at which the bot will use AcidRocket
+local kVokexAcidMinRange     = 3.0    -- below this, prefer swipe over AcidRocket
+local kVokexShadowStepDist   = 7.0    -- target farther than this → ShadowStep to close
+local kVokexShadowStepCD     = 1.2    -- seconds between ShadowStep dashes
+local kVokexWeaponSwitchCD   = 0.4    -- min seconds between weapon switches (anti-thrash)
 
 -- ---------------------------------------------------------------------------
 -- Per-Vokex attack urgency (mirrors Prowler urgency but tuned for a Fade-tier melee fighter)
@@ -95,7 +104,9 @@ local function GetVokexAttackUrgency(bot, vokex, mem)
 end
 
 -- ---------------------------------------------------------------------------
--- Executor: perform the Vokex melee attack toward bestMem
+-- Executor: perform the Vokex attack toward bestMem.
+-- Picks AcidRocket (ranged) or SwipeShadowStep (melee) by distance, walks/dashes
+-- toward the target via ShadowStep, and fires the chosen weapon.
 -- ---------------------------------------------------------------------------
 local kExecVokexAttackAction = function(move, bot, brain, vokex, action)
     PROFILE("VokexBrain_Data - ExecVokexAttack")
@@ -103,37 +114,86 @@ local kExecVokexAttackAction = function(move, bot, brain, vokex, action)
     local mem = action.bestMem
     if not mem then return end
 
+    local now    = Shared.GetTime()
     local eyePos = vokex:GetEyePos()
     local target = Shared.GetEntity(mem.entId)
-    local aimPos
+    local aimPos, movePos
 
     if target ~= nil then
         local sighted = not HasMixin(target, "LOS") or target:GetIsSighted()
-        aimPos = sighted and GetBestAimPoint(target) or (mem.lastSeenPos + Vector(0, 0.5, 0))
+        aimPos  = sighted and GetBestAimPoint(target) or (mem.lastSeenPos + Vector(0, 0.5, 0))
+        -- Walk toward the target's ground origin, NOT the elevated aim point — moving
+        -- toward a point in the air is what stalled the bot's pathing before.
+        movePos = target:GetOrigin()
     else
-        aimPos = mem.lastSeenPos + Vector(0, 0.5, 0)
+        aimPos  = mem.lastSeenPos + Vector(0, 0.5, 0)
+        movePos = mem.lastSeenPos
     end
 
-    local distance = target and GetDistanceToTouch(eyePos, target) or 999.0
+    local distance = target and GetDistanceToTouch(eyePos, target)
+                     or eyePos:GetDistance(movePos)
 
-    -- Ensure SwipeShadowStep is the active weapon
-    vokex:SetActiveWeapon("swipeshadowstep")
+    -- ---- Choose weapon: AcidRocket for ranged, SwipeShadowStep for melee. ----
+    local hasAcid      = vokex:GetWeapon("acidrocket") ~= nil
+    local hasClearShot = target ~= nil and bot.GetBotCanSeeTarget and bot:GetBotCanSeeTarget(target)
+    local useAcid      = hasAcid and target ~= nil and hasClearShot and
+                         distance > kVokexAcidMinRange and distance <= kVokexAcidRange
+    local desiredWeapon = useAcid and "acidrocket" or "swipeshadowstep"
 
-    -- Face the target
+    -- Switch only when needed, and rate-limited: re-issuing SetActiveWeapon every
+    -- frame resets the draw and interrupts the swipe animation (why melee "didn't
+    -- swipe"). The cooldown also stops weapon thrash near the range boundary.
+    local active     = vokex:GetActiveWeapon()
+    local activeName  = active and active:GetMapName()
+    if activeName ~= desiredWeapon and
+            (not bot.vokex_nextWeaponSwitch or now >= bot.vokex_nextWeaponSwitch) then
+        vokex:SetActiveWeapon(desiredWeapon)
+        bot.vokex_nextWeaponSwitch = now + kVokexWeaponSwitchCD
+    end
+
+    -- Face the target.
     bot:GetMotion():SetDesiredViewTarget(aimPos)
+    if bot.aim then
+        bot.aim:UpdateAim(target or nil, aimPos, kBotAccWeaponGroup.Swipe)
+    end
+
+    brain.teamBrain:UnassignBot(bot)
+    brain.teamBrain:AssignBotToMemory(bot, mem)
+
+    if useAcid then
+        -- Ranged: fire, and only close in if beyond effective acid range.
+        move.commands = AddMoveCommand(move.commands, Move.PrimaryAttack)
+        if distance > kVokexAcidRange * 0.9 then
+            bot:GetMotion():SetDesiredMoveTarget(movePos)
+        else
+            bot:GetMotion():SetDesiredMoveTarget(nil)
+        end
+        return
+    end
+
+    -- ---- Melee path ----
+    bot:GetMotion():SetDesiredMoveTarget(movePos)
 
     if distance <= kVokexMeleeRange + math.random() * 0.15 then
-        -- Within melee range: fire and assign to target for load-balancing
-        brain.teamBrain:UnassignBot(bot)
-        brain.teamBrain:AssignBotToMemory(bot, mem)
-        if bot.aim then
-            bot.aim:UpdateAim(target or nil, aimPos, kBotAccWeaponGroup.Swipe)
-        end
+        -- In range: swipe.
         move.commands = AddMoveCommand(move.commands, Move.PrimaryAttack)
-    end
+    else
+        -- Out of range: ShadowStep-dash to close when far enough, with energy to
+        -- spare (keep a reserve so swipes still have energy), and not already mid-dash.
+        local ssCost = kVokexShadowStepEnergyCost or 20
+        local canDash =
+            distance > kVokexShadowStepDist and
+            vokex:GetEnergy() > ssCost * 2 and
+            not vokex:GetIsShadowStepping() and
+            (not bot.vokex_nextShadowStep or now >= bot.vokex_nextShadowStep)
 
-    -- Always move toward the target to close melee range
-    bot:GetMotion():SetDesiredMoveTarget(aimPos)
+        if canDash then
+            -- SetDesiredMoveTarget already aims the bot's movement input at the
+            -- target; ShadowStep (secondary attack) boosts along that direction.
+            move.commands = AddMoveCommand(move.commands, Move.SecondaryAttack)
+            bot.vokex_nextShadowStep = now + kVokexShadowStepCD
+        end
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -155,9 +215,11 @@ kVokexBrainActions =
                 return GetVokexAttackUrgency(bot, vokex, mem)
             end)
 
-        local weapon = vokex:GetActiveWeapon()
-        -- Vokex primary weapon is SwipeShadowStep (mapName "swipeshadowstep")
-        local canAttack = weapon ~= nil and weapon:isa("SwipeShadowStep")
+        -- Gate on the always-present swipe weapon existing in inventory; the executor
+        -- chooses swipe vs AcidRocket and switches to it when firing. Checking the
+        -- ACTIVE weapon caused a deadlock: if a different weapon was active the weight
+        -- stayed 0, the executor never ran, and the weapon was never switched.
+        local canAttack = vokex:GetWeapon("swipeshadowstep") ~= nil
 
         local eHP = vokex:GetHealthScalar()
 

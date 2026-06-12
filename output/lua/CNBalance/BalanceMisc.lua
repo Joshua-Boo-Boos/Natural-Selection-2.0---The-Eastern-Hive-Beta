@@ -169,7 +169,7 @@ kJetpackLifeRegenHPS = 3   kJetpackLifeSustainHPS = 5
 kOnFireHealingScalar = 0.5
 kOnFireEnergyRecuperationScalar = 1
 
-kAutoMedCooldown = 6    kAutoMedPRes = 0.8
+kAutoMedCooldown = 10   kAutoMedPRes = 1
 kAutoAmmoCooldown = 40  kAutoAmmoPRes = 1.5
 
 kAutoMistPRes = 1.5 kAutoMistCooldown = 30

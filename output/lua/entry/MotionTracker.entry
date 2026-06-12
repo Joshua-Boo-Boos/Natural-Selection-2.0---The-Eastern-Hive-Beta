@@ -1,0 +1,9 @@
+-- Priority 0 = lowest, so MotionTracker is processed LAST. The ModLoader sorts
+-- descending (highest first) and post-hooks run in that order, so the mod loaded
+-- last wins for function redefinitions. We must load after CNBalance (Priority 1)
+-- so our Marine:GetPlayerStatusDesc wrapper (which returns kPlayerStatus.MotionTracker)
+-- wraps CNBalance's version instead of being overwritten by it.
+modEntry = {
+    FileHooks = "lua/MotionTracker/FileHooks.lua",
+    Priority = 0
+}

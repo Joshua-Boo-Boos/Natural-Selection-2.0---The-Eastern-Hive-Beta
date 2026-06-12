@@ -212,6 +212,16 @@ function MarineTeam:InitTechTree()
 
     self.techTree:AddActivation(kTechId.SocketPowerNode,    kTechId.None,   kTechId.None)
 
+    -- Motion Tracker (detection device). Registered here because this is the
+    -- authoritative marine tech tree: this InitTechTree is applied last (CNBalance
+    -- priority 1) and fully replaces any earlier definition, so a node added in
+    -- lua/MotionTracker/MarineTeam.lua would be discarded. Without a node here,
+    -- Player:ProcessBuyAction has no tech node to validate and the armory buy
+    -- silently fails even though the buy-menu icon shows.
+    -- Requires Advanced Armory (like GL/HMG/Flamethrower).
+    self.techTree:AddTargetedBuyNode(kTechId.MotionTracker,     kTechId.AdvancedArmory, kTechId.None)
+    self.techTree:AddTargetedActivation(kTechId.DropMotionTracker, kTechId.AdvancedArmory, kTechId.None)
+
     self.techTree:SetComplete()
 
     self.militaryProtocolTechNode = self.techTree:GetTechNode(kTechId.MilitaryProtocol)

@@ -4,6 +4,66 @@ Exo.kMaxProtectionDamageReduction = 0
 if Server then
 
     local kDeploy2DSound = PrecacheAsset("sound/NS2.fev/marine/heavy/deploy_2D")
+    local kBoostKnockbackCheckRadius = 2.2
+    local kBoostKnockbackExtents = Vector(1.1, 1.0, 1.25)
+    local kBoostKnockbackCooldown = 0.6
+    local kBoostKnockbackSpeed = 8
+
+    local function GetBoostKnockbackDirection(self)
+        local velocity = self:GetVelocity()
+        local direction = Vector(velocity.x, 0, velocity.z)
+
+        if direction:GetLengthSquared() < 0.01 then
+            local viewDirection = self:GetViewCoords().zAxis
+            direction = Vector(viewDirection.x, 0, viewDirection.z)
+        end
+
+        direction:Normalize()
+        return direction
+    end
+
+    local function CanBoostKnockbackTarget(target)
+        if not target or not target:GetIsAlive() then
+            return false
+        end
+
+        return target:isa("Marine") or target:isa("JetpackMarine")
+    end
+
+    local function BoostKnockbackNearbyMarines(self)
+        if not self.thrustersActive or self.thrusterMode == kExoThrusterMode.Vertical then
+            return
+        end
+
+        local direction = GetBoostKnockbackDirection(self)
+        local hitOrigin = self:GetOrigin() + Vector(0, 0.8, 0) + direction * kBoostKnockbackExtents.z
+        local hitboxCoords = Coords.GetLookIn(hitOrigin, direction, Vector(0, 1, 0))
+        local invHitboxCoords = hitboxCoords:GetInverse()
+        local marines = GetEntitiesForTeamWithinRange("Player", self:GetTeamNumber(), hitOrigin, kBoostKnockbackCheckRadius)
+        local now = Shared.GetTime()
+
+        for i = 1, #marines do
+            local marine = marines[i]
+            if marine ~= self and CanBoostKnockbackTarget(marine) and (not marine.nextExoBoostKnockback or now >= marine.nextExoBoostKnockback) then
+                local localSpacePosition = invHitboxCoords:TransformPoint(marine:GetEngagementPoint())
+                local extents = marine:GetExtents()
+
+                if math.abs(localSpacePosition.x) <= kBoostKnockbackExtents.x + extents.x
+                        and math.abs(localSpacePosition.y) <= kBoostKnockbackExtents.y + extents.y
+                        and math.abs(localSpacePosition.z) <= kBoostKnockbackExtents.z + extents.z then
+                    marine.nextExoBoostKnockback = now + kBoostKnockbackCooldown
+                    ApplyPushback(marine, 0.2, direction * kBoostKnockbackSpeed + Vector(0, 2.5, 0))
+                end
+            end
+        end
+    end
+
+    local baseModifyVelocity = Exo.ModifyVelocity
+    function Exo:ModifyVelocity(input, velocity, deltaTime)
+        baseModifyVelocity(self, input, velocity, deltaTime)
+        BoostKnockbackNearbyMarines(self)
+    end
+
     function Exo:GetCanVampirismBeUsedOn()
         return true
     end

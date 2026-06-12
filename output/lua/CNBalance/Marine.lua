@@ -103,6 +103,92 @@ if Server then
 end
 
 if Server then
+
+    Marine.kPickupPriority[kTechId.Cannon] = 5
+
+    local function GetWeaponPriority(weapon)
+        return weapon and (Marine.kPickupPriority[weapon:GetTechId()] or 0) or 0
+    end
+
+    local function GetAllNearbyPickupableWeapons(self)
+        local pickupables = GetEntitiesWithMixinWithinRange("Pickupable", self:GetOrigin(), Marine.kFindWeaponRange + 1.0)
+        local filtered = {}
+        local rangeSq = Marine.kFindWeaponRange * Marine.kFindWeaponRange
+
+        for i = 1, #pickupables do
+            local weapon = pickupables[i]
+            local weaponOrigin = weapon.GetPickupOrigin and weapon:GetPickupOrigin() or weapon:GetOrigin()
+            local distSq = (weaponOrigin - self:GetOrigin()):GetLengthSquared()
+            if weapon and weapon:isa("Weapon") and not weapon:GetIsDestroyed() and weapon:GetIsValidRecipient(self)
+                    and (self.lastDroppedWeapon ~= weapon or Shared.GetTime() > self.timeOfLastPickUpWeapon + Marine.kPickupWeaponTimeLimit)
+                    and distSq <= rangeSq then
+                table.insert(filtered, weapon)
+            end
+        end
+
+        return filtered
+    end
+
+    local function GetWeaponClosestToPlayer(self, weapons)
+        local closest, closestDistSq
+        for i = 1, #weapons do
+            local distSq = (self:GetOrigin() - weapons[i]:GetOrigin()):GetLengthSquared()
+            if not closest or distSq < closestDistSq then
+                closest = weapons[i]
+                closestDistSq = distSq
+            end
+        end
+        return closest
+    end
+
+    local function GetAutoPickupables(self, weapons)
+        local filtered = {}
+        for i = 1, #weapons do
+            local weapon = weapons[i]
+            local slotWeapon = self:GetWeaponInHUDSlot(weapon:GetHUDSlot())
+            if not slotWeapon or slotWeapon:isa("Axe") or slotWeapon:isa("Knife") then
+                table.insert(filtered, weapon)
+            end
+        end
+        return filtered
+    end
+
+    local function GetHighestPriorityPickupable(self, weapons)
+        local currentBestPriority = GetWeaponPriority(self:GetWeaponInHUDSlot(1))
+        local best
+        local bestDistSq = 0
+
+        for i = 1, #weapons do
+            local weapon = weapons[i]
+            if weapon:GetHUDSlot() == 1 then
+                local priority = GetWeaponPriority(weapon)
+                local distSq = (self:GetOrigin() - weapon:GetOrigin()):GetLengthSquared()
+                if priority > currentBestPriority then
+                    currentBestPriority = priority
+                    best = weapon
+                    bestDistSq = distSq
+                elseif priority == currentBestPriority and best and distSq < bestDistSq then
+                    best = weapon
+                    bestDistSq = distSq
+                end
+            end
+        end
+
+        return best
+    end
+
+    function Marine:FindNearbyAutoPickupWeapon()
+        local nearbyWeapons = GetAllNearbyPickupableWeapons(self)
+
+        if self.ShouldAutopickupBetterWeapons and self:ShouldAutopickupBetterWeapons() then
+            local bestNearby = GetHighestPriorityPickupable(self, nearbyWeapons)
+            if bestNearby then
+                return bestNearby
+            end
+        end
+
+        return GetWeaponClosestToPlayer(self, GetAutoPickupables(self, nearbyWeapons))
+    end
     
     function Marine:GiveItem(itemMapName,setActive, suppressError)
 
@@ -115,6 +201,7 @@ if Server then
         if itemMapName then
             
             local continue = true
+            local replaceWelderWithKnife = false
             
             if itemMapName == LayMines.kMapName then
             
@@ -130,6 +217,7 @@ if Server then
                 -- since axe cannot be dropped we need to delete it before adding the welder (shared hud slot)
 
                 local meleeWeapon = self:GetWeapon(Axe.kMapName) or self:GetWeapon(Knife.kMapName)
+                replaceWelderWithKnife = meleeWeapon and meleeWeapon:isa("Knife")
                 if meleeWeapon then
                     self:RemoveWeapon(meleeWeapon)
                     DestroyEntity(meleeWeapon)
@@ -148,7 +236,11 @@ if Server then
                 
             end            
             if continue == true then
-                return Player.GiveItem(self, itemMapName, setActive, suppressError)
+                newItem = Player.GiveItem(self, itemMapName, setActive, suppressError)
+                if newItem and itemMapName == Welder.kMapName then
+                    newItem.replaceWithKnife = replaceWelderWithKnife == true
+                end
+                return newItem
             end
             
         end
@@ -182,6 +274,10 @@ if Server then
 
             local obsoleteWep = self:GetWeapon(obseleteName1) or self:GetWeapon(obseleteName2) -- Player walked over weapon with higher priority. Handled by weapon pickupable getter func.
             if obsoleteWep then
+                if weapon:isa("Welder") then
+                    weapon.replaceWithKnife = obsoleteWep:isa("Knife")
+                end
+
                 -- If we are "using", and the weapon we will switch back to when we're done "using"
                 -- is the weapon we're replacing, make sure we also replace this reference.
                 local obsoleteWepId = obsoleteWep:GetId()

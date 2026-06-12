@@ -354,7 +354,7 @@ function AlienTeam:OnUpdateBiomass(oldBiomass, newBiomass)
         local players = GetEntitiesForTeam("Player", self:GetTeamNumber())
         for i = 1, #players do
             local player = players[i]
-            if player and player.isa and player:isa("Lerk") then
+            if player and player.isa and player:isa("Lerk") and player:GetTeamNumber() ~= kTeamReadyRoom then
                 if not player:GetWeapon(mapName) then
                     player:GiveItem(mapName, false)
                 end

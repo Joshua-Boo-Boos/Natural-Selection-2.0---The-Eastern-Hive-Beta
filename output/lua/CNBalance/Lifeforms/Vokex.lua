@@ -223,7 +223,8 @@ function Vokex:MovementModifierChanged(newMovementModifierState, input)
     end
 end
 
-function Vokex:ModifyDamageTaken(damageTable, attacker, doer, damageType, hitPoint) -- dud
+function Vokex:ModifyDamageTaken(damageTable, attacker, doer, damageType, hitPoint)
+    if not doer then return end
     local reduction = kVokexDamageReduction[doer:GetClassName()]
     if reduction then
         damageTable.damage = damageTable.damage * reduction

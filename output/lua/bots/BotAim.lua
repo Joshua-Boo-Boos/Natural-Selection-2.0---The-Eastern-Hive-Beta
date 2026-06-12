@@ -295,7 +295,9 @@ function BotAim_UpdateAim(self, target, targetAimPoint, weaponGroup)
     local className = player and player:GetClassName() or "Default"
 
     if player and player.GetIsInCombat and player:GetIsInCombat() then
-        self.aimTurnRate = BotAim.kBotTurnSpeeds[className]
+        -- Fall back to the default turn speed for classes not present in kBotTurnSpeeds
+        -- (e.g. DevouredPlayer), otherwise aimTurnRate becomes nil and crashes BotMotion:GetRotateSpeed().
+        self.aimTurnRate = BotAim.kBotTurnSpeeds[className] or BotAim.kBotTurnSpeeds["Default"]
     else
         self.aimTurnRate = 1.0
     end
