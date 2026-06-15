@@ -5,8 +5,7 @@ Script.Load("lua/bots/BotAim.lua")
 
 local gMarineAimJitterAmount = 0.8
 
-local kExoBrainRetreatHealth  = 0.6
-local kExoDropArmorThreshold  = 0.25  -- TEH: drop exo when armor scalar falls below this
+local kExoBrainRetreatHealth = 0.6
 
 ------------------------------------------
 --  Handles things like using phase gates
@@ -230,8 +229,8 @@ local function PerformAttack( eyePos, mem, bot, brain, move )
     if target ~= nil then
 
         PerformAttackEntity( eyePos, target, mem.lastSeenPos, bot, brain, move )
-        --   local chatMsg =  bot:SendTeamMessage( "Cooonnntaaaact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-            -- bot:SendTeamMessage(chatMsg, 60)
+          local chatMsg =  bot:SendTeamMessage( "Cooonnntaaaact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
+            bot:SendTeamMessage(chatMsg, 60)
 
     end
 
@@ -310,13 +309,6 @@ local kExecFollowOrder = function(move, bot, brain, exo, action)
     end
 end
 
-local kExecExitExo = function(move, bot, brain, exo, action)
-    -- Drop the Exosuit immediately when armor is critically low
-    brain.teamBrain:UnassignPlayer(exo)
-    move.commands = AddMoveCommand(move.commands, Move.Drop)
-    return kPlayerObjectiveComplete
-end
-
 local kExecRetreat = function(move, bot, brain, exo, action)
     local structure = action.structure
 
@@ -375,7 +367,6 @@ end
 
 local kExoBrainObjectiveTypes = enum({
     'FollowOrder',
-    'ExitExo',          -- TEH: Drop exo when armor is critically low
     'Retreat',
     'GoToCommPing',
 })
@@ -402,23 +393,6 @@ kExoBrainObjectives =
             validate = kValidateFollowOrder,
             perform = kExecFollowOrder
         }
-    end,
-
-    function(bot, brain, exo)        --FIXME ...retreat to an Armory? eh...this needs a refactor
-
-        local name, weight = ExoBrainObjectiveWeights:Get(kExoBrainObjectiveTypes.ExitExo)
-
-        -- Drop the exo immediately when armor is critically low
-        if exo:GetArmorScalar() >= kExoDropArmorThreshold then
-            return kNilAction
-        end
-
-        return {
-            name    = name,
-            weight  = weight,
-            perform = kExecExitExo
-        }
-
     end,
 
     function(bot, brain, exo)        --FIXME ...retreat to an Armory? eh...this needs a refactor

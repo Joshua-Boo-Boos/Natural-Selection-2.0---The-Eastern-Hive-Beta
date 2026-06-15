@@ -910,7 +910,7 @@ kGorgeBrainActions =
         PROFILE("GorgeBrain - Bombard")
 
         local name = "bombard"
-        local weight = 3.5
+        local weight = 2.5
 
         local sdb = brain:GetSenses()
         local bileTargData = sdb:Get("nearestBilebombTarget")
@@ -936,23 +936,20 @@ kGorgeBrainActions =
                 local target = Shared.GetEntity(bestMem.entId)
                 local eHP = gorge:GetHealthScalar() -- current / max, or [0-1] percentage
 
-                -- Use weapon existence check rather than tech tree; GetHasTech(BileBomb)
-                -- required a Crag Hive and silently disabled biling for the whole game
-                -- when no Crag Hive was present. If the Gorge has the weapon it can fire it.
-                local bileBombWeapon = gorge:GetWeapon(BileBomb.kMapName)
-                if bileBombWeapon then
-
+                local techTree = GetTechTree(gorge:GetTeamNumber())
+                if techTree and techTree:GetHasTech(kTechId.BileBomb, true) then
+        
                     local targetUrgency = GetAttackStructuresUrgency(gorge, target)
 
                     weight = weight + (targetUrgency ~= nil and targetUrgency or 0)
                     weight = (weight + ( bot.aggroAbility or 0 )) - (1 - eHP) --decrease, the less eHP we have
-
+        
                     --dampening heavily if we're being attacked, or losing health
                     if gorge:GetIsUnderFire() then
                         --reduce if we're being shot, so Attack/Retreat have higher chances
                         weight = (weight * 0.25) * eHP
                     end
-
+                
                 else
                     weight = 0
                 end
@@ -1618,8 +1615,7 @@ function CreateGorgeBrainSenses()
                 ( healTarget.GetIsBuilt and healTarget:GetIsBuilt() ) or  
                 ( healTarget:GetIsAlive() )
             )
-            -- Exclude Clogs from considered healable targets so Gorges won't try to healspray them
-            if isValidHealable and not healTarget:isa("Clog") then
+            if isValidHealable then
                 table.insert(healables, healTarget)
             end
         end
