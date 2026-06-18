@@ -343,6 +343,13 @@ local function GetBuildTargetPriority(target)
 end
 
 
+-- Gorge babbler harassment pacing: Spit is the Gorge's main attack. The bot only
+-- diverts to the Babbler ability in a short burst every so often, then returns to
+-- spitting. Without this the bot re-selected babblers on EVERY strafe frame, which
+-- fired babblers instead of spit AND thrashed the weapon-draw so it barely attacked.
+local kGorgeBabblerSendInterval = 7.0   -- seconds between babbler bursts
+local kGorgeBabblerSendWindow   = 0.6   -- how long each babbler burst lasts (deploy+fire)
+
 local function PerformAttackEntity( eyePos, bestTarget, lastSeenPos, bot, brain, move )
     assert(bestTarget)
 
@@ -388,7 +395,26 @@ local function PerformAttackEntity( eyePos, bestTarget, lastSeenPos, bot, brain,
 
         end
 
-        if distance <= 20 and hasClearShot then     --TODO Change to local glob?
+        -- Use Bile Bomb as well as Spit while attacking: when Bile Bomb is
+        -- researched and we have energy, lob bile at players/MACs in arc range.
+        -- Spit is still used up close or when bile isn't available.
+        local usedBile = false
+        if isDodgeable and hasClearShot and distance >= 5 and distance <= 22 then
+            local techTree = GetTechTree(player:GetTeamNumber())
+            if techTree and techTree:GetHasTech(kTechId.BileBomb, true)
+                    and player:GetEnergy() > kBileBombEnergyCost then
+                player:SetActiveWeapon(BileBomb.kMapName, true)
+                local aimDir = Ballistics.GetAimDirection( eyePos, bestTarget:GetEngagementPoint(),
+                                   kBilebombVelocity + player:GetVelocity():GetLength() )
+                local aimTarg = aimDir + Vector( eyePos.x, eyePos.y, eyePos.z )
+                if bot.aim and bot.aim:UpdateAim(bestTarget, aimTarg, kBotAccWeaponGroup.Spit) then
+                    move.commands = AddMoveCommand( move.commands, Move.PrimaryAttack )
+                    usedBile = true
+                end
+            end
+        end
+
+        if not usedBile and distance <= 20 and hasClearShot then     --TODO Change to local glob?
             doFire = true
         end
 
@@ -413,11 +439,29 @@ local function PerformAttackEntity( eyePos, bestTarget, lastSeenPos, bot, brain,
                 --strafeTarget = strafeTarget * ConditionalValue( math.sin(time * 3.5 ) + math.sin(time * 2.2 ) > 0 , -1, 1)
                 strafeTarget = strafeTarget * ConditionalValue( math.sin(time * 1.5 ) + math.sin(time * 1.1 ) > 0 , -1.25, 1.25)
 
-                if strafeTarget:GetLengthSquared() > 0 and hasClearShot and player:GetIsInCombat() then 
+                if strafeTarget:GetLengthSquared() > 0 and hasClearShot and player:GetIsInCombat() then
 
                     bot:GetMotion():SetDesiredMoveDirection( strafeTarget )
                     bot:GetMotion():SetDesiredViewTarget( aimPos )  --aimPosPlusVel
-                    player:SetActiveWeapon(BabblerAbility.kMapName)
+
+                    -- Keep SPITTING for damage; only divert to babblers in a short,
+                    -- rate-limited burst (long enough to actually deploy and throw),
+                    -- then go straight back to spit. This stops the per-frame weapon
+                    -- thrash that left the Gorge "stuck" on babblers and barely firing.
+                    local sendingBabblers = false
+                    if bot.babblerWindowEnd and bot.babblerWindowEnd > time then
+                        sendingBabblers = true
+                    elseif not bot.lastBabblerSendTime or bot.lastBabblerSendTime + kGorgeBabblerSendInterval < time then
+                        bot.lastBabblerSendTime = time
+                        bot.babblerWindowEnd = time + kGorgeBabblerSendWindow
+                        sendingBabblers = true
+                    end
+
+                    if sendingBabblers then
+                        player:SetActiveWeapon(BabblerAbility.kMapName)
+                    else
+                        player:SetActiveWeapon(SpitSpray.kMapName)
+                    end
                     move.commands = AddMoveCommand( move.commands, Move.PrimaryAttack )
 
                     if not player.timeOfLastJump or (player.timeOfLastJump + 2 > time and player.timeOfLastJump + 8 < time) then
@@ -910,7 +954,9 @@ kGorgeBrainActions =
         PROFILE("GorgeBrain - Bombard")
 
         local name = "bombard"
-        local weight = 2.5
+        -- Higher base so the Gorge reliably prioritises biling structures (its main
+        -- siege role) over passive behaviours when a valid bile target + tech exist.
+        local weight = 4.0
 
         local sdb = brain:GetSenses()
         local bileTargData = sdb:Get("nearestBilebombTarget")
@@ -937,19 +983,23 @@ kGorgeBrainActions =
                 local eHP = gorge:GetHealthScalar() -- current / max, or [0-1] percentage
 
                 local techTree = GetTechTree(gorge:GetTeamNumber())
-                if techTree and techTree:GetHasTech(kTechId.BileBomb, true) then
-        
+                -- 'target and ...' guards a nil entity: GetAttackStructuresUrgency
+                -- asserts on a nil target, which would error the whole action.
+                if target and techTree and techTree:GetHasTech(kTechId.BileBomb, true) then
+
                     local targetUrgency = GetAttackStructuresUrgency(gorge, target)
 
                     weight = weight + (targetUrgency ~= nil and targetUrgency or 0)
                     weight = (weight + ( bot.aggroAbility or 0 )) - (1 - eHP) --decrease, the less eHP we have
-        
-                    --dampening heavily if we're being attacked, or losing health
+
+                    -- Soften (don't abandon) bile when shot. The old x0.25 made the
+                    -- Gorge give up biling a structure the instant it took any fire, so
+                    -- it rarely bombed anything. Keep most of the weight so it commits
+                    -- to the bile, while Retreat still wins at genuinely low health.
                     if gorge:GetIsUnderFire() then
-                        --reduce if we're being shot, so Attack/Retreat have higher chances
-                        weight = (weight * 0.25) * eHP
+                        weight = (weight * 0.6) * math.max(eHP, 0.5)
                     end
-                
+
                 else
                     weight = 0
                 end

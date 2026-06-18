@@ -34,3 +34,21 @@ function OnCommandGorgeBuildStructure(client, message)
     end
 end
 Server.HookNetworkMessage("GorgeBuildStructure", OnCommandGorgeBuildStructure)
+
+
+-- ============================================================================
+-- NS2.0-TEH: never play the medpack / ammo request voiceover and never notify
+-- the Marine commander about them. Identified by AlertTechId so the Marine,
+-- MAC and Mil-MAC request variants are all caught. Covers human key-press
+-- requests and any bot CreateVoiceMessage calls; the commander alert is also
+-- dropped centrally in CNBalance/PlayingTeam.lua (TriggerAlert).
+-- ============================================================================
+local TEH_baseCreateVoiceMessage = CreateVoiceMessage
+function CreateVoiceMessage(player, voiceId)
+    local soundData = GetVoiceSoundData(voiceId)
+    if soundData and (soundData.AlertTechId == kTechId.MarineAlertNeedMedpack
+                   or soundData.AlertTechId == kTechId.MarineAlertNeedAmmo) then
+        return
+    end
+    return TEH_baseCreateVoiceMessage(player, voiceId)
+end

@@ -580,8 +580,8 @@ local kExecPressureNaturals = function(move, bot, brain, skulk, action)
         elseif action.idleStart + 30 < now then --orginal + 15
         --wait a short duration for any hostiles to come through or for any structures to be dropped, etc.
 
-            CreateVoiceMessage( skulk, kVoiceId.AlienTaunt ) -- for fun
- 
+            --CreateVoiceMessage( skulk, kVoiceId.AlienTaunt ) -- for fun
+
             return kPlayerObjectiveComplete
 
         end
@@ -679,6 +679,149 @@ local kSkulkBrainObjectiveTypes = enum({
 
 local SkulkObjectiveWeights = MakeBotActionWeights(kSkulkBrainObjectiveTypes, 100)
 
+------------------------------------------
+-- TEH: HARD lifeform cap (anti Gorge-flood) -- FULLY SELF-CONTAINED
+--
+-- We wrap the standard evolve action with a hard cap so a Skulk can NEVER evolve
+-- into a lifeform the alien team is already full of. ALL the cap math is computed
+-- inline here from engine primitives (GetEntitiesForTeam, kTechId, gestationClass)
+-- so it does NOT depend on TeamBrain methods being inherited, on the CommonAlien
+-- actions override, or on the 30s pass. If this file loads, the cap is enforced.
+--
+-- Counts include alive evolved lifeforms AND gestating Embryos (by gestationClass),
+-- so bots mid-evolution and (correctly) not dead bots are accounted for. Caps are an
+-- even split of the alien field-player count across the lifeforms; the cheapest
+-- open lifeform is handed out, and if everything is full the Skulk stays a Skulk
+-- (i.e. it is forced to save for its assigned lifeform).
+------------------------------------------
+
+-- {techId, className}, cheapest -> most expensive. Built each call (cheap, 6 items)
+-- so custom Vokex/Prowler tech ids are picked up once they exist, and skipped if not.
+local function TEH_GetLifeformList()
+    local raw =
+    {
+        { kTechId.Gorge,   "Gorge"   },
+        { kTechId.Prowler, "Prowler" },
+        { kTechId.Lerk,    "Lerk"    },
+        { kTechId.Fade,    "Fade"    },
+        { kTechId.Vokex,   "Vokex"   },
+        { kTechId.Onos,    "Onos"    },
+    }
+    local list = {}
+    for i = 1, #raw do
+        if raw[i][1] ~= nil then
+            list[#list + 1] = raw[i]
+        end
+    end
+    return list
+end
+
+-- Returns counts{techId=n}, caps{techId=n}, list, N for the player's team.
+local function TEH_GetCountsAndCaps(player)
+    local teamNumber = player:GetTeamNumber()
+    local list = TEH_GetLifeformList()
+    local L = #list
+
+    local techForClass = {}
+    local counts = {}
+    for i = 1, L do
+        techForClass[list[i][2]] = list[i][1]
+        counts[list[i][1]] = 0
+    end
+
+    local N = 0
+    for _, p in ipairs(GetEntitiesForTeam("Player", teamNumber)) do
+        if not p:isa("Commander") then
+            N = N + 1                                  -- field player (alive or dead)
+        end
+        if p.GetIsAlive and p:GetIsAlive() then
+            if p:isa("Embryo") then
+                local gestClass = p.gestationClass     -- authoritative target class
+                local tech = gestClass and techForClass[gestClass]
+                if tech then counts[tech] = counts[tech] + 1 end
+            else
+                for i = 1, L do
+                    if p:isa(list[i][2]) then
+                        counts[list[i][1]] = counts[list[i][1]] + 1
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    local caps = {}
+    if N > 0 and L > 0 then
+        local base = math.floor(N / L)
+        local rem = N % L
+        for idx = 1, L do
+            local getsExtra = idx > (L - rem)          -- remainder to expensive lifeforms
+            local cap = base + (getsExtra and 1 or 0)
+            if cap < 1 then cap = 1 end                -- keep higher lifeforms reachable
+            caps[list[idx][1]] = cap
+        end
+    else
+        for i = 1, L do caps[list[i][1]] = 0 end
+    end
+
+    return counts, caps, list, N
+end
+
+-- Is this lifeform actually evolvable right now for this player (tech unlocked,
+-- e.g. enough Biomass/Hives)? Prevents assigning a bot to a lifeform it cannot yet
+-- become, which would otherwise leave it stuck as a Skulk "saving" forever.
+local function TEH_IsAvailable(player, tech)
+    local tree = player.GetTechTree and player:GetTechTree()
+    local node = tree and tree:GetTechNode(tech)
+    return node ~= nil and node:GetAvailable(player, tech, false) == true
+end
+
+-- Cheapest lifeform that still has an open slot AND is currently evolvable, or nil.
+local function TEH_ChooseLifeform(player, counts, caps, list)
+    for i = 1, #list do
+        local tech = list[i][1]
+        if (counts[tech] or 0) < (caps[tech] or 0) and TEH_IsAvailable(player, tech) then
+            return tech
+        end
+    end
+    return nil
+end
+
+local kRawSkulkEvolveAction = CreateAlienEvolveAction(SkulkObjectiveWeights, kSkulkBrainObjectiveTypes.Evolve, kTechId.Skulk)
+local function CappedSkulkEvolveAction(bot, brain, player)
+
+    if player and player.isa and player:isa("Skulk") then
+        local counts, caps, list, N = TEH_GetCountsAndCaps(player)
+        local target = bot.lifeformEvolution
+        -- Keep the current target only if it is under cap AND still evolvable; otherwise
+        -- re-point at the cheapest open, available lifeform (or stay a Skulk if none).
+        local allowed = target and caps[target] ~= nil and (counts[target] or 0) < caps[target]
+                        and TEH_IsAvailable(player, target)
+
+        if not allowed then
+            local rebalanced = TEH_ChooseLifeform(player, counts, caps, list)
+
+            -- Diagnostic (throttled per-bot): proves the cap gate is executing and
+            -- shows the live Gorge count/cap so we can confirm enforcement in console.
+            if not bot.lastTEHEvoLog or bot.lastTEHEvoLog + 5 < Shared.GetTime() then
+                bot.lastTEHEvoLog = Shared.GetTime()
+                Log("[TEH] evolve gate: N=%s target=%s (Gorge %s/%s) -> repoint=%s",
+                    tostring(N), tostring(target),
+                    tostring(counts[kTechId.Gorge]), tostring(caps[kTechId.Gorge]),
+                    tostring(rebalanced))
+            end
+
+            if not rebalanced then
+                -- Every lifeform is already at its cap: stay a Skulk and keep saving.
+                return kNilAction
+            end
+            bot.lifeformEvolution = rebalanced
+        end
+    end
+
+    return kRawSkulkEvolveAction(bot, brain, player)
+end
+
 kSkulkBrainObjectives =
 {
 
@@ -772,9 +915,9 @@ kSkulkBrainObjectives =
     CreateAlienRespondToThreatAction(SkulkObjectiveWeights, kSkulkBrainObjectiveTypes.RespondToThreat, PerformMove),
 
     ------------------------------------------
-    --  Evolve
+    --  Evolve (TEH: hard-capped, see CappedSkulkEvolveAction above)
     ------------------------------------------
-    CreateAlienEvolveAction(SkulkObjectiveWeights, kSkulkBrainObjectiveTypes.Evolve, kTechId.Skulk),
+    CappedSkulkEvolveAction,
 
     ------------------------------------------
     -- Pheromone

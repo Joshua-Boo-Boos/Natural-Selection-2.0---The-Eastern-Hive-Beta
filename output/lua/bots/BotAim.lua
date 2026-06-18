@@ -125,7 +125,9 @@ BotAim.kBotTurnSpeeds =
     ["Gorge"] = 1.5,
     ["Lerk"] = 2.0,
     ["Fade"] = 2.3,
-    ["Onos"] = 1.5, -- extra hinzugefügt
+    ["Onos"] = 1.5, -- extra hinzugefï¿½gt
+    ["Vokex"] = 2.3,    -- TEH: Fade-like lifeform
+    ["Prowler"] = 1.6,  -- TEH: Skulk-like lifeform
 }
 --[[{
     ["Default"] = 1.0,
@@ -218,7 +220,8 @@ function BotAim:GetIsAimDebuffed()
 end
 
 function BotAim:GetAimTurnRateModifier()
-    return self.aimTurnRate
+    -- Return 1.0 if aimTurnRate was never set; avoids nil-arithmetic crash in BotMotion:GetRotateSpeed.
+    return self.aimTurnRate or 1.0
 end
 
 function BotAim:GetIsWeaponGroupDistanceAffected(weaponGroup)

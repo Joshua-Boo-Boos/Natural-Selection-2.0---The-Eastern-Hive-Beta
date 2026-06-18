@@ -925,7 +925,7 @@ function(bot, brain, com)
                 DropWeapon(protoOrigin,0.5,kTechId.DropHeavyMachineGun)
                 DropWeapon(protoOrigin,0.3,kTechId.DropGrenadeLauncher)
                 local message = string.format("I dropped supplies in our starting base!", overrideName)
-                bot:SendTeamMessage(message, 10, false, true)
+                --bot:SendTeamMessage(message, 10, false, true)
             end}
 
     end, -- Drop Jetpack und/oder Waffen
@@ -1431,7 +1431,7 @@ function(bot, brain, com)
 
                 local overrideName = EnumToString(kMarineTechPathOverrideType, brain.currentTechpathOverride)
                 local message = string.format("I'm saving up for %s! No Meds or Ammo!", overrideName)
-                bot:SendTeamMessage(message, 0, false, true)
+                --bot:SendTeamMessage(message, 0, false, true)
 
                 brain.timeLastSavingMessage = Shared.GetTime()
 

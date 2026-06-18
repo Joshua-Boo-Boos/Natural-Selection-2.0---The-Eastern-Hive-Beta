@@ -262,7 +262,7 @@ function GetMarineComNextTechStep(bot, brain, com)
         if techOverrideType ~= kMarineTechPathOverrideType.None then
             local overrideName = EnumToString(kMarineTechPathOverrideType, techOverrideType)
             local message = string.format("I'm saving up for %s!", overrideName)
-            bot:SendTeamMessage(message, 0, false, true)
+            --bot:SendTeamMessage(message, 0, false, true)
         end
 
     end

@@ -443,7 +443,11 @@ function Vokex:TriggerShadowStep()
         self.timeShadowStep = Shared.GetTime()
         self.shadowStepping = true
         
-        self:TriggerEffects("shadow_step", {effecthostcoords = Coords.GetLookIn(self:GetOrigin(), self.shadowStepDirection)})
+        -- shadowStepDirection is zero-vector until first ModifyVelocity call; Coords.GetLookIn
+        -- on a zero vector produces NaN coords and crashes the particle system.
+        local stepDir = (self.shadowStepDirection and self.shadowStepDirection:GetLengthSquared() > 0.001)
+            and self.shadowStepDirection or self:GetViewCoords().zAxis
+        self:TriggerEffects("shadow_step", {effecthostcoords = Coords.GetLookIn(self:GetOrigin(), stepDir)})
 
         -- /*
         -- if Client and Client.GetLocalPlayer() == self then
@@ -474,13 +478,24 @@ function Vokex:OnProcessMove(input)
     Alien.OnProcessMove(self, input)
     
     if Server then
-    
+
         if self.isScanned and self.timeLastScan + kVokexScanDuration < Shared.GetTime() then
             self.isScanned = false
         end
 
+        -- Bot AI: grant AcidRocket (the Vokex's ranged weapon) once it is unlocked by
+        -- Biomass (kTechId.AcidRocket <- kTechId.BioMassSix). Human Vokex buy it via the
+        -- Vokex menu; bots do not use menus, so give it directly when the tech is
+        -- available. Checked periodically (not every tick) and never force-switched to.
+        if self:GetIsVirtual() and AcidRocket and (not self.tehNextAcidCheck or Shared.GetTime() >= self.tehNextAcidCheck) then
+            self.tehNextAcidCheck = Shared.GetTime() + 2
+            if self:GetIsAlive() and not self:GetWeapon(AcidRocket.kMapName) and GetHasTech(self, kTechId.AcidRocket) then
+                self:GiveItem(AcidRocket.kMapName, false)
+            end
+        end
+
     end
-    
+
     if not self:GetHasMetabolizeAnimationDelay() and self.previousweapon ~= nil then
 
         if self:GetActiveWeapon():GetMapName() == MetabolizeShadowStep.kMapName then

@@ -1,18 +1,15 @@
 -- ProwlerBrain_Data.lua
--- Combat AI data for Prowler bots.
--- Prowler uses VolleyRappel (ranged spread projectile) as primary weapon.
--- This file defines kProwlerBrainActions (attack logic) and helper functions.
--- kProwlerBrainObjectives is re-used from kSkulkBrainObjectives since the Skulk
--- objectives (explore, defend hive, respond to threat, etc.) are identical for Prowler.
--- The Evolve objective inside kSkulkBrainObjectives is overridden globally by
--- TEHBotManager.lua so Prowler bots correctly handle their assigned lifeform.
+-- Combat AI data for Prowler bots. The Prowler uses VolleyRappel (map name
+-- "volley"), a ranged spread projectile, as its weapon. This file defines
+-- kProwlerBrainActions (attack logic). The non-combat objectives (explore,
+-- defend hive, respond to threat, evolve, etc.) are inherited from SkulkBrain.
 
-local kProwlerFireRange    = 10.0   -- effective fire range for VolleyRappel
+-- VolleyRappel is a RANGED weapon (GetRange() == 40). Firing only at 10m made the
+-- Prowler charge into melee before ever shooting, so it looked like it never attacked.
+-- Fire from a proper ranged distance (kept just under the weapon's 40m range).
+local kProwlerFireRange    = 32.0   -- effective fire range for VolleyRappel
 local kProwlerEngageRange  = 50.0   -- maximum range at which a Prowler will engage
 
--- ---------------------------------------------------------------------------
--- Per-Prowler attack urgency (local copy, similar to Skulk's but no bite-range bonus)
--- ---------------------------------------------------------------------------
 local function GetProwlerAttackUrgency(bot, prowler, mem)
     PROFILE("ProwlerBrain_Data - GetProwlerAttackUrgency")
 
@@ -33,7 +30,6 @@ local function GetProwlerAttackUrgency(bot, prowler, mem)
     if dist < 20 then
         closeBonus = math.max(0, (dist * -0.1) + 2)
     end
-
     if target.GetHealthScalar and target:GetHealthScalar() < 0.3 then
         closeBonus = closeBonus + (0.3 - target:GetHealthScalar()) * 3
     end
@@ -60,12 +56,10 @@ local function GetProwlerAttackUrgency(bot, prowler, mem)
                 (mem.btype ~= kMinimapBlipType.Extractor and mem.btype ~= kMinimapBlipType.CommandStation) then
             return nil
         end
-
         local nearestThreat = bot.brain:GetSenses():Get("nearestThreat")
         if nearestThreat and nearestThreat.distance and nearestThreat.distance <= 8 then
             return nil
         end
-
         return passiveUrgencies[mem.btype] + closeBonus
     end
 
@@ -83,7 +77,6 @@ local function GetProwlerAttackUrgency(bot, prowler, mem)
         if dist < 15 or isInCombat then
             numOthers = 0
         end
-        -- re-evaluate with correct numOthers
         activeUrgencies =
         {
             [kMinimapBlipType.Exo]          = numOthers >= 4 and 0.4 or 1.6,
@@ -97,9 +90,6 @@ local function GetProwlerAttackUrgency(bot, prowler, mem)
     return nil
 end
 
--- ---------------------------------------------------------------------------
--- Executor: perform the Prowler ranged attack
--- ---------------------------------------------------------------------------
 local kExecProwlerAttackAction = function(move, bot, brain, prowler, action)
     PROFILE("ProwlerBrain_Data - ExecProwlerAttack")
 
@@ -119,14 +109,19 @@ local kExecProwlerAttackAction = function(move, bot, brain, prowler, action)
 
     local distance = target and GetDistanceToTouch(eyePos, target) or 999.0
 
-    -- Ensure VolleyRappel is the active weapon
-    prowler:SetActiveWeapon("volley")
+    -- Ensure VolleyRappel is the active weapon (only switch when it isn't already
+    -- active, matching the Vokex pattern, to avoid re-issuing OnSetActive every frame)
+    local activeWep = prowler:GetActiveWeapon()
+    if not activeWep or activeWep:GetMapName() ~= "volley" then
+        prowler:SetActiveWeapon("volley")
+    end
 
-    -- Face the target
     bot:GetMotion():SetDesiredViewTarget(aimPos)
+    if bot.aim and target ~= nil then
+        bot.aim:UpdateAim(target, aimPos, kBotAccWeaponGroup.Bullets)
+    end
 
     if distance < kProwlerFireRange then
-        -- Within effective range: fire and assign to this target for load-balancing
         brain.teamBrain:UnassignBot(bot)
         brain.teamBrain:AssignBotToMemory(bot, mem)
         move.commands = AddMoveCommand(move.commands, Move.PrimaryAttack)
@@ -136,10 +131,6 @@ local kExecProwlerAttackAction = function(move, bot, brain, prowler, action)
     bot:GetMotion():SetDesiredMoveTarget(aimPos)
 end
 
--- ---------------------------------------------------------------------------
--- Actions table for ProwlerBrain
--- (replaces kSkulkBrainActions - fixes canAttack for VolleyRappel)
--- ---------------------------------------------------------------------------
 kProwlerBrainActions =
 {
     ------------------------------------------
@@ -157,13 +148,13 @@ kProwlerBrainActions =
             end)
 
         local weapon = prowler:GetActiveWeapon()
-        -- Prowler attacks with VolleyRappel (mapName "volley")
-        local canAttack = weapon ~= nil and weapon:GetMapName() == "volley"
+        -- Prowler attacks with VolleyRappel (map name "volley")
+        local canAttack = prowler:GetWeapon("volley") ~= nil
 
         local weight = 0.0
 
         if canAttack and bestMem ~= nil then
-            local dist = 0.0
+            local dist
             local attackTargetEnt = Shared.GetEntity(bestMem.entId)
             if attackTargetEnt ~= nil then
                 dist = select(2, GetTunnelDistanceForAlien(prowler, attackTargetEnt))
@@ -188,6 +179,7 @@ kProwlerBrainActions =
             name = name,
             weight = weight,
             bestMem = bestMem,
+            fastUpdate = true,
             perform = kExecProwlerAttackAction
         }
     end,

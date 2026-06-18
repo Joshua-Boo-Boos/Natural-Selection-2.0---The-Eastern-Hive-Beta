@@ -608,9 +608,8 @@ local function PerformAttackEntity( eyePos, target, lastSeenPos, bot, brain, mov
         brain.lastShootingTime = Shared.GetTime()
         
         if (not bot.lastHostilesTime or bot.lastHostilesTime < Shared.GetTime() - 45) and isDodgeable then
-            CreateVoiceMessage( player, kVoiceId.MarineHostiles )
-            local chatMsg =  bot:SendTeamMessage( "Enemy contact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-            bot:SendTeamMessage(chatMsg, 60)
+            --CreateVoiceMessage( player, kVoiceId.MarineHostiles )
+            --bot:SendTeamMessage( "Enemy contact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
             bot.lastHostilesTime = Shared.GetTime()
         end
         
@@ -783,7 +782,7 @@ local function PerformWeld(marine, target, bot, brain, move)    --BOT-FIXME Need
         move.commands = AddMoveCommand( move.commands, Move.PrimaryAttack )
         
         if (not bot.lastCoveringTime or bot.lastCoveringTime < Shared.GetTime() - 45) and isPlayer then
-            CreateVoiceMessage( bot:GetPlayer(), kVoiceId.MarineCovering )
+            --CreateVoiceMessage( bot:GetPlayer(), kVoiceId.MarineCovering )
             bot.lastCoveringTime = Shared.GetTime()
         end
         
@@ -792,9 +791,9 @@ local function PerformWeld(marine, target, bot, brain, move)    --BOT-FIXME Need
 
         move.commands = AddMoveCommand( move.commands, Move.PrimaryAttack )
         
-        if isPlayer and not target:GetIsVirtual() then
-            bot:SendTeamMessage("Let me weld you, " .. target:GetName(), 70)
-        end
+        --if isPlayer and not target:GetIsVirtual() then
+        --    bot:SendTeamMessage("Let me weld you, " .. target:GetName(), 70)
+        --end
     end
     
     if not brain.lastWeldTime or brain.lastWeldTime < Shared.GetTime() - 2 then
@@ -846,12 +845,24 @@ local function EstimateBotResponseUtility(marine, target)
     end
 end
 
+-- Structures the bots mine, by ascending priority (higher = mined first).
+-- Phase Gates and Command Stations are the highest-value defensive mining targets.
 local kMinePriority = {
     [kMinimapBlipType.Extractor] = 1,
     [kMinimapBlipType.Observatory] = 2,
-    [kMinimapBlipType.PhaseGate] = 3,
-    [kMinimapBlipType.InfantryPortal] = 4
+    [kMinimapBlipType.Armory] = 3,
+    [kMinimapBlipType.AdvancedArmory] = 4,
+    [kMinimapBlipType.InfantryPortal] = 5,
+    [kMinimapBlipType.CommandStation] = 6,
+    [kMinimapBlipType.PhaseGate] = 7,
 }
+
+-- Mine placement tuning. Up to kMaxMinesPerStructure mines per structure; the
+-- actual number is how many fit around the structure at kMineSpacing apart.
+local kMaxMinesPerStructure = 4
+local kMinePlaceGap   = 1.25   -- distance out from the structure's edge to place
+local kMineSpacing    = 2.0    -- spacing between mines around the structure ring
+local kMineNearRadius = 1.5    -- count existing mines within this margin of the ring
 
 ---------------------------------------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -1559,7 +1570,7 @@ local kExecGuardNearestHuman = function(move, bot, brain, marine, action)
         --Only play so often, but never play more than once for the same player, nor when that player is trying to be sneaky
         if brain.lastGuardStateMimicKey ~= Move.Crouch and diffTargetThanLast and brain.lastCoveringAlertTime == 0 then
         --Notify the player we're guarding them. Also, don't do so if the player is crouching (sneaking)
-            CreateVoiceMessage( marine, kVoiceId.MarineCovering )            
+            --CreateVoiceMessage( marine, kVoiceId.MarineCovering )
             brain.lastCoveringAlertTime = time
         end
 
@@ -1618,9 +1629,8 @@ local kExecBuildStructure = function(move, bot, brain, marine, action)
 
     --BOT-TODO Improve, this is too generic/dry (no, not "Beige-Flavor text", but something better that this)
     --BOT-FIXME Need to properly format the names ...some MapName value has _ instead if spaces, and all are lowercased
-    local chatMsg = ( "I'll build the " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-
-    bot:SendTeamMessage(chatMsg, 120)
+    --local chatMsg = ( "I'll build the " .. target:GetMapName() .. " in " .. target:GetLocationName() )
+    --bot:SendTeamMessage(chatMsg, 120)
 
     if marine:GetOrigin():GetDistance(target:GetOrigin()) < 5 then
         return kPlayerObjectiveComplete
@@ -1682,7 +1692,8 @@ local kExecAwaitEarlyResPlacement = function(move, bot, brain, marine, action)
 
         if brain.lastCommanderRequestTime + brain.kCommanderRequestRateTime < time then
             if math.random(0,1) < 0.5 then
-                CreateVoiceMessage( marine, kVoiceId.MarineRequestStructure )
+                -- TEH: bots only ever request mist; no structure requests.
+                --CreateVoiceMessage( marine, kVoiceId.MarineRequestStructure )
                 brain.lastCommanderRequestTime = time + math.random(0.25, 1.5) --cheese, but adds variance
             end
         end
@@ -1725,7 +1736,7 @@ local kExecPressureNaturals = function(move, bot, brain, marine, action)
         elseif action.idleStart + 30 < now then --orginal + 15
         --wait a short duration for any hostiles to come through or for any structures to be dropped, etc.
 
-            CreateVoiceMessage( marine, kVoiceId.MarineTaunt ) -- for fun
+            --CreateVoiceMessage( marine, kVoiceId.MarineTaunt ) -- for fun
             return kPlayerObjectiveComplete
 
         end
@@ -2151,54 +2162,73 @@ kMarineBrainObjectiveActions =
         local weight = 0
         local key = nil
 
-        local nearbyMemories = teamBrain:GetMemoriesAtLocation(marine:GetLocationName(), marine:GetTeamNumber())
-        local numMines = 0
-        local wantedMines = 0
-        local bestWeight = 0
-        local bestStructure = nil
-        local bestPos = nil
-
         local hasMine = marine:GetWeaponInHUDSlot(4) ~= nil
-
         if not hasMine then
             return kNilAction
         end
 
+        local nearbyMemories = teamBrain:GetMemoriesAtLocation(marine:GetLocationName(), marine:GetTeamNumber())
+
+        -- Gather positions of mines already placed in this location (mines show as
+        -- SensorBlips) so we can tell how many are already around each structure.
+        local minePositions = {}
         for _, mem in ipairs(nearbyMemories) do
-
-            local t = mem.btype
-
-            if t == kMinimapBlipType.Extractor or t == kMinimapBlipType.InfantryPortal or t == kMinimapBlipType.PhaseGate or t == kMinimapBlipType.Observatory then
-                -- one mine for each structure and two for the gate (may not be placed on those structures specifically)
-                wantedMines = wantedMines + (t == kMinimapBlipType.PhaseGate and 2 or 1)
-
-                local numAssigned = teamBrain:GetNumAssignedToEntity("mine-" .. mem.entId)
-                local sweight = kMinePriority[t]
-
-                if sweight > bestWeight and numAssigned < 1 then
-                    bestWeight = sweight
-                    bestStructure = Shared.GetEntity(mem.entId)
+            if mem.btype == kMinimapBlipType.SensorBlip then
+                local mineEnt = Shared.GetEntity(mem.entId)
+                if mineEnt then
+                    table.insert(minePositions, mineEnt:GetOrigin())
                 end
             end
+        end
 
-            -- assume it's a mine
-            if t == kMinimapBlipType.SensorBlip then
-                numMines = numMines + 1
+        local bestWeight = 0
+        local bestStructure = nil
+        local bestPos = nil
+        local bestRingIndex = 0
+        local bestDesired = 0
+
+        for _, mem in ipairs(nearbyMemories) do
+            local t = mem.btype
+            if kMinePriority[t] ~= nil then
+                local structure = Shared.GetEntity(mem.entId)
+                if structure then
+                    local sOrigin = structure:GetOrigin()
+                    local placeDist = structure:GetExtents():GetLengthXZ() + kMinePlaceGap
+
+                    -- How many mines fit around this structure at kMineSpacing apart,
+                    -- capped at the per-structure maximum.
+                    local ring = math.floor( (2 * math.pi * placeDist) / kMineSpacing )
+                    local desired = math.max(1, math.min(kMaxMinesPerStructure, ring))
+
+                    -- Count mines already placed around THIS structure.
+                    local existingNear = 0
+                    for _, mpos in ipairs(minePositions) do
+                        if mpos:GetDistance(sOrigin) <= placeDist + kMineNearRadius then
+                            existingNear = existingNear + 1
+                        end
+                    end
+
+                    local assigned = teamBrain:GetNumAssignedToEntity("mine-" .. mem.entId)
+                    local placedOrClaimed = existingNear + assigned
+                    local sweight = kMinePriority[t]
+
+                    if placedOrClaimed < desired and sweight > bestWeight then
+                        bestWeight = sweight
+                        bestStructure = structure
+                        bestRingIndex = placedOrClaimed   -- which sector to place the next mine in
+                        bestDesired = desired
+                    end
+                end
             end
-
         end
 
-        -- hard cap how many mines we want in main base
-        if marine:GetLocationName() == teamBrain.initialTechPointLoc then
-            wantedMines = 4
-        end
-
-        if bestStructure and numMines < wantedMines then
-
-            local ang = math.random() * math.pi * 2
-            local kPlaceDist = bestStructure:GetExtents():GetLengthXZ() + 1.25
-
-            local point = Vector(math.sin(ang) * kPlaceDist, 0, math.cos(ang) * kPlaceDist) + bestStructure:GetOrigin()
+        if bestStructure then
+            local placeDist = bestStructure:GetExtents():GetLengthXZ() + kMinePlaceGap
+            -- Spread mines evenly around the structure (one per sector), with a
+            -- little jitter so they don't stack if positions get rounded together.
+            local ang = (bestRingIndex / math.max(1, bestDesired)) * (2 * math.pi)
+                        + (math.random() - 0.5) * 0.4
+            local point = Vector(math.sin(ang) * placeDist, 0, math.cos(ang) * placeDist) + bestStructure:GetOrigin()
             bestPos = Pathing.GetClosestPoint(point)
 
             weight = GetMarineObjectiveBaselineWeight(kMarineBrainObjectiveTypes.PlaceMines)
@@ -2469,19 +2499,28 @@ kMarineBrainObjectiveActions =
 
                 end
                 
+                -- If saving for the Jetpack + Gauss Cannon combo, buy the Cannon
+                -- (the Prototype Lab weapon) as the chosen weapon when affordable.
+                if bot.wantsCannon and availableWeapons[kTechId.Cannon]
+                        and resources >= LookupTechData(kTechId.Cannon, kTechDataCostKey) then
+                    canAffordWeaponTechId = kTechId.Cannon
+                end
+
                 --BOT-TODO Revise below, and use some kind of lookup table via TeamBrain (or similar) which marks what all other Marines have, try to bias towards to fill "gaps"
-                for _, techId in ipairs(availableWeapons) do
-                    
-                    if resources >= LookupTechData(techId, kTechDataCostKey) then
-                        
-                        canAffordWeaponTechId = techId
-                        --Continue checking the other weapons with a 50% chance each
-                        if math.random() > 0.5 then     --BOT-FIXME This is fucking garbage...at a minimum it should use BotPersona ...at least that'll add SOME distribution (see PlayerBot_Server.lua - line 212)
-                            break
+                if not canAffordWeaponTechId then
+                    for _, techId in ipairs(availableWeapons) do
+
+                        if resources >= LookupTechData(techId, kTechDataCostKey) then
+
+                            canAffordWeaponTechId = techId
+                            --Continue checking the other weapons with a 50% chance each
+                            if math.random() > 0.5 then     --BOT-FIXME This is fucking garbage...at a minimum it should use BotPersona ...at least that'll add SOME distribution (see PlayerBot_Server.lua - line 212)
+                                break
+                            end
+
                         end
-                        
+
                     end
-                    
                 end
                 
                 --Set the desired Weapon, on next weight-compute time, the armory checks will be done
@@ -2518,9 +2557,17 @@ kMarineBrainObjectiveActions =
         
         local techTree = GetTechTree(marine:GetTeamNumber())
         
-        if proto and protoDist and not marine:isa("JetpackMarine") and techTree:GetIsTechAvailable(kTechId.JetpackTech, true) and resources >= LookupTechData(kTechId.Jetpack, kTechDataCostKey) then
+        -- Over-supply back-off: cap jetpacks relative to team size. While the team
+        -- already has too many jetpackers, the bot holds its resources (keeps
+        -- saving) and buys later once the count drops.
+        local jpTeam = GetGamerules():GetTeam(marine:GetTeamNumber())
+        local jpTotalPlayers = jpTeam and jpTeam:GetNumPlayers() or 1
+        local jpCap = math.max(1, math.floor(jpTotalPlayers / 3))
+        local jpCount = #GetEntitiesForTeam("JetpackMarine", marine:GetTeamNumber())
+
+        if proto and protoDist and not marine:isa("JetpackMarine") and techTree:GetIsTechAvailable(kTechId.JetpackTech, true) and resources >= LookupTechData(kTechId.Jetpack, kTechDataCostKey) and jpCount < jpCap then
             weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyJetpack )
-                    
+
             if bot.wantsJetpack then
                 weight = weight + 5 -- gimme gimme gimme
             end
@@ -2949,8 +2996,7 @@ local kExecAttackStructures = function(move, bot, brain, marine, action)
     end
 
     PerformAttackStructure( marine:GetEyePos(), target, memory.lastSeenPos, bot, brain, move )
-      local chatMsg =  bot:SendTeamMessage( "Structural threat! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-            bot:SendTeamMessage(chatMsg, 60)
+    --bot:SendTeamMessage( "Structural threat! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
 
 end
 

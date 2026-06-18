@@ -632,3 +632,17 @@ function PlayingTeam:UpdateBotEconomy()
 end
 
 debug.setupvaluex(PlayingTeam.OnResearchComplete, "GetIsResearchRelevant", extGetIsResearchRelevant)
+
+
+-- ============================================================================
+-- NS2.0-TEH: the Marine commander never receives medpack / ammo requests.
+-- Bots call TriggerAlert directly (PlayerBot_Server) and human requests arrive
+-- via CreateVoiceMessage, so drop these two alert tech ids here as a catch-all.
+-- ============================================================================
+local TEH_basePlayingTeamTriggerAlert = PlayingTeam.TriggerAlert
+function PlayingTeam:TriggerAlert(techId, entity, force)
+    if techId == kTechId.MarineAlertNeedMedpack or techId == kTechId.MarineAlertNeedAmmo then
+        return
+    end
+    return TEH_basePlayingTeamTriggerAlert(self, techId, entity, force)
+end

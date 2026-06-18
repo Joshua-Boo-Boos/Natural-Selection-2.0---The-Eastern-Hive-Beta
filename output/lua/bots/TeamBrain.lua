@@ -1071,6 +1071,30 @@ function TeamBrain:Update()
         self:DebugDraw()
     end
 
+    -- 30-second server-side lifeform distribution for the Alien bot team (TEH).
+    if self:GetIsAlienTeam() then
+        if not self.lastLifeformDistribution then
+            -- Use negative offset so the distribution fires on the very first Update,
+            -- preventing bots from using the old Gorge-biased random selection.
+            self.lastLifeformDistribution = -kTEHLifeformDistributionInterval
+        end
+        if self.lastLifeformDistribution + kTEHLifeformDistributionInterval < time then
+            self.lastLifeformDistribution = time
+            self:UpdateAlienLifeformDistribution()
+        end
+    end
+
+    -- 30-second server-side high-tech review for the Marine bot team (TEH).
+    if self:GetIsMarineTeam() then
+        if not self.lastMarineHighTechReview then
+            self.lastMarineHighTechReview = 0
+        end
+        if self.lastMarineHighTechReview + kTEHMarineHighTechInterval < time then
+            self.lastMarineHighTechReview = time
+            self:UpdateMarineHighTechReview()
+        end
+    end
+
     self.lastUpdate = Shared.GetTime()
 
 end
@@ -1110,6 +1134,351 @@ end
 
 function TeamBrain:GetRoleCount(role)
     return self.teamRoles[role] or 0
+end
+
+------------------------------------------
+--  TEH: Alien bot lifeform balancing (HARD CAPS)
+--
+--  The alien bot team is kept in an even spread across the lifeforms:
+--      Gorge, Prowler, Lerk, Fade, Vokex, Onos
+--
+--  Two mechanisms enforce this, both built on the SAME cap math so they can
+--  never disagree:
+--
+--   1. A per-lifeform HARD CAP, computed from the alien field-player count.
+--      The evolve action (CommonAlienActions.CreateAlienEvolveAction) calls
+--      GetIsLifeformEvolveAllowed() right before a Skulk actually evolves and
+--      REFUSES to evolve into any lifeform already at its cap. This is the real
+--      guarantee: it does not matter what stale target a bot is carrying, it
+--      simply cannot become e.g. a 7th Gorge when the cap is 3. If its target is
+--      full it is re-pointed (ChooseBalancedLifeform) at a lifeform with room,
+--      or it stays a Skulk and saves.
+--
+--   2. A 30-second redistribution pass (UpdateAlienLifeformDistribution) that
+--      re-points every free Skulk bot at the most under-populated lifeform, so
+--      assignments self-heal after deaths/respawns and never drift Gorge-heavy.
+--
+--  Counts are ALWAYS taken from the live world (GetCurrentLifeformCounts), never
+--  from a running tally that can leak, so the balance is self-correcting.
+------------------------------------------
+kTEHLifeformDistributionInterval = 30   -- in-game seconds
+
+function TeamBrain:GetIsAlienTeam()
+    local gr = GetGamerules()
+    local team = gr and gr:GetTeam(self.teamNumber)
+    return team ~= nil and team.GetTeamType and team:GetTeamType() == kAlienTeamType
+end
+
+-- The lifeform rotation used for balancing, cheapest -> most expensive.
+-- Built at call time so the custom Vokex/Prowler tech IDs are guaranteed loaded,
+-- and tech IDs that don't exist in this build are skipped.
+function TeamBrain:GetAlienLifeformOrder()
+    local raw = { kTechId.Gorge, kTechId.Prowler, kTechId.Lerk,
+                  kTechId.Fade, kTechId.Vokex, kTechId.Onos }
+    local order = {}
+    for i = 1, #raw do
+        if raw[i] ~= nil then
+            table.insert(order, raw[i])
+        end
+    end
+    return order
+end
+
+function TeamBrain:GetAlienLifeformClassMap()
+    local map = {}
+    if kTechId.Gorge   then map[kTechId.Gorge]   = "Gorge"   end
+    if kTechId.Prowler then map[kTechId.Prowler] = "Prowler" end
+    if kTechId.Lerk    then map[kTechId.Lerk]    = "Lerk"    end
+    if kTechId.Fade    then map[kTechId.Fade]    = "Fade"    end
+    if kTechId.Vokex   then map[kTechId.Vokex]   = "Vokex"   end
+    if kTechId.Onos    then map[kTechId.Onos]    = "Onos"    end
+    return map
+end
+
+-- Number of alien FIELD players (excludes the commander). Dead players are still
+-- counted so caps stay stable across respawns. This is the basis for the even split.
+function TeamBrain:GetAlienFieldPlayerCount()
+    local count = 0
+    for _, player in ipairs(GetEntitiesForTeam("Player", self.teamNumber)) do
+        if not player:isa("Commander") then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+-- Ground-truth count of how many of each lifeform are currently fielded by this
+-- team: evolved lifeforms that are alive, plus Embryos counted toward the lifeform
+-- they are gestating into (so we don't over-commit mid-gestation).
+function TeamBrain:GetCurrentLifeformCounts()
+    local order = self:GetAlienLifeformOrder()
+    local classForTech = self:GetAlienLifeformClassMap()
+
+    -- reverse map: class name (e.g. "Gorge") -> techId
+    local techForClass = {}
+    for tech, className in pairs(classForTech) do
+        techForClass[className] = tech
+    end
+
+    local counts = {}
+    for _, tech in ipairs(order) do
+        counts[tech] = 0
+    end
+
+    for _, player in ipairs(GetEntitiesForTeam("Player", self.teamNumber)) do
+        if player.GetIsAlive and player:GetIsAlive() then
+            if player:isa("Embryo") then
+                -- Gestating: count toward the lifeform it is BECOMING. The embryo's own
+                -- gestationClass is the authoritative source -- it is set synchronously by
+                -- ProcessBuyAction -> SetGestationData the instant a Skulk commits to
+                -- evolving, so an in-progress evolution can NEVER slip past the cap. Fall
+                -- back to the controlling bot's target only if gestationClass is missing.
+                local tech
+                local gestClass = player.gestationClass
+                if gestClass and techForClass[gestClass] then
+                    tech = techForClass[gestClass]
+                else
+                    local client = player.GetClient and player:GetClient()
+                    local bot = client and client.bot
+                    if bot and bot.lifeformEvolution and counts[bot.lifeformEvolution] ~= nil then
+                        tech = bot.lifeformEvolution
+                    end
+                end
+                if tech and counts[tech] ~= nil then
+                    counts[tech] = counts[tech] + 1
+                end
+            else
+                for tech, className in pairs(classForTech) do
+                    if player:isa(className) then
+                        counts[tech] = counts[tech] + 1
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    return counts
+end
+
+-- The hard per-lifeform cap: an even split of all alien field players across the
+-- lifeform rotation. The remainder is handed to the MORE EXPENSIVE lifeforms, so
+-- the cheap lifeforms (Gorge) are capped tightest and can never flood the field.
+-- e.g. 16 players / 6 lifeforms -> Gorge 2, Prowler 2, Lerk 3, Fade 3, Vokex 3, Onos 3.
+function TeamBrain:GetAlienLifeformCaps()
+    local order = self:GetAlienLifeformOrder()
+    local L = #order
+    local caps = {}
+
+    if L == 0 then
+        return caps
+    end
+
+    local N = self:GetAlienFieldPlayerCount()
+    if N <= 0 then
+        for _, tech in ipairs(order) do
+            caps[tech] = 0
+        end
+        return caps
+    end
+
+    local base = math.floor(N / L)
+    local rem = N % L
+    for idx, tech in ipairs(order) do
+        -- remainder goes to the end of the order (expensive lifeforms)
+        local getsExtra = idx > (L - rem)
+        local cap = base + (getsExtra and 1 or 0)
+        -- allow at least 1 so higher lifeforms remain reachable on small teams
+        if cap < 1 then cap = 1 end
+        caps[tech] = cap
+    end
+
+    return caps
+end
+
+-- True if the team can still field another of techId (its cap is not yet reached).
+-- The evolving Skulk is NOT yet counted as techId, so a direct < comparison is correct.
+function TeamBrain:GetIsLifeformEvolveAllowed(player, techId)
+    if techId == nil then
+        return true
+    end
+    local caps = self:GetAlienLifeformCaps()
+    local cap = caps[techId]
+    if cap == nil then
+        return true -- not a balanced lifeform (e.g. staying a Skulk) -> no cap
+    end
+    local counts = self:GetCurrentLifeformCounts()
+    return (counts[techId] or 0) < cap
+end
+
+-- Build the list of currently-OPEN lifeform slots, cheapest lifeform first. Each
+-- lifeform contributes (cap - current count) entries, so a lifeform already at cap
+-- contributes none. e.g. caps Gorge2/Prowler2/... with 1 Gorge already evolved ->
+-- { Gorge, Prowler, Prowler, Lerk, Lerk, ... }. This is the ordered pool of seats
+-- the free Skulk bots get matched into, cheapest-to-most-expensive.
+function TeamBrain:GetAvailableLifeformSlots()
+    local order = self:GetAlienLifeformOrder()
+    local caps = self:GetAlienLifeformCaps()
+    local counts = self:GetCurrentLifeformCounts()
+
+    local slots = {}
+    for _, tech in ipairs(order) do
+        local open = (caps[tech] or 0) - (counts[tech] or 0)
+        for _ = 1, open do
+            table.insert(slots, tech)
+        end
+    end
+    return slots
+end
+
+-- Per-bot fallback (used by the evolve action when a bot's assigned lifeform has
+-- filled up): hand back the CHEAPEST lifeform that still has an open slot, so the
+-- bot re-points at something it can most readily afford. nil if the team is full.
+function TeamBrain:ChooseBalancedLifeform()
+    local slots = self:GetAvailableLifeformSlots()
+    return slots[1]
+end
+
+-- 30-second redistribution: re-point every free Skulk bot at a balanced lifeform.
+-- Slots are taken fresh each pass (cheapest-first) so the spread is self-correcting,
+-- and the free Skulks are sorted POOREST -> RICHEST and zipped onto the slot list:
+--   poorest Skulk  -> cheapest open seat  (Gorge),
+--   richest  Skulk -> most expensive seat reached (Onos).
+-- So a broke bot is asked to become a cheap lifeform it can afford soon, while a
+-- rich bot is asked to become an expensive one it can buy outright. If there are
+-- more free Skulks than open seats (a transient over-supply, e.g. a glut of Gorges
+-- that cannot be un-evolved), the surplus bots simply stay Skulks until seats free.
+function TeamBrain:UpdateAlienLifeformDistribution()
+    PROFILE("TeamBrain:UpdateAlienLifeformDistribution")
+
+    local slots = self:GetAvailableLifeformSlots()
+
+    -- Gather free Skulk bots (the only ones we can re-point) and clear their targets.
+    local eligible = {}
+    for i = 1, #self.teamBots do
+        local bot = self.teamBots[i]
+        local player = bot and bot.GetPlayer and bot:GetPlayer()
+        if player and player.GetIsAlive and player:GetIsAlive() and player:isa("Skulk") then
+            bot.lifeformEvolution = nil
+            bot.lifeformAssignedByServer = nil
+            table.insert(eligible, { bot = bot, player = player })
+        end
+    end
+
+    -- Diagnostic: prints to the server console every 30s so we can confirm this code
+    -- is actually running and see the live balance (have/cap per lifeform).
+    local order = self:GetAlienLifeformOrder()
+    local caps = self:GetAlienLifeformCaps()
+    local counts = self:GetCurrentLifeformCounts()
+    local classForTech = self:GetAlienLifeformClassMap()
+    local summary = ""
+    for _, tech in ipairs(order) do
+        summary = summary .. string.format("%s %d/%d  ", classForTech[tech] or tostring(tech), counts[tech] or 0, caps[tech] or 0)
+    end
+    Log("[TEH] Alien lifeform balance (have/cap): %s| N=%d freeSkulks=%d openSlots=%d",
+        summary, self:GetAlienFieldPlayerCount(), #eligible, #slots)
+
+    if #eligible == 0 or #slots == 0 then
+        return
+    end
+
+    -- Poorest bots first, so the poorest are matched to the cheapest seats.
+    table.sort(eligible, function(a, b)
+        return a.player:GetPersonalResources() < b.player:GetPersonalResources()
+    end)
+
+    -- Zip sorted bots onto sorted seats: bot i (i-th poorest) -> slot i (i-th cheapest).
+    local n = math.min(#eligible, #slots)
+    for i = 1, n do
+        eligible[i].bot.lifeformEvolution = slots[i]
+        eligible[i].bot.lifeformAssignedByServer = true
+    end
+    -- eligible[n+1 ..] (the richest, if bots outnumber seats) stay Skulks this pass.
+end
+
+------------------------------------------
+--  TEH: Marine bot high-tech review
+--
+--  Every 30 seconds the server reviews the marine bots one-by-one. Once a
+--  Prototype Lab is built and the tech is available, each bot rolls ONCE per
+--  life to decide whether to save for a high-tech combo:
+--      * Exo, or
+--      * Jetpack, or
+--      * Jetpack + Gauss Cannon (bought together).
+--  A successful roll sets the bot's save flags (bot.wantsExo / bot.wantsJetpack
+--  / bot.wantsCannon); the existing buy actions then reserve resources (save)
+--  and purchase the combo when affordable. Over-supply back-off is enforced at
+--  purchase time (BuyExo/BuyJetpack team caps): while there are already too many
+--  of that entity, the bot keeps its resources and buys the combo later once the
+--  count drops. A failed roll means the bot buys normal weapons this life. The
+--  decision is reset when the bot dies (its Marine entity id changes), so the
+--  roll happens again next life. Motion Tracker is never a bot purchase.
+------------------------------------------
+kTEHMarineHighTechInterval = 30   -- in-game seconds
+
+function TeamBrain:GetIsMarineTeam()
+    local gr = GetGamerules()
+    local team = gr and gr:GetTeam(self.teamNumber)
+    return team ~= nil and team.GetTeamType and team:GetTeamType() == kMarineTeamType
+end
+
+function TeamBrain:UpdateMarineHighTechReview()
+    PROFILE("TeamBrain:UpdateMarineHighTechReview")
+
+    local techTree = GetTechTree(self.teamNumber)
+    if not techTree then
+        return
+    end
+
+    local exoAvail    = techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit)
+    local jpAvail     = techTree:GetIsTechAvailable(kTechId.JetpackTech)
+    -- The Gauss Cannon comes from the Prototype Lab.
+    local cannonAvail = techTree:GetIsTechAvailable(kTechId.PrototypeLab)
+
+    -- Nothing to review until at least one high-tech option exists.
+    if not (exoAvail or jpAvail) then
+        return
+    end
+
+    for i = 1, #self.teamBots do
+        local bot = self.teamBots[i]
+        local marine = bot and bot.GetPlayer and bot:GetPlayer()
+        if marine and marine.GetIsAlive and marine:GetIsAlive() then
+
+            -- Per-life state: a respawn produces a new Marine entity id, so reset
+            -- the save decision then (re-roll each life).
+            if bot.tehHighTechLifeId ~= marine:GetId() then
+                bot.tehHighTechLifeId = marine:GetId()
+                bot.tehHighTechDecided = false
+                bot.wantsExo = false
+                bot.wantsJetpack = false
+                bot.wantsCannon = false
+                bot.decidedIfSavingForExo = false
+                bot.decidedIfSavingForJetpack = false
+            end
+
+            if marine:isa("Exo") or marine:isa("JetpackMarine") then
+                -- Already high-tech this life; nothing more to decide.
+                bot.tehHighTechDecided = true
+            elseif not bot.tehHighTechDecided then
+                -- One roll per life.
+                if exoAvail and math.random() < 0.4 then
+                    bot.wantsExo = true
+                elseif jpAvail and math.random() < 0.5 then
+                    bot.wantsJetpack = true
+                    if cannonAvail and math.random() < 0.5 then
+                        bot.wantsCannon = true
+                    end
+                end
+                -- Mark decided so the bot's own BuyWeapons roll defers to this and
+                -- we don't re-roll until the bot dies. (A "nothing" result means the
+                -- bot just buys normal weapons this life.)
+                bot.tehHighTechDecided = true
+                bot.decidedIfSavingForExo = true
+                bot.decidedIfSavingForJetpack = true
+            end
+        end
+    end
 end
 
 

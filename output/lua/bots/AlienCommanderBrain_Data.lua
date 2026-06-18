@@ -175,7 +175,7 @@ local kExecAlienCommanderResearchUpgrade = function(move, bot, brain, com, actio
     if action.researchTechId and action.researchUnit then
         local success = brain:ExecuteTechId(com, action.researchTechId, Vector(0,0,0), action.researchUnit)
         if success then
-            SendResearchingChatMessage(bot, com, action.researchTechId)
+            --SendResearchingChatMessage(bot, com, action.researchTechId)
         end
     end
 
@@ -267,7 +267,7 @@ local kExecDropHive = function(move, bot, brain, com, action)
                 local message = string.format("I want to drop a Hive in %s in %s seconds!",
                         techPointLocationName,
                         kHiveSpawnDelay)
-                bot:SendTeamMessage(message, 0, false, true)
+                --bot:SendTeamMessage(message, 0, false, true)
 
                 -- Create a warning pheromone where we want to spawn the Hive.
                 CreatePheromone(kTechId.ExpandingMarker, action.targetTP:GetOrigin(), com:GetTeamNumber())
@@ -285,7 +285,7 @@ local kExecDropHive = function(move, bot, brain, com, action)
                 techPointLocationName = (techPointLocationName and techPointLocationName ~= "" and techPointLocationName) or "no name"
                 local message = string.format("I %s dropped a Hive in %s!", emergencyStr, techPointLocationName)
 
-                bot:SendTeamMessage(message, 0, false, true)
+                --bot:SendTeamMessage(message, 0, false, true)
                 brain.isDroppingHive = false
             end
 
@@ -1259,7 +1259,7 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                 techPointLocationName = (techPointLocationName and techPointLocationName ~= "" and techPointLocationName) or "no name"
                 local message = string.format("I can't drop a Hive in %s anymore! Something is there...", techPointLocationName)
 
-                bot:SendTeamMessage(message, 0, false, true)
+                --bot:SendTeamMessage(message, 0, false, true)
                 brain.isDroppingHive = false
 
             else -- Do nothing else until we drop that hive, this way we guarantee we have enough res while avoiding cancellactions, etc

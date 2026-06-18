@@ -15,7 +15,10 @@ function Vokex:InitWeapons()
     
     self:GiveItem(SwipeShadowStep.kMapName)
     self:SetActiveWeapon(SwipeShadowStep.kMapName)
-    
+    -- NOTE: AcidRocket (ranged) is NOT given here. It unlocks at Biomass 6
+    -- (kTechId.AcidRocket <- kTechId.BioMassSix); for bots it is granted dynamically
+    -- in Vokex:OnProcessMove once that tech becomes available.
+
 end
 
 function Vokex:InitWeaponsForReadyRoom()

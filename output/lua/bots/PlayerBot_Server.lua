@@ -469,6 +469,9 @@ function PlayerBot:TriggerAlerts()          --FIXME Unused. Utilize/Revise, or d
         -- Don't ask for stuff too often
         if not self.timeOfLastRequest or (Shared.GetTime() > self.timeOfLastRequest + 9) then
 
+            -- TEH: bots must NOT create any request except a mist request. The
+            -- medpack/ammo/order requests below are disabled accordingly.
+            --[[
             -- Ask for health if we need it
             if player:GetHealthScalar() < .4 and (math.random() < .3) then
 
@@ -487,6 +490,7 @@ function PlayerBot:TriggerAlerts()          --FIXME Unused. Utilize/Revise, or d
                 self.timeOfLastRequest = Shared.GetTime()
 
             end
+            --]]
 
         end
 

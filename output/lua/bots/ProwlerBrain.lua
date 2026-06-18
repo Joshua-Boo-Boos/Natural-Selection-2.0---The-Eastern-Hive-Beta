@@ -1,11 +1,9 @@
 -- ProwlerBrain.lua
--- Brain class for Prowler bots. Extends SkulkBrain so Prowler bots can explore,
--- defend hives, retreat and respond to threats the same way Skulks do.
--- Key overrides:
---   GetExpectedPlayerClass → "Prowler"  (prevents brain-nil when Skulk evolves to Prowler)
---   GetActions             → kProwlerBrainActions (uses VolleyRappel attack, not BiteLeap)
--- Objectives are re-used from kSkulkBrainObjectives; the Evolve objective is
--- intercepted by TEHBotManager.lua so Prowler bots handle assigned lifeforms correctly.
+-- Brain class for Prowler bots. Extends SkulkBrain so Prowler bots explore,
+-- defend hives, retreat and respond to threats exactly like Skulks do; only the
+-- attack actions differ (Prowler fires VolleyRappel instead of biting).
+--   GetExpectedPlayerClass -> "Prowler" (keeps this brain after a Skulk evolves)
+--   GetActions             -> kProwlerBrainActions
 
 Script.Load("lua/bots/SkulkBrain.lua")
 Script.Load("lua/bots/ProwlerBrain_Data.lua")

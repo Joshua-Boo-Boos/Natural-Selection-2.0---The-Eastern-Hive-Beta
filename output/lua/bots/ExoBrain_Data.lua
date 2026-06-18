@@ -74,7 +74,7 @@ local function PerformAttackEntity( eyePos, target, lastSeenPos, bot, brain, mov
     else
 
         if not bot.lastHostilesTime or bot.lastHostilesTime < Shared.GetTime() - 45 and target:isa("Player") then
-            CreateVoiceMessage( bot:GetPlayer(), kVoiceId.MarineHostiles )
+            --CreateVoiceMessage( bot:GetPlayer(), kVoiceId.MarineHostiles )
 
             bot.lastHostilesTime = Shared.GetTime()
         end
@@ -229,8 +229,7 @@ local function PerformAttack( eyePos, mem, bot, brain, move )
     if target ~= nil then
 
         PerformAttackEntity( eyePos, target, mem.lastSeenPos, bot, brain, move )
-          local chatMsg =  bot:SendTeamMessage( "Cooonnntaaaact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
-            bot:SendTeamMessage(chatMsg, 60)
+        --bot:SendTeamMessage( "Cooonnntaaaact! " .. target:GetMapName() .. " in " .. target:GetLocationName() )
 
     end
 
@@ -330,9 +329,9 @@ local kExecRetreat = function(move, bot, brain, exo, action)
         PerformMove( exo:GetOrigin(), structure:GetOrigin(), bot, brain, move )
         move.commands = AddMoveCommand( move.commands, Move.MovementModifier )
 
-        if dist > 15.0 then
-            bot:SendTeamMessage("I could really use some welds!")
-        end
+        --if dist > 15.0 then
+        --    bot:SendTeamMessage("I could really use some welds!")
+        --end
 
     else
 

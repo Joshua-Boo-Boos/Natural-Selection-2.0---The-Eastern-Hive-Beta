@@ -103,7 +103,9 @@ local function PerformMove( alienPos, targetPos, bot, brain, move )
         brain:ResetBlinkSequence()
     end
 
-    local canBlink = brain.blinkJumpTick == 0 and brain.blinkSequenceActive == false and not fade:GetIsBlinking()
+    -- Guard: if the player entity changed to a non-Fade (e.g. Vokex after evolution), GetIsBlinking may not exist.
+    local canBlink = brain.blinkJumpTick == 0 and brain.blinkSequenceActive == false and
+        (fade.GetIsBlinking ~= nil and not fade:GetIsBlinking())
 
     if canBlink then
 
