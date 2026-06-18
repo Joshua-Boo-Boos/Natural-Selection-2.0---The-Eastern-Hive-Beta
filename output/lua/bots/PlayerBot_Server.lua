@@ -365,32 +365,7 @@ end
 
 local kSayTeamDelay = 20 -- don't want to make them too chatty
 function PlayerBot:SendTeamMessage(message, extraTime, needLocalization, ignoreSayDelay)
-    local brain = self.brain
-    if not brain then return end
-
-    if not message or type(message) ~= "string" or string.len(message) == 0 then return end
-
-    extraTime = extraTime or 0
-    local delay = ignoreSayDelay and 0 or kSayTeamDelay
-
-    local now = Shared.GetTime()
-    if not brain.timeLastSayTeam or brain.timeLastSayTeam + delay + extraTime < now then
-
-        local chatMessage = string.UTF8Sub(message, 1, kMaxChatLength)
-        local player = self:GetPlayer()
-        local playerName = player:GetName()
-        local playerLocationId = player.locationId
-        local playerTeamNumber = player:GetTeamNumber()
-        local playerTeamType = player:GetTeamType()
-
-        local players = GetEntitiesForTeam("Player", playerTeamNumber)
-        local networkMessageId = needLocalization and "ChatUnlocalized" or "Chat"
-        for _, player in ipairs(players) do
-            Server.SendNetworkMessage(player, networkMessageId, BuildChatMessage(true, playerName, playerLocationId, playerTeamNumber, playerTeamType, chatMessage), true)
-        end
-
-        brain.timeLastSayTeam = now
-    end
+    return
 end
 
 --
@@ -469,28 +444,16 @@ function PlayerBot:TriggerAlerts()          --FIXME Unused. Utilize/Revise, or d
         -- Don't ask for stuff too often
         if not self.timeOfLastRequest or (Shared.GetTime() > self.timeOfLastRequest + 9) then
 
-            -- TEH: bots must NOT create any request except a mist request. The
-            -- medpack/ammo/order requests below are disabled accordingly.
-            --[[
-            -- Ask for health if we need it
-            if player:GetHealthScalar() < .4 and (math.random() < .3) then
+            local hasMilitaryProtocol = GetHasTech(player, kTechId.MilitaryProtocol)
 
-                team:TriggerAlert(kTechId.MarineAlertNeedMedpack, player)
+            if not hasMilitaryProtocol and player:GetHealthScalar() < .4 and player.MedSelf then
+                player:MedSelf()
                 self.timeOfLastRequest = Shared.GetTime()
 
-                -- Ask for ammo if we need it
-            elseif primaryWeapon and primaryWeapon:isa("ClipWeapon") and (primaryWeapon:GetAmmo() < primaryWeapon:GetMaxAmmo()*.4) and (math.random() < .25) then
-
-                team:TriggerAlert(kTechId.MarineAlertNeedAmmo, player)
+            elseif not hasMilitaryProtocol and primaryWeapon and primaryWeapon:isa("ClipWeapon") and (primaryWeapon:GetAmmo() < primaryWeapon:GetMaxAmmo()*.4) and player.AmmoSelf then
+                player:AmmoSelf()
                 self.timeOfLastRequest = Shared.GetTime()
-
-            elseif (not self:GetPlayerHasOrder()) and (math.random() < .2) then
-
-                team:TriggerAlert(kTechId.MarineAlertNeedOrder, player)
-                self.timeOfLastRequest = Shared.GetTime()
-
             end
-            --]]
 
         end
 

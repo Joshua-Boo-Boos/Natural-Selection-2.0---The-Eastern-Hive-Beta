@@ -453,20 +453,21 @@ end
 -- simply no-ops -- it can never create an invalid purchase.
 -- =====================================================================
 
-local kBotEconomyInterval = 4   -- seconds between economy passes (per team)
+local kBotEconomyInterval = 4   -- seconds between marine economy passes
+local kAlienBotEconomyInterval = 30 -- seconds between alien lifeform re-plans
 local kBotEvolveDangerRange = 18 -- don't evolve (become a vulnerable egg) with an enemy this close
 local kBotResHoardCap = 75      -- if a bot reaches this much res it MUST spend, even if its role target is locked
 
--- Role-weighted alien lifeform targets (weights need not sum to anything).
--- Includes the custom Prowler & Vokex lifeforms so bots actually become them.
-local kAlienLifeformWeights =
+-- Alien bot lifeforms, cheap -> expensive. Caps are computed from this list so
+-- bots are spread across Gorge, Prowler, Lerk, Fade, Vokex and Onos.
+local kAlienBotLifeforms =
 {
-    { techId = kTechId.Gorge,   weight = 12 },
-    { techId = kTechId.Prowler, weight = 16 },
-    { techId = kTechId.Lerk,    weight = 20 },
-    { techId = kTechId.Fade,    weight = 22 },
-    { techId = kTechId.Vokex,   weight = 16 },
-    { techId = kTechId.Onos,    weight = 14 },
+    { techId = kTechId.Gorge,   className = "Gorge",   mapName = "gorge"   },
+    { techId = kTechId.Prowler, className = "Prowler", mapName = "prowler" },
+    { techId = kTechId.Lerk,    className = "Lerk",    mapName = "lerk"    },
+    { techId = kTechId.Fade,    className = "Fade",    mapName = "fade"    },
+    { techId = kTechId.Vokex,   className = "Vokex",   mapName = "vokex"   },
+    { techId = kTechId.Onos,    className = "Onos",    mapName = "onos"    },
 }
 
 -- Marine primary goals, a roughly-even split across the high-value purchases.
@@ -501,42 +502,161 @@ local function GetIsBotSafeToEvolve(player)
     return true
 end
 
--- Assign each bot a fixed role target once (weighted random), so the team gets
--- a varied composition rather than everyone funnelling into one lifeform.
-local function GetBotLifeformTarget(player)
-    if not player.botEcoLifeformTarget then
-        local total = 0
-        for i = 1, #kAlienLifeformWeights do
-            total = total + kAlienLifeformWeights[i].weight
-        end
-        local roll = math.random() * total
-        local acc = 0
-        for i = 1, #kAlienLifeformWeights do
-            acc = acc + kAlienLifeformWeights[i].weight
-            if roll <= acc then
-                player.botEcoLifeformTarget = kAlienLifeformWeights[i].techId
-                break
+local function GetAlienBotLifeformCountsAndCaps(team)
+
+    local counts, caps, techForClass, techForMap = {}, {}, {}, {}
+    for i = 1, #kAlienBotLifeforms do
+        local data = kAlienBotLifeforms[i]
+        counts[data.techId] = 0
+        caps[data.techId] = 0
+        techForClass[data.className] = data.techId
+        techForMap[data.mapName] = data.techId
+    end
+
+    local fieldPlayerCount = 0
+    local skulkBots = {}
+
+    for _, player in ipairs(team:GetPlayers()) do
+        if player and player.isa and not player:isa("Commander") then
+            fieldPlayerCount = fieldPlayerCount + 1
+
+            if player.GetIsVirtual and player:GetIsVirtual() and player:isa("Skulk") then
+                table.insert(skulkBots, player)
+            end
+
+            if player.GetIsAlive and player:GetIsAlive() then
+                if player:isa("Embryo") then
+                    local techId = player.gestationClass and techForMap[player.gestationClass]
+                    if techId then
+                        counts[techId] = counts[techId] + 1
+                    end
+                else
+                    for i = 1, #kAlienBotLifeforms do
+                        local data = kAlienBotLifeforms[i]
+                        if player:isa(data.className) then
+                            counts[data.techId] = counts[data.techId] + 1
+                            break
+                        end
+                    end
+                end
             end
         end
-        player.botEcoLifeformTarget = player.botEcoLifeformTarget or kTechId.Lerk
     end
-    return player.botEcoLifeformTarget
+
+    local lifeformCount = #kAlienBotLifeforms
+    if fieldPlayerCount > 0 and lifeformCount > 0 then
+        local baseCap = math.floor(fieldPlayerCount / lifeformCount)
+        local remainder = fieldPlayerCount % lifeformCount
+        for i = 1, lifeformCount do
+            local cap = baseCap + ((i > lifeformCount - remainder) and 1 or 0)
+            caps[kAlienBotLifeforms[i].techId] = math.max(1, cap)
+        end
+    end
+
+    return counts, caps, skulkBots
+end
+
+local function GetAlienBotLifeformRank(techId)
+
+    for i = 1, #kAlienBotLifeforms do
+        if kAlienBotLifeforms[i].techId == techId then
+            return i
+        end
+    end
+
+    return #kAlienBotLifeforms
+end
+
+local function GetOpenAlienBotLifeformSlots(counts, caps)
+
+    local slots = {}
+    for i = 1, #kAlienBotLifeforms do
+        local techId = kAlienBotLifeforms[i].techId
+        local open = (caps[techId] or 0) - (counts[techId] or 0)
+        for _ = 1, open do
+            table.insert(slots, techId)
+        end
+    end
+
+    table.sort(slots, function(a, b)
+        return GetAlienBotLifeformRank(a) < GetAlienBotLifeformRank(b)
+    end)
+
+    return slots
+end
+
+local function AssignAlienBotLifeformTargets(team)
+
+    local counts, caps, skulkBots = GetAlienBotLifeformCountsAndCaps(team)
+    local slots = GetOpenAlienBotLifeformSlots(counts, caps)
+
+    table.sort(skulkBots, function(a, b)
+        local aRes = a.GetPersonalResources and a:GetPersonalResources() or 0
+        local bRes = b.GetPersonalResources and b:GetPersonalResources() or 0
+        if aRes == bRes then
+            local aId = a.GetId and a:GetId() or 0
+            local bId = b.GetId and b:GetId() or 0
+            return aId < bId
+        end
+        return aRes < bRes
+    end)
+
+    local poorIndex = 1
+    local richIndex = #skulkBots
+    local expensiveRankStart = math.floor(#kAlienBotLifeforms / 2) + 1
+
+    for _, player in ipairs(skulkBots) do
+        player.botEcoLifeformTarget = nil
+        local client = player.GetClient and player:GetClient()
+        if client and client.bot then
+            client.bot.lifeformEvolution = nil
+            client.bot.lifeformAssignedByServer = nil
+        end
+    end
+
+    for _, target in ipairs(slots) do
+        if poorIndex > richIndex then
+            break
+        end
+
+        local targetRank = GetAlienBotLifeformRank(target)
+        local player
+        if targetRank >= expensiveRankStart then
+            player = skulkBots[richIndex]
+            richIndex = richIndex - 1
+        else
+            player = skulkBots[poorIndex]
+            poorIndex = poorIndex + 1
+        end
+
+        player.botEcoLifeformTarget = target
+        local client = player.GetClient and player:GetClient()
+        if client and client.bot then
+            client.bot.lifeformEvolution = target
+            client.bot.lifeformAssignedByServer = target ~= nil
+        end
+        counts[target] = (counts[target] or 0) + 1
+    end
+
+    return counts, caps
 end
 
 -- Highest-cost lifeform the bot can currently afford AND evolve to (anti-hoard fallback).
-local function GetBestAffordableLifeform(player, res)
+local function GetBestAffordableLifeform(player, res, counts, caps, preferredTarget)
     local bestId, bestCost = nil, -1
-    for i = 1, #kAlienLifeformWeights do
-        local id = kAlienLifeformWeights[i].techId
+    for i = 1, #kAlienBotLifeforms do
+        local id = kAlienBotLifeforms[i].techId
         local cost = GetCostForTech(id) or math.huge
-        if cost <= res and cost > bestCost and GetIsLifeformEvolveAvailable(player, id) then
+        local hasReservedSlot = id == preferredTarget and (counts[id] or 0) <= (caps[id] or 0)
+        local hasOpenSlot = (counts[id] or 0) < (caps[id] or 0)
+        if (hasReservedSlot or hasOpenSlot) and cost <= res and cost > bestCost and GetIsLifeformEvolveAvailable(player, id) then
             bestId, bestCost = id, cost
         end
     end
     return bestId
 end
 
-local function TryEvolveAlienBot(player)
+local function TryEvolveAlienBot(player, counts, caps)
     -- Only base lifeforms get auto-evolved; already-evolved bots have spent.
     if not player.isa or not player:isa("Skulk") then return end
     if not player:GetIsAlive() then return end
@@ -546,7 +666,12 @@ local function TryEvolveAlienBot(player)
     local res = player.GetPersonalResources and player:GetPersonalResources()
     if not res or res <= 0 then return end
 
-    local target = GetBotLifeformTarget(player)
+    local target = player.botEcoLifeformTarget
+    if not target then return end
+
+    local targetHasReservedSlot = (counts[target] or 0) <= (caps[target] or 0)
+    if not targetHasReservedSlot then return end
+
     local targetCost = GetCostForTech(target) or math.huge
 
     -- 1) Role target is reachable & affordable -> evolve straight into it.
@@ -559,7 +684,7 @@ local function TryEvolveAlienBot(player)
     --    enough biomass yet), or we're near the cap -> spend on the best lifeform
     --    available now instead of sitting on resources.
     if res >= targetCost or res >= kBotResHoardCap then
-        local bestId = GetBestAffordableLifeform(player, res)
+        local bestId = GetBestAffordableLifeform(player, res, counts, caps, target)
         if bestId then
             player:ProcessBuyAction({ bestId })
         end
@@ -613,16 +738,22 @@ end
 function PlayingTeam:UpdateBotEconomy()
 
     local now = Shared.GetTime()
-    if self._nextBotEconomyTime and now < self._nextBotEconomyTime then return end
-    self._nextBotEconomyTime = now + kBotEconomyInterval
-
     local teamType = self:GetTeamType()
     if teamType ~= kAlienTeamType and teamType ~= kMarineTeamType then return end
+
+    local interval = teamType == kAlienTeamType and kAlienBotEconomyInterval or kBotEconomyInterval
+    if self._nextBotEconomyTime and now < self._nextBotEconomyTime then return end
+    self._nextBotEconomyTime = now + interval
+
+    local alienLifeformCounts, alienLifeformCaps
+    if teamType == kAlienTeamType then
+        alienLifeformCounts, alienLifeformCaps = AssignAlienBotLifeformTargets(self)
+    end
 
     for _, player in ipairs(self:GetPlayers()) do
         if player and player.GetIsVirtual and player:GetIsVirtual() then
             if teamType == kAlienTeamType then
-                TryEvolveAlienBot(player)
+                TryEvolveAlienBot(player, alienLifeformCounts, alienLifeformCaps)
             else
                 TryBuyMarineBot(player)
             end
@@ -635,14 +766,18 @@ debug.setupvaluex(PlayingTeam.OnResearchComplete, "GetIsResearchRelevant", extGe
 
 
 -- ============================================================================
--- NS2.0-TEH: the Marine commander never receives medpack / ammo requests.
--- Bots call TriggerAlert directly (PlayerBot_Server) and human requests arrive
--- via CreateVoiceMessage, so drop these two alert tech ids here as a catch-all.
+-- NS2.0-TEH: bots must not send med/ammo requests to the commander. Human
+-- requests still pass through so commander sounds and notifications work.
 -- ============================================================================
 local TEH_basePlayingTeamTriggerAlert = PlayingTeam.TriggerAlert
 function PlayingTeam:TriggerAlert(techId, entity, force)
     if techId == kTechId.MarineAlertNeedMedpack or techId == kTechId.MarineAlertNeedAmmo then
-        return
+        if entity and entity.GetIsVirtual and entity:GetIsVirtual() then
+            if entity.HandleManualAlert then
+                entity:HandleManualAlert(techId)
+            end
+            return
+        end
     end
     return TEH_basePlayingTeamTriggerAlert(self, techId, entity, force)
 end

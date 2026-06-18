@@ -776,15 +776,22 @@ local function TEH_IsAvailable(player, tech)
     return node ~= nil and node:GetAvailable(player, tech, false) == true
 end
 
--- Cheapest lifeform that still has an open slot AND is currently evolvable, or nil.
+-- Most underrepresented lifeform that still has an open slot AND is currently evolvable, or nil.
 local function TEH_ChooseLifeform(player, counts, caps, list)
+    local bestTech, bestDeficit, bestCount
     for i = 1, #list do
         local tech = list[i][1]
-        if (counts[tech] or 0) < (caps[tech] or 0) and TEH_IsAvailable(player, tech) then
-            return tech
+        local count = counts[tech] or 0
+        local cap = caps[tech] or 0
+        local deficit = cap - count
+        if deficit > 0 and TEH_IsAvailable(player, tech)
+                and (not bestTech or deficit > bestDeficit or (deficit == bestDeficit and count < bestCount)) then
+            bestTech = tech
+            bestDeficit = deficit
+            bestCount = count
         end
     end
-    return nil
+    return bestTech
 end
 
 local kRawSkulkEvolveAction = CreateAlienEvolveAction(SkulkObjectiveWeights, kSkulkBrainObjectiveTypes.Evolve, kTechId.Skulk)

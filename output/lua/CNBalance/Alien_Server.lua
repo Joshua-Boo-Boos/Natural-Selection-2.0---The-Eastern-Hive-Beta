@@ -109,13 +109,18 @@ function Alien:ProcessBuyAction(techIds)
         end
 
         if lifeTech and (counts[lifeTech] or 0) >= (caps[lifeTech] or 0) then
-            -- Over cap: redirect to the cheapest open + available lifeform...
-            local swap
+            -- Over cap: redirect to the most underrepresented open + available lifeform.
+            local swap, bestDeficit, bestCount
             for j = 1, #list do
                 local t = list[j][1]
-                if (counts[t] or 0) < (caps[t] or 0) and TEH_IsLifeformAvailable(self, t) then
+                local count = counts[t] or 0
+                local cap = caps[t] or 0
+                local deficit = cap - count
+                if deficit > 0 and TEH_IsLifeformAvailable(self, t)
+                        and (not swap or deficit > bestDeficit or (deficit == bestDeficit and count < bestCount)) then
                     swap = t
-                    break
+                    bestDeficit = deficit
+                    bestCount = count
                 end
             end
             if swap then

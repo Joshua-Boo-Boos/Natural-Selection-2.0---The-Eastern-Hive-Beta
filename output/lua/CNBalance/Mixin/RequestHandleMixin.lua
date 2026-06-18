@@ -76,11 +76,9 @@ if Server then
     -- the "player needs health/ammo" sound is NOT played to the commander;
     -- returning FALSE lets the alert (and its sound) reach the commander.
     --
-    -- Rule: if the marine is NOT on the auto-med/auto-ammo cooldown, the auto
-    -- system will service the request itself (the scheduled MedSelf/AmmoSelf
-    -- fires shortly), so there's no need to bother the commander -> suppress.
-    -- If the marine IS still on cooldown (auto can't help yet) OR the team has
-    -- Military Protocol researched, the request always reaches the commander.
+    -- Human med/ammo requests must always reach the commander. When Military
+    -- Protocol is not researched, also service the request locally through the
+    -- auto-med/auto-ammo cooldown path.
     function RequestHandleMixin:HandleManualAlert(techId)
 
         if self.kIgnoreRequest then return false end
@@ -89,17 +87,17 @@ if Server then
         local hasMilitaryProtocol = GetHasTech(self, kTechId.MilitaryProtocol)
 
         if techId == kTechId.MarineAlertNeedMedpack then
-            self:AddTimedCallback(self.MedSelf, kAlertHandleDelay)
-            local onMedCooldown = now < self.timeLastPrimaryRequestHandle
-            local playCommanderSound = onMedCooldown or hasMilitaryProtocol
-            return not playCommanderSound
+            if not hasMilitaryProtocol then
+                self:AddTimedCallback(self.MedSelf, kAlertHandleDelay)
+            end
+            return false
         end
 
         if techId == kTechId.MarineAlertNeedAmmo then
-            self:AddTimedCallback(self.AmmoSelf, kAlertHandleDelay)
-            local onAmmoCooldown = now < self.timeLastAutoAmmoPack
-            local playCommanderSound = onAmmoCooldown or hasMilitaryProtocol
-            return not playCommanderSound
+            if not hasMilitaryProtocol then
+                self:AddTimedCallback(self.AmmoSelf, kAlertHandleDelay)
+            end
+            return false
         end
 
         if techId == kTechId.AlienAlertNeedMist then

@@ -1332,26 +1332,37 @@ function TeamBrain:GetAvailableLifeformSlots()
 end
 
 -- Per-bot fallback (used by the evolve action when a bot's assigned lifeform has
--- filled up): hand back the CHEAPEST lifeform that still has an open slot, so the
--- bot re-points at something it can most readily afford. nil if the team is full.
+-- filled up): hand back the most underrepresented lifeform that still has an
+-- open slot. nil if the team is full.
 function TeamBrain:ChooseBalancedLifeform()
-    local slots = self:GetAvailableLifeformSlots()
-    return slots[1]
+    local order = self:GetAlienLifeformOrder()
+    local caps = self:GetAlienLifeformCaps()
+    local counts = self:GetCurrentLifeformCounts()
+
+    local bestTech, bestDeficit, bestCount
+    for _, tech in ipairs(order) do
+        local count = counts[tech] or 0
+        local cap = caps[tech] or 0
+        local deficit = cap - count
+        if deficit > 0 and (not bestTech or deficit > bestDeficit or (deficit == bestDeficit and count < bestCount)) then
+            bestTech = tech
+            bestDeficit = deficit
+            bestCount = count
+        end
+    end
+
+    return bestTech
 end
 
 -- 30-second redistribution: re-point every free Skulk bot at a balanced lifeform.
--- Slots are taken fresh each pass (cheapest-first) so the spread is self-correcting,
--- and the free Skulks are sorted POOREST -> RICHEST and zipped onto the slot list:
---   poorest Skulk  -> cheapest open seat  (Gorge),
---   richest  Skulk -> most expensive seat reached (Onos).
--- So a broke bot is asked to become a cheap lifeform it can afford soon, while a
--- rich bot is asked to become an expensive one it can buy outright. If there are
--- more free Skulks than open seats (a transient over-supply, e.g. a glut of Gorges
--- that cannot be un-evolved), the surplus bots simply stay Skulks until seats free.
+-- Each assignment reserves its slot immediately so the next bot is pointed at the
+-- next most-underrepresented lifeform instead of stacking onto the same target.
 function TeamBrain:UpdateAlienLifeformDistribution()
     PROFILE("TeamBrain:UpdateAlienLifeformDistribution")
 
-    local slots = self:GetAvailableLifeformSlots()
+    local order = self:GetAlienLifeformOrder()
+    local caps = self:GetAlienLifeformCaps()
+    local counts = self:GetCurrentLifeformCounts()
 
     -- Gather free Skulk bots (the only ones we can re-point) and clear their targets.
     local eligible = {}
@@ -1367,33 +1378,64 @@ function TeamBrain:UpdateAlienLifeformDistribution()
 
     -- Diagnostic: prints to the server console every 30s so we can confirm this code
     -- is actually running and see the live balance (have/cap per lifeform).
-    local order = self:GetAlienLifeformOrder()
-    local caps = self:GetAlienLifeformCaps()
-    local counts = self:GetCurrentLifeformCounts()
     local classForTech = self:GetAlienLifeformClassMap()
     local summary = ""
+    local openSlots = 0
     for _, tech in ipairs(order) do
+        openSlots = openSlots + math.max(0, (caps[tech] or 0) - (counts[tech] or 0))
         summary = summary .. string.format("%s %d/%d  ", classForTech[tech] or tostring(tech), counts[tech] or 0, caps[tech] or 0)
     end
     Log("[TEH] Alien lifeform balance (have/cap): %s| N=%d freeSkulks=%d openSlots=%d",
-        summary, self:GetAlienFieldPlayerCount(), #eligible, #slots)
+        summary, self:GetAlienFieldPlayerCount(), #eligible, openSlots)
 
-    if #eligible == 0 or #slots == 0 then
+    if #eligible == 0 or openSlots == 0 then
         return
     end
 
-    -- Poorest bots first, so the poorest are matched to the cheapest seats.
     table.sort(eligible, function(a, b)
-        return a.player:GetPersonalResources() < b.player:GetPersonalResources()
+        local aRes = a.player:GetPersonalResources()
+        local bRes = b.player:GetPersonalResources()
+        if aRes == bRes then
+            return a.player:GetId() < b.player:GetId()
+        end
+        return aRes < bRes
     end)
 
-    -- Zip sorted bots onto sorted seats: bot i (i-th poorest) -> slot i (i-th cheapest).
-    local n = math.min(#eligible, #slots)
-    for i = 1, n do
-        eligible[i].bot.lifeformEvolution = slots[i]
-        eligible[i].bot.lifeformAssignedByServer = true
+    local slots = {}
+    for _, tech in ipairs(order) do
+        local open = (caps[tech] or 0) - (counts[tech] or 0)
+        for _ = 1, open do
+            table.insert(slots, tech)
+        end
     end
-    -- eligible[n+1 ..] (the richest, if bots outnumber seats) stay Skulks this pass.
+
+    local rank = {}
+    for i, tech in ipairs(order) do
+        rank[tech] = i
+    end
+
+    local poorIndex = 1
+    local richIndex = #eligible
+    local expensiveRankStart = math.floor(#order / 2) + 1
+
+    for _, target in ipairs(slots) do
+        if poorIndex > richIndex then
+            break
+        end
+
+        local chosen
+        if (rank[target] or #order) >= expensiveRankStart then
+            chosen = eligible[richIndex]
+            richIndex = richIndex - 1
+        else
+            chosen = eligible[poorIndex]
+            poorIndex = poorIndex + 1
+        end
+
+        chosen.bot.lifeformEvolution = target
+        chosen.bot.lifeformAssignedByServer = true
+        counts[target] = (counts[target] or 0) + 1
+    end
 end
 
 ------------------------------------------
