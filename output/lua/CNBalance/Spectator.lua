@@ -1,5 +1,14 @@
 if Client then
 
+    -- Alien vision is an alien-only screen effect. Marine-team spectators must
+    -- never see it - this includes respawning marines, who are MarineSpectators
+    -- (a marine-team spectator) for the whole time they are being spawned by an
+    -- Infantry Portal. Without this guard such a player could press the toggle
+    -- (F) and turn Alien Vision on while spawning.
+    local function GetSpectatorCanUseAlienVision(self)
+        return not (self.GetTeamType and self:GetTeamType() == kMarineTeamType)
+    end
+
     local function SetSpectatorAlienVision(self, state)
         state = state == true
 
@@ -31,6 +40,16 @@ if Client then
             return
         end
 
+        -- Marine-team spectators (e.g. respawning marines) cannot use alien vision.
+        -- Force it off and ignore the toggle key for them.
+        if not GetSpectatorCanUseAlienVision(self) then
+            if self.spectatorAlienVisionOn then
+                SetSpectatorAlienVision(self, false)
+            end
+            self.spectatorAlienVisionLastFrame = bit.band(input.commands, Move.ToggleFlashlight) ~= 0
+            return
+        end
+
         local darkVisionPressed = bit.band(input.commands, Move.ToggleFlashlight) ~= 0
         if not self.spectatorAlienVisionLastFrame and darkVisionPressed then
             SetSpectatorAlienVision(self, not self.spectatorAlienVisionOn)
@@ -49,6 +68,13 @@ if Client then
 
         local useShader = Player.screenEffects.darkVision
         if not useShader then
+            return
+        end
+
+        -- Marine-team spectators (e.g. respawning marines) never get alien vision.
+        if not GetSpectatorCanUseAlienVision(self) then
+            self.spectatorAlienVisionOn = false
+            useShader:SetActive(false)
             return
         end
 

@@ -72,32 +72,70 @@ if Server then
         CreateEntity(NutrientMist.kMapName,self:GetOrigin(),self:GetTeamNumber())
     end
 
+    -- Decide how a marine med/ammo request should be serviced. Single source of
+    -- truth shared by the CreateVoiceMessage override and HandleManualAlert.
+    --
+    --   "selfservice" - Military Protocol off AND not on cooldown: grant the
+    --                   pack locally through the auto-med/auto-ammo path. Silent
+    --                   (no voiceover, no commander alert).
+    --   "commander"   - the requester is a human but cannot self-service right
+    --                   now (on cooldown, or Military Protocol active): route the
+    --                   request to the Marine commander with all the usual sounds.
+    --   "suppress"    - the requester is a bot that cannot self-service: drop the
+    --                   request so the commander is never bothered.
+    --
+    -- pass isMed = true for medpack requests, false for ammo requests.
+    function RequestHandleMixin:GetPackRequestDecision(isMed)
+
+        if self.kIgnoreRequest then return "suppress" end
+
+        local team = self.GetTeam and self:GetTeam()
+        local hasMilitaryProtocol = team and team.IsMilitaryProtocol and team:IsMilitaryProtocol()
+
+        local now = Shared.GetTime()
+        local onCooldown
+        if isMed then
+            onCooldown = now < self.timeLastPrimaryRequestHandle
+        else
+            onCooldown = now < self.timeLastAutoAmmoPack
+        end
+
+        if not hasMilitaryProtocol and not onCooldown then
+            return "selfservice"
+        end
+
+        local isHuman = not (self.GetIsVirtual and self:GetIsVirtual())
+        if isHuman then
+            return "commander"
+        end
+
+        return "suppress"
+    end
+
     -- Returning TRUE here makes PlayingTeam:TriggerAlert swallow the request so
     -- the "player needs health/ammo" sound is NOT played to the commander;
     -- returning FALSE lets the alert (and its sound) reach the commander.
     --
-    -- Human med/ammo requests must always reach the commander. When Military
-    -- Protocol is not researched, also service the request locally through the
-    -- auto-med/auto-ammo cooldown path.
+    -- The marine key-press path goes through CreateVoiceMessage (see
+    -- CNBalance/NetworkMessages_Server.lua); this handler covers any other code
+    -- that triggers a med/ammo alert directly and keeps the same routing rules.
     function RequestHandleMixin:HandleManualAlert(techId)
 
         if self.kIgnoreRequest then return false end
 
-        local now = Shared.GetTime()
-        local hasMilitaryProtocol = GetHasTech(self, kTechId.MilitaryProtocol)
+        if techId == kTechId.MarineAlertNeedMedpack or techId == kTechId.MarineAlertNeedAmmo then
 
-        if techId == kTechId.MarineAlertNeedMedpack then
-            if not hasMilitaryProtocol then
-                self:AddTimedCallback(self.MedSelf, kAlertHandleDelay)
-            end
-            return false
-        end
+            local isMed = (techId == kTechId.MarineAlertNeedMedpack)
+            local decision = self:GetPackRequestDecision(isMed)
 
-        if techId == kTechId.MarineAlertNeedAmmo then
-            if not hasMilitaryProtocol then
-                self:AddTimedCallback(self.AmmoSelf, kAlertHandleDelay)
+            if decision == "selfservice" then
+                self:AddTimedCallback(isMed and self.MedSelf or self.AmmoSelf, kAlertHandleDelay)
+                return true     -- handled locally; do not notify the commander
+            elseif decision == "suppress" then
+                return true     -- bot on cooldown / under Military Protocol; drop it
             end
-            return false
+
+            return false        -- "commander": let the alert + sounds reach the commander
         end
 
         if techId == kTechId.AlienAlertNeedMist then
