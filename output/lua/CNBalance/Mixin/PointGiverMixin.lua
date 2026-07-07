@@ -4,6 +4,8 @@ if Server then
     table.insert(kNoConstructPoints, "Sentry")
     table.insert(kNoConstructPoints, "Hydra")
 
+    local kRappelKillCreditWindow = 10
+
     function PointGiverMixin:PreOnKill(attacker, doer, point, direction)
 
         if self.isHallucination then
@@ -14,6 +16,28 @@ if Server then
         local points = self:GetPointValue()
 
         local selfIsPlayer = self:isa("Player")
+
+        -- Prowler Rappel -> lava/void kill credit: if this entity was released from a
+        -- Prowler's Rappel pull within the last kRappelKillCreditWindow seconds and the
+        -- kill has no real credited attacker (environmental death via DeathTrigger, or no
+        -- attacker at all), credit the releasing Prowler instead.
+        if (not attacker or attacker:isa("DeathTrigger"))
+           and self.lastRappelProwlerId and self.lastRappelReleaseTime
+           and Shared.GetTime() < self.lastRappelReleaseTime + kRappelKillCreditWindow then
+
+            local prowler = Shared.GetEntity(self.lastRappelProwlerId)
+            if prowler and HasMixin(prowler, "Live") and prowler:GetIsAlive() then
+
+                attacker = prowler
+
+                local prowlerId = prowler:GetId()
+                if not self.damagePoints[prowlerId] then
+                    self.damagePoints[prowlerId] = 0
+                    table.insert(self.damagePoints.attackers, prowlerId)
+                end
+
+            end
+        end
 
         local _techID = self:GetTechId()
         local resRewardFraction = 1

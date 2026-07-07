@@ -21,6 +21,8 @@ local kPunchSoundRight = PrecacheAsset("sound/ns2plus.fev/common/marine/onos_pun
 local kWoundSound = PrecacheAsset("sound/NS2.fev/marine/common/wound")
 local kRange = 0.0001
 local kPunchSelfDamage = 5
+-- Fixed, reliably-audible volume for the devoured marine's punches. Adjustable.
+local kPunchSoundVolume = 0.9
 
 local networkVars =
 {
@@ -144,19 +146,20 @@ function DevouredViewModel:OnTag(tagName)
 		-- 	end
 		-- end
 
-		-- We want other players to be able to hear the punch sounds
-		local musicVol = OptionsDialogUI_GetMusicVolume and OptionsDialogUI_GetMusicVolume() or 100
+		-- Punch sounds are SOUND EFFECTS, not music: the old code scaled volume by
+		-- OptionsDialogUI_GetMusicVolume(), so anyone with the music slider turned
+		-- down heard nothing. It also passed the punching player as the "predictor"
+		-- arg, which tells the engine to EXCLUDE that player from the networked sound
+		-- (assuming they predict it locally) - so the marine actually punching never
+		-- heard it. Fix: play server-side, networked to everyone (no predictor), at a
+		-- fixed audible volume. The engine already applies the user's sound-fx volume.
 		if tagName == "attack_left_start" then
-			if parent.GetHealth then
-				if parent:GetHealth() > 0 then
-					StartSoundEffectOnEntity(kPunchSoundLeft, parent, 0.35 * musicVol / 100, parent)
-				end
+			if Server and parent.GetHealth and parent:GetHealth() > 0 then
+				StartSoundEffectOnEntity(kPunchSoundLeft, parent, kPunchSoundVolume)
 			end
 		elseif tagName == "attack_right_start" then
-			if parent.GetHealth then
-				if parent:GetHealth() > 0 then
-					StartSoundEffectOnEntity(kPunchSoundRight, parent, 0.35 * musicVol / 100, parent)
-				end
+			if Server and parent.GetHealth and parent:GetHealth() > 0 then
+				StartSoundEffectOnEntity(kPunchSoundRight, parent, kPunchSoundVolume)
 			end
 		end
 		

@@ -89,6 +89,12 @@ function XenocideLeap:OnDestroy()
 end
 
 function XenocideLeap:GetDeathIconIndex()
+    -- A Leap-impact kill (see CNBalance/Lifeforms/Skulk.lua) flags this weapon
+    -- instance immediately before the killing DoDamage call so the killfeed
+    -- shows the Leap icon instead of the Xenocide icon for that specific kill.
+    if self._isLeapImpact then
+        return kDeathMessageIcon.Leap
+    end
     return kDeathMessageIcon.Xenocide
 end
 
@@ -207,6 +213,15 @@ end
 if Server then
 
     function XenocideLeap:GetDamageType()
+
+        -- Leap-impact damage (CNBalance/Lifeforms/Skulk.lua) flags this weapon
+        -- with _isLeapImpact around its DoDamage call. Leap impact is defined to
+        -- deal kDamageType.Normal (a Bite skulk's BiteLeap already yields Normal
+        -- via kTechId.Leap's techdata); force Normal here too so a Xenocide skulk's
+        -- leap impact is not silently kBiteDamageType instead.
+        if self._isLeapImpact then
+            return kDamageType.Normal
+        end
 
         if self.xenocideTimeLeft == 0 then
             return kXenocideDamageType

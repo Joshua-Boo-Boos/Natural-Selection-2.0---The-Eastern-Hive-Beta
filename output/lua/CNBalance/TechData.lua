@@ -1291,6 +1291,144 @@ function BuildTechData()
         [kTechDataPointValue] = kTunnelEntrancePointValue,
     })
 
+    -- Prototype Lab upgrade entries (personal-resource buy window)
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeBoost,
+        [kTechDataDisplayName] = "Boost",
+        [kTechDataCostKey] = 15,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeJetpackExtraFuel,
+        [kTechDataDisplayName] = "Extra Fuel",
+        [kTechDataCostKey] = 15,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeJetpackArmour,
+        [kTechDataDisplayName] = "Armour Plating",
+        [kTechDataCostKey] = 15,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeExoArmour,
+        [kTechDataDisplayName] = "Armour Plating",
+        [kTechDataCostKey] = 20,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeExoExtraFuel,
+        [kTechDataDisplayName] = "Extra Fuel",
+        [kTechDataCostKey] = 20,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeLifeformScanner,
+        [kTechDataDisplayName] = "Lifeform Scanner",
+        [kTechDataCostKey] = 20,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeEmergencyEjection,
+        [kTechDataDisplayName] = "Emergency Ejection",
+        [kTechDataCostKey] = 20,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeSelfDestruct,
+        [kTechDataDisplayName] = "Self-Destruct",
+        [kTechDataCostKey] = 20,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeResupply,
+        [kTechDataDisplayName] = "Resupply",
+        [kTechDataCostKey] = 20,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeExtendedMagazine,
+        [kTechDataDisplayName] = "Extended Magazine",
+        [kTechDataCostKey] = 10,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeChargeShot,
+        [kTechDataDisplayName] = "Charge Shot",
+        [kTechDataCostKey] = 10,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeTungstenPenetrator,
+        [kTechDataDisplayName] = "Tungsten Penetrator",
+        [kTechDataCostKey] = 10,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.PrototypeShotgun,
+        [kTechDataDisplayName] = "Shotgun",
+        [kTechDataCostKey] = 10,
+    })
+
+    -- Experimental Technologies researches (commander, 15 t-res each).  Researched
+    -- at the specialised Prototype Lab to unlock that base entity's experimental
+    -- modifications (the "extras" in the buy window).  Icons reuse the base entity
+    -- image (set in CNBalance/TechTreeButtons.lua).
+    table.insert(techData, {
+        [kTechDataId] = kTechId.JetpackExperimentalTech,
+        [kTechDataDisplayName] = "Jetpack - Experimental Technologies",
+        [kTechDataTooltipInfo] = "Unlocks the experimental modifications for the Jetpack.",
+        [kTechDataResearchName] = "Jetpack - Experimental Technologies",
+        [kTechDataCostKey] = 15,
+        [kTechDataResearchTimeKey] = 15,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.ExosuitExperimentalTech,
+        [kTechDataDisplayName] = "Exosuit - Experimental Technologies",
+        [kTechDataTooltipInfo] = "Unlocks the experimental modifications for the Exosuit.",
+        [kTechDataResearchName] = "Exosuit - Experimental Technologies",
+        [kTechDataCostKey] = 15,
+        [kTechDataResearchTimeKey] = 15,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.CannonExperimentalTech,
+        [kTechDataDisplayName] = "Cannon - Experimental Technologies",
+        [kTechDataTooltipInfo] = "Unlocks the experimental modifications for the Cannon.",
+        [kTechDataResearchName] = "Cannon - Experimental Technologies",
+        [kTechDataCostKey] = 15,
+        [kTechDataResearchTimeKey] = 15,
+    })
+
+    -- New exo combo entries
+    table.insert(techData, {
+        [kTechDataId] = kTechId.DualFlamethrowerExosuit,
+        [kTechDataDisplayName] = "Dual Flamethrower",
+        [kTechDataCostKey] = 75,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.DualGrenadeLauncherExosuit,
+        [kTechDataDisplayName] = "Dual Grenade Launcher",
+        [kTechDataCostKey] = 65,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.DualWelderExosuit,
+        [kTechDataDisplayName] = "Dual Welder",
+        [kTechDataCostKey] = 55,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.MinigunClawExosuit,
+        [kTechDataDisplayName] = "Minigun Claw",
+        [kTechDataCostKey] = 40,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.RailgunClawExosuit,
+        [kTechDataDisplayName] = "Railgun Claw",
+        [kTechDataCostKey] = 40,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.FlamethrowerClawExosuit,
+        [kTechDataDisplayName] = "Flamethrower Claw",
+        [kTechDataCostKey] = 50,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.GrenadeLauncherClawExosuit,
+        [kTechDataDisplayName] = "Grenade Launcher Claw",
+        [kTechDataCostKey] = 45,
+    })
+    table.insert(techData, {
+        [kTechDataId] = kTechId.WelderClawExosuit,
+        [kTechDataDisplayName] = "Welder Claw",
+        [kTechDataCostKey] = 40,
+    })
+
 
     table.insert(techData, {
         [kTechDataId] = kTechId.BuildTunnelEntryTwo,

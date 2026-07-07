@@ -116,6 +116,19 @@ if Server then
 	--	return resReward
 	--
 	--end
+
+    -- Pre-game free purchases: during any state before kGameState.Started, suppress
+    -- p-res deductions so all players stay at 100 p-res for testing.
+    local baseAddResources = Player.AddResources
+    function Player:AddResources(amount)
+        if amount < 0 then
+            local gr = GetGamerules and GetGamerules()
+            if gr and gr.GetGameState and gr:GetGameState() < kGameState.Started then
+                return 0
+            end
+        end
+        return baseAddResources(self, amount)
+    end
 end
 
 

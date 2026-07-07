@@ -513,13 +513,14 @@ function Hive:OnUpdate(deltaTime)
 
     if self:GetIsAlive() then
         self:UpdateBiomassLevel()
-        local gameInfo = GetGameInfoEntity()
-        if gameInfo and gameInfo:IsAlienDeadlocking() then
-            self:SetDesiredInfestationRadius(0)
-        else
-            self:SetDesiredInfestationRadius(self:GetInfestationMaxRadius())
-        end
-        
+        -- Infestation is DELIBERATELY decoupled from Deadlock: previously, while
+        -- the alien team was deadlocking this set the desired radius to 0, which
+        -- made a built-up Hive's infestation recede and never return (Deadlock is
+        -- persistent, so it stayed at 0). Deadlock only reduces max EHP - it must
+        -- not touch infestation - so always drive the radius to max, exactly like
+        -- every other alien structure (GorgeTunnel / TunnelEntrance) does.
+        self:SetDesiredInfestationRadius(self:GetInfestationMaxRadius())
+
     else
         local destructionAllowedTable = { allowed = true }
         if self.GetDestructionAllowed then

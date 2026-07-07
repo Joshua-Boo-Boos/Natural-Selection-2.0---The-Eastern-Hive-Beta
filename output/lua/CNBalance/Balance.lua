@@ -50,7 +50,9 @@ kAssistMinimumDamageFraction = 0.35      --Avoid parasiter or babbler assists ,f
 kBountyScoreEachAssist = 1 kBountyScoreEachKill = 2 kMaxBountyScore = 512       --You can't kill 256 players in a row?
 kBountyClaimMinMarine = 5 kBountyClaimMinJetpack = 8 kBountyClaimMinExo = 12
 kBountyClaimMinSkulk = 5 kBountyClaimMinAlien = 8 kBountyClaimMinFade = 10 kBountyClaimMinOnos = 12
-kBountyCooldown = 20 kBountyClaimMultiplier = 2
+-- Bounty decay rate reduced to 60% of the original (1 point lost every 20s ->
+-- every 20/0.6 ≈ 33.33s), so a claimed bounty lasts longer before decaying.
+kBountyCooldown = 20 / 0.6 kBountyClaimMultiplier = 2
 
 --Toy for marine commander (remove all marines passive income)
 kMilitaryProtocolResearchCost = 0
@@ -366,8 +368,9 @@ kFadeEggCost = 50
 kOnosCost = 65
 kOnosEggCost = 100
 
-kTunnelEntranceCost = 7
-kTunnelRelocateCost = 5
+kTunnelEntranceCost = 8
+kTunnelExitCost = 8
+kTunnelRelocateCost = 6
 
 --Research with skill activation
 kResearchBioMassOneCost = 30
@@ -455,7 +458,7 @@ kHealthOnBlink = 0
 kVokexCost = 42
 kVokexUpgradeCost = 5
 
-kVokexShadowStepEnergyCost = 14 -- 13
+kVokexShadowStepEnergyCost = 13 -- matches NS2.0-EN
 kSwipeShadowStepDamage = 40
 kVokexGestateTime = 25
 kVokexEggCost = 80
@@ -468,7 +471,9 @@ kAcidRocketResearchCost = 25
 kAcidRocketResearchTime = 40
 
 kAcidRocketVelocity = 32
-kAcidRocketEnergyCost = 12 -- Was 10
+-- Was 10 (matches NS2.0-EN) after a previous change removed the nerf here.
+-- Nerf partially re-added per request: 11.
+kAcidRocketEnergyCost = 11
 kAcidRocketRoundPerSecond = 2.4
 kAcidRocketBombDamageType = kDamageType.Corrode
 kAcidRocketBombDamage = 25

@@ -21,6 +21,9 @@ local networkVars =     --?
     ruptured = "boolean",
     interruptAim = "private boolean",
     poisoned = "boolean",
+    infectionHitCount = "private integer (0 to 3)",
+    infectionWasFullyInfected = "private boolean",
+    infectionLastHitTime = "private time",
     weaponUpgradeLevel = "integer (0 to 3)",
 
     unitStatusPercentage = "private integer (0 to 100)",
@@ -68,6 +71,173 @@ function Marine:OnCreate()
     baseOnCreate(self)
     InitMixin(self,AutoWeldMixin)
     InitMixin(self,RequestHandleMixin)
+
+    self.infectionHitCount = 0
+    self.infectionWasFullyInfected = false
+    self.infectionLastHitTime = 0
+    self.infectionCreditedIsCommander = false
+    self.infectionCreditedAttackerId = Entity.invalidId
+    self.infectionHitTimestamps = {}
+    self.infectionDamageTicksApplied = 0
+    self.suppressInfectionReinfect = false
+end
+
+local kInfectionHitWindowSeconds   = 10    -- a Parasite hit is forgotten if a 3rd hit doesn't land within this many seconds of it
+local kInfectionAppliedSound       = PrecacheAsset("sound/NS2.fev/alien/skulk/taunt")  -- nearby-audible, plays once on reaching 3/3
+-- Personal "you were just hurt" cue, once per damage tick. This is the same
+-- sound vanilla's own damage-flinch system plays for a Marine taking damage
+-- from any source, including a Skulk bite (NS2-Copy/ns2/lua/DamageEffects.lua:439,
+-- triggered from FlinchMixin.lua:83's "flinch" effect) - reused directly here
+-- rather than routing through the flinch/TriggerEffects system, since that
+-- system is driven by the normal TakeDamage pipeline our nil-doer DoT
+-- deliberately bypasses (see the doer=nil comment further down).
+local kInfectionHurtSound          = PrecacheAsset("sound/NS2.fev/marine/common/wound")
+local kInfectionDamageAmount       = 5     -- health-only, per tick
+local kInfectionDoTSeconds         = 5     -- total span of the 3/3 -> 0/3 unwind
+local kInfectionDamageTickInterval = kInfectionDoTSeconds / 2  -- 2.5s: first tick fires immediately (t=0), 2nd at 2.5s, 3rd (final) at 5s
+
+local baseMarineOnProcessMove = Marine.OnProcessMove
+function Marine:OnProcessMove(input)
+
+    if Server then
+
+        if not self.infectionWasFullyInfected then
+
+            -- Build-up phase: each Parasite hit (from any source) is
+            -- remembered for exactly kInfectionHitWindowSeconds, then
+            -- forgotten - so reaching 3/3 requires 3 hits landing within a
+            -- rolling window of each other, not 3 hits ever, total.
+            local timestamps = self.infectionHitTimestamps
+            if timestamps and #timestamps > 0 then
+
+                local now = Shared.GetTime()
+                local kept = {}
+                for _, t in ipairs(timestamps) do
+                    if now - t < kInfectionHitWindowSeconds then
+                        table.insert(kept, t)
+                    end
+                end
+                self.infectionHitTimestamps = kept
+                self.infectionHitCount = #kept
+
+                if self.infectionHitCount >= 3 then
+                    self.infectionWasFullyInfected = true
+                    self.infectionDamageTicksApplied = 0
+                    -- Repurposed for this phase: marks when the fixed
+                    -- Infected! unwind below begins, not "last build-up hit".
+                    self.infectionLastHitTime = now
+                    StartSoundEffectAtOrigin(kInfectionAppliedSound, self:GetOrigin())
+                end
+
+            end
+
+        else
+
+            -- Infected! unwind: fixed kInfectionDoTSeconds span, 3 ticks,
+            -- first tick fires immediately (the instant Infected! begins),
+            -- independent of the build-up phase's rolling window above.
+            local elapsed = Shared.GetTime() - self.infectionLastHitTime
+            local ticksDue = math.min(3, math.floor(elapsed / kInfectionDamageTickInterval) + 1)
+
+            if ticksDue > self.infectionDamageTicksApplied and self:GetIsAlive() then
+
+                local ticksToApply = ticksDue - self.infectionDamageTicksApplied
+                self.infectionDamageTicksApplied = ticksDue
+                self.infectionHitCount = math.max(0, 3 - ticksDue)
+
+                for _ = 1, ticksToApply do
+
+                    -- doer is nil by default: passing a live entity here would
+                    -- re-trigger ParasiteMixin:SetParasited's hook in a
+                    -- self-reinfection loop (Critical bug found in v1 review)
+                    -- — nil matches vanilla Lerk poison's own
+                    -- self:DeductHealth(poisonDamage, attacker, nil, true).
+                    --
+                    -- Exception: for the weapon-sourced case, if the credited
+                    -- Skulk still has a live Parasite weapon, use it as doer so
+                    -- the killfeed shows the correct killer AND the Parasite
+                    -- icon (doer:GetDeathIconIndex() requires a real Parasite
+                    -- instance — there is no icon-by-damage-type shortcut).
+                    -- self.suppressInfectionReinfect (checked in
+                    -- ParasiteMixin.lua) swallows the resulting re-trigger
+                    -- harmlessly instead of logging a spurious extra hit.
+                    local attacker
+                    local doer
+                    if self.infectionCreditedIsCommander then
+                        local aliensTeam = GetGamerules() and GetGamerules():GetTeam(kAlienTeamType)
+                        attacker = aliensTeam and aliensTeam:GetCommander()
+                    else
+                        attacker = Shared.GetEntity(self.infectionCreditedAttackerId)
+                        if attacker and attacker.GetWeapon then
+                            doer = attacker:GetWeapon("parasite")
+                        end
+                    end
+
+                    -- Scale the per-tick damage by the TARGET's own Bounty, same as
+                    -- every other damage source: DeductHealth calls TakeDamage
+                    -- directly (bypassing DamageMixin:DoDamage/GetDamageByType), so
+                    -- it never reaches ScoringMixin:ModifyDamageTaken - without this,
+                    -- infection damage stayed flat at kInfectionDamageAmount
+                    -- regardless of Bounty. Mirrors ModifyDamageTaken's own formula
+                    -- exactly (CNBalance/Mixin/ScoringMixin.lua) so a bountied target
+                    -- takes proportionally more from Infection too.
+                    local infectionDamage = kInfectionDamageAmount
+                    if self.GetBountyCurrentLife then
+                        local bountyScore = self:GetBountyCurrentLife()
+                        if bountyScore > 0 then
+                            local damageScalar = 1 + 1.5 * (bountyScore / 50)
+                            infectionDamage = infectionDamage * Clamp(damageScalar, 0.2, 2.5)
+                        end
+                    end
+
+                    self.suppressInfectionReinfect = true
+                    local _, damageDone = self:DeductHealth(infectionDamage, attacker, doer, true)
+                    self.suppressInfectionReinfect = false
+
+                    if attacker then
+                        -- Signature: SendDamageMessage(attacker, targetId, amount,
+                        -- point, overkill, ...). The 5th arg is OVERKILL (excess
+                        -- damage past the target's remaining health), not a second
+                        -- copy of the amount - pass 0 (a 5-dmg DoT tick does not
+                        -- overkill in the normal case; the popup shows `amount`).
+                        SendDamageMessage(attacker, self:GetId(), damageDone, self:GetOrigin(), 0)
+                    end
+
+                    -- Personal "you were just hurt" cue - only this player
+                    -- hears it (unlike kInfectionAppliedSound above, which is
+                    -- positional/nearby-audible to everyone).
+                    StartSoundEffectForPlayer(kInfectionHurtSound, self)
+
+                end
+
+            end
+
+            if self.infectionDamageTicksApplied >= 3 then
+                self.infectionWasFullyInfected = false
+                self.infectionHitCount = 0
+                self.infectionDamageTicksApplied = 0
+                self.infectionHitTimestamps = {}
+                self.infectionCreditedIsCommander = false
+                self.infectionCreditedAttackerId = Entity.invalidId
+            end
+
+        end
+
+    end
+
+    baseMarineOnProcessMove(self, input)
+
+end
+
+local baseMarineOnEntityChange = Marine.OnEntityChange
+function Marine:OnEntityChange(oldId, newId)
+
+    baseMarineOnEntityChange(self, oldId, newId)
+
+    if oldId == self.infectionCreditedAttackerId then
+        self.infectionCreditedAttackerId = newId or Entity.invalidId
+    end
+
 end
 
 --Weapons

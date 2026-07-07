@@ -206,6 +206,9 @@ function DevouredPlayer:GetPlayerStatusDesc()
 end
 
 function DevouredPlayer:GetTechId()
+    if self.previousMapName == JetpackMarine.kMapName then
+        return kTechId.JetpackMarine
+    end
     return kTechId.Marine
 end
 

@@ -1,0 +1,30 @@
+Debug: 
+Cleaning project 'motion_tracker'...
+Debug: Deleting file C:\Users\Joshu\Desktop\NS2.0-TEH\NS2.0-TEH-Beta\source\soundsrc\motion_tracker.fev...
+Debug: Deleting file C:\Users\Joshu\Desktop\NS2.0-TEH\NS2.0-TEH-Beta\source\soundsrc\motion_tracker_bank00.fsb...
+Debug: 
+Building project 'motion_tracker'...
+Debug: Building project C:\Users\Joshu\Desktop\NS2.0-TEH\NS2.0-TEH-Beta\source\soundsrc\motion_tracker.fev...
+Debug: Unique sound defs 1/3
+Debug: Retrieving sound file info...
+Debug: Retrieving reverb info...
+Debug: FEV file written ok
+Debug: Unique Envelope Points: 0 of 0
+Debug: Unique Strings: 142 characters of 142
+Debug: Caching sound file details for ''...
+Debug: motion_tracker_activate.mp3
+Debug: motion_tracker_detected.mp3
+Debug: motion_tracker_scanning.mp3
+Debug: Building 'motion_tracker_bank00.fsb'
+Debug: Encoded C:\Users\Joshu\Desktop\NS2.0-TEH\NS2.0-TEH-Beta\source\soundsrc\motion_tracker_activate.mp3
+Debug: Encoded C:\Users\Joshu\Desktop\NS2.0-TEH\NS2.0-TEH-Beta\source\soundsrc\motion_tracker_detected.mp3
+Debug: Encoded C:\Users\Joshu\Desktop\NS2.0-TEH\NS2.0-TEH-Beta\source\soundsrc\motion_tracker_scanning.mp3
+Debug: Writing FSB...
+Debug: Finished building FSB
+Debug: 
+Debug: 
+Summary of build:
+SUCCESS: C:/Users/Joshu/Desktop/NS2.0-TEH/NS2.0-TEH-Beta/source/soundsrc/motion_tracker.fev
+SUCCESS: motion_tracker_bank00.fsb
+Debug: Information : FMOD Designer : Build finished.  Took 00:00:00
+

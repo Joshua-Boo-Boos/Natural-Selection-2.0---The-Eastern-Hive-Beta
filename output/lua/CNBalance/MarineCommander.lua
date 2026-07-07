@@ -146,9 +146,11 @@ function MarineCommander:GetQuickMenuTechButtons(techId)
     if not menuButtons then
         menuButtons = {kTechId.None, kTechId.None, kTechId.None, kTechId.None, kTechId.None, kTechId.None, kTechId.None, kTechId.None }
     end
-    if techId == kTechId.AdvancedMenu then
-        menuButtons[7] = Shared.GetCheatsEnabled() and kTechId.BioformSuppressor or kTechId.None
-    end
+    -- Bioform Suppressor build-menu icon commented out per request - slot 7 stays
+    -- kTechId.None (the default) so the button is not shown in the Advanced Menu.
+    -- if techId == kTechId.AdvancedMenu then
+    --     menuButtons[7] = Shared.GetCheatsEnabled() and kTechId.BioformSuppressor or kTechId.None
+    -- end
 
     table.copy(menuButtons, marineTechButtons, true)        
 

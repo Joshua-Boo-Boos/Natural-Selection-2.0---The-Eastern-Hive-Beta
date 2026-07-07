@@ -167,6 +167,8 @@ function MarineTeam:InitTechTree()
     self.techTree:AddTargetedActivation(kTechId.JetpackTech,      kTechId.JetpackPrototypeLab,      kTechId.None)
     self.techTree:AddTargetedActivation(kTechId.DropJetpack,    kTechId.JetpackPrototypeLab,      kTechId.None)
     self.techTree:AddBuyNode(kTechId.Jetpack,                    kTechId.JetpackPrototypeLab)
+    -- Experimental Technologies research (available once the lab is jetpack-specialised).
+    self.techTree:AddResearchNode(kTechId.JetpackExperimentalTech, kTechId.JetpackPrototypeLab)
     --self.techTree:AddResearchNode(kTechId.JetpackFuelTech,           kTechId.JetpackTech)
 
     --Cannon
@@ -174,6 +176,8 @@ function MarineTeam:InitTechTree()
     self.techTree:AddTargetedActivation(kTechId.CannonTech,      kTechId.CannonPrototypeLab,      kTechId.None)
     self.techTree:AddTargetedActivation(kTechId.DropCannon, kTechId.CannonPrototypeLab)
     self.techTree:AddBuyNode(kTechId.Cannon,   kTechId.CannonPrototypeLab)
+    -- Experimental Technologies research (available once the lab is cannon-specialised).
+    self.techTree:AddResearchNode(kTechId.CannonExperimentalTech, kTechId.CannonPrototypeLab)
 
     -- Exosuit
     self.techTree:AddUpgradeNode(kTechId.ExosuitProtoUpgrade,           kTechId.PrototypeLab)
@@ -182,6 +186,8 @@ function MarineTeam:InitTechTree()
     self.techTree:AddTargetedActivation(kTechId.DropDualMinigunExosuit,     kTechId.ExosuitPrototypeLab, kTechId.None)
     self.techTree:AddBuyNode(kTechId.DualRailgunExosuit, kTechId.ExosuitPrototypeLab, kTechId.CannonPrototypeLab)
     self.techTree:AddTargetedActivation(kTechId.DropDualRailgunExosuit,     kTechId.ExosuitPrototypeLab, kTechId.CannonPrototypeLab)
+    -- Experimental Technologies research (available once the lab is exosuit-specialised).
+    self.techTree:AddResearchNode(kTechId.ExosuitExperimentalTech, kTechId.ExosuitPrototypeLab)
     
     self.techTree:AddBuildNode(kTechId.BioformSuppressor,kTechId.InfantryPortal)
     self.techTree:AddUpgradeNode(kTechId.BioformSuppressProtocol,kTechId.BioformSuppressor)

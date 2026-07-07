@@ -365,6 +365,19 @@ function Prowler:GetIsRappelling( )
     return self.rappelling
 end
 
+function Prowler:StampRappelRelease()
+
+    if not Server then return end
+    if not self.rappelling then return end
+
+    local followEntity = Shared.GetEntity(self.rappelFollow)
+    if followEntity then
+        followEntity.lastRappelProwlerId = self:GetId()
+        followEntity.lastRappelReleaseTime = Shared.GetTime()
+    end
+
+end
+
 local kContinuousReelDamageInterval = 0.1
 local kDisableVector = Vector(0,0,0)
 function Prowler:ModifyVelocity(input, velocity, deltaTime)
@@ -616,6 +629,8 @@ function Prowler:PostUpdateMove(input)
 
     if not breakRappel then return end
 
+    self:StampRappelRelease()
+
     self.rappelling = false
     self.rappelPoint = nil
     self.rappelFollow = Entity.invalidId
@@ -704,6 +719,7 @@ function Prowler:PreUpdateMove(input, runningPrediction)
 
     local activeWeapon = self:GetActiveWeapon()
     if activeWeapon and not HasMixin(activeWeapon,"Rappel") then
+        self:StampRappelRelease()
         self.rappelling = false
         self.rappelPoint = nil
     end
@@ -762,6 +778,7 @@ end
 local baseOnKill = Prowler.OnKill
 function Prowler:OnKill(attacker,doer,point, direction)
     baseOnKill(self,attacker,doer,point, direction)
+    self:StampRappelRelease()
     self.rappelling = false
 end
 

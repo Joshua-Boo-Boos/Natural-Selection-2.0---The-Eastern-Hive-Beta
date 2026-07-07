@@ -4,7 +4,7 @@ local kAdditionalEffects =
     {
         devourOutsideEffects = 
         {
-            {parented_sound = "sound/ns2plus.fev/abilities/onos/devour", volume = 0.2, done = true},
+            {parented_sound = "sound/ns2plus.fev/abilities/alien/onos/devour", volume = 0.2, done = true},
         },
     },
     
@@ -12,7 +12,7 @@ local kAdditionalEffects =
     {
         devourInsideEffects = 
         {
-            {private_sound = "sound/ns2plus.fev/abilities/onos/devour", done = true},
+            {private_sound = "sound/ns2plus.fev/abilities/alien/onos/devour", done = true},
         },
     },
     

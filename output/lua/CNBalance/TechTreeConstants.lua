@@ -45,6 +45,38 @@ debug.appendtoenum(kTechId, "CannonPrototypeLab")
 debug.appendtoenum(kTechId, "BioformSuppressor")
 debug.appendtoenum(kTechId, "BioformSuppressProtocol")
 
+-- Experimental Technologies researches (unlock the "extras" / experimental
+-- modifications for each specialised Prototype Lab; researched AT the specialised
+-- lab after the base specialisation upgrade).
+debug.appendtoenum(kTechId, "JetpackExperimentalTech")
+debug.appendtoenum(kTechId, "ExosuitExperimentalTech")
+debug.appendtoenum(kTechId, "CannonExperimentalTech")
+
+-- Prototype Lab upgrade ids
+debug.appendtoenum(kTechId, "PrototypeBoost")
+debug.appendtoenum(kTechId, "PrototypeJetpackExtraFuel")
+debug.appendtoenum(kTechId, "PrototypeJetpackArmour")
+debug.appendtoenum(kTechId, "PrototypeExoArmour")
+debug.appendtoenum(kTechId, "PrototypeExoExtraFuel")
+debug.appendtoenum(kTechId, "PrototypeLifeformScanner")
+debug.appendtoenum(kTechId, "PrototypeEmergencyEjection")
+debug.appendtoenum(kTechId, "PrototypeSelfDestruct")
+debug.appendtoenum(kTechId, "PrototypeResupply")
+debug.appendtoenum(kTechId, "PrototypeExtendedMagazine")
+debug.appendtoenum(kTechId, "PrototypeChargeShot")
+debug.appendtoenum(kTechId, "PrototypeTungstenPenetrator")
+debug.appendtoenum(kTechId, "PrototypeShotgun")
+
+-- New exo combo ids
+debug.appendtoenum(kTechId, "DualFlamethrowerExosuit")
+debug.appendtoenum(kTechId, "DualGrenadeLauncherExosuit")
+debug.appendtoenum(kTechId, "DualWelderExosuit")
+debug.appendtoenum(kTechId, "MinigunClawExosuit")
+debug.appendtoenum(kTechId, "RailgunClawExosuit")
+debug.appendtoenum(kTechId, "FlamethrowerClawExosuit")
+debug.appendtoenum(kTechId, "GrenadeLauncherClawExosuit")
+debug.appendtoenum(kTechId, "WelderClawExosuit")
+
 --Weapons
 debug.appendtoenum(kTechId, "Knife")
 debug.appendtoenum(kTechId, "SubMachineGun")

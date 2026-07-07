@@ -68,7 +68,7 @@
 <notes></notes>
 <entrylistmode>1</entrylistmode>
 <waveform>
-<filename>sound/PrimalScream.mp3</filename>
+<filename>PrimalScream.mp3</filename>
 <soundbankname>NS1_Sounds_bank00</soundbankname>
 <weight>100</weight>
 <percentagelocked>0</percentagelocked>
@@ -107,7 +107,7 @@
 <notes></notes>
 <entrylistmode>1</entrylistmode>
 <waveform>
-<filename>sound/PrimalScreamReceiving.mp3</filename>
+<filename>PrimalScreamReceiving.mp3</filename>
 <soundbankname>NS1_Sounds_bank00</soundbankname>
 <weight>100</weight>
 <percentagelocked>0</percentagelocked>
@@ -636,7 +636,7 @@
 <_BB10_banktype>DecompressedSample</_BB10_banktype>
 <notes></notes>
 <waveform>
-<filename>sound/PrimalScream.mp3</filename>
+<filename>PrimalScream.mp3</filename>
 <guid>{4d3917f1-140c-45ec-9bc5-943d0418c96b}</guid>
 <mindistance>1</mindistance>
 <maxdistance>10000</maxdistance>
@@ -690,7 +690,7 @@
 <notes></notes>
 </waveform>
 <waveform>
-<filename>sound/PrimalScreamReceiving.mp3</filename>
+<filename>PrimalScreamReceiving.mp3</filename>
 <guid>{2671ff1e-7015-4c4b-94b0-c8b9c7522d1d}</guid>
 <mindistance>1</mindistance>
 <maxdistance>10000</maxdistance>
