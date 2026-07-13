@@ -676,14 +676,7 @@ function AlienTeam:UpdateEggGeneration()
         self.timeLastEggUpdate = Shared.GetTime()
     end
 
-    local eggGenerationInterval = ScaleWithPlayerCount(kEggGenerationRate, #GetEntitiesForTeam("Player", self:GetTeamNumber()))
-    if self:IsOriginForm() then
-        -- +10% egg spawn rate: dividing the interval by 1.1 multiplies the rate (1/interval)
-        -- by exactly 1.1, i.e. +10% - NOT the same as multiplying the interval by 0.9 (+11.1%).
-        eggGenerationInterval = eggGenerationInterval / 1.1
-    end
-
-    if self.timeLastEggUpdate + eggGenerationInterval < Shared.GetTime() then
+    if self.timeLastEggUpdate + ScaleWithPlayerCount(kEggGenerationRate, #GetEntitiesForTeam("Player", self:GetTeamNumber())) < Shared.GetTime() then
 
         local hives = GetEntitiesForTeam("Hive", self:GetTeamNumber())
         local builtHives = {}

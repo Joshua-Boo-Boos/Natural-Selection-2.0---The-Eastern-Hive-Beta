@@ -111,19 +111,17 @@ kShowAsClass["JetpackMarine"] =
     GUIJetpackFuel = true,
 }
 
-kShowAsClass["Exo"] =
-{
-    GUIExoThruster = true,
-    ["Hud/Marine/GUIMarineHUD"] = true,
+kShowAsClass["Exo"] = 
+{ 
+    GUIExoThruster = true, 
+    ["Hud/Marine/GUIMarineHUD"] = true, 
     ["Hud/Marine/GUIExoHUD"] = true,
     GUIObjectiveDisplay = true,
     GUIProgressBar = true,
-    GUIRequestMenu = true,
-    GUIWaypoints = true,
+    GUIRequestMenu = true, 
+    GUIWaypoints = true, 
     GUIExoEject = true,
-    GUIClassicAmmo = true,
-    -- Task 26: Exo combo + upgrade HUD (visibility gated inside the script itself)
-    ["CNBalance/GUI/GUIExoUpgradeHud"] = true,
+    GUIClassicAmmo = true
 }
 
 kShowAsClass["MarineSpectator"] =
@@ -215,8 +213,6 @@ local kMiscPreloads = {
     'GUILifeformPopup',
     'GUIList',
     'GUIMarineBuyMenu',
-    'CNBalance/GUI/GUIPrototypeLabBuyMenu',
-    'CNBalance/GUI/GUIExoUpgradeHud',
     'GUIMarineTeamMessage',
     'GUIMinimapButtons',
     'GUIParticleSystem',

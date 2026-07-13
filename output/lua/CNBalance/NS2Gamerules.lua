@@ -54,22 +54,6 @@
                  SendTeamMessage(self.team1, kTeamMessageTypes.GameStarted)
                  SendTeamMessage(self.team2, kTeamMessageTypes.GameStarted)
 
-                 -- Reset player resources to normal starting amounts when the game
-                 -- transitions from pre-game to Started (force-start or countdown end).
-                 -- Pre-game grants 100 p-res for testing; clear that on real start.
-                 local function ResetPlayerRes(player, startingRes)
-                     if player.SetResources and player.GetIsAlive and player:GetIsAlive() then
-                         player:SetResources(startingRes)
-                     end
-                     player._preGameResGranted = false
-                 end
-                 for _, p in ipairs(GetEntitiesForTeam("Player", kTeam1Index)) do
-                     ResetPlayerRes(p, kMarineInitialIndivRes)
-                 end
-                 for _, p in ipairs(GetEntitiesForTeam("Player", kTeam2Index)) do
-                     ResetPlayerRes(p, kAlienInitialIndivRes)
-                 end
-
              end
 
              -- On end game, check for map switch conditions
@@ -364,7 +348,6 @@
 
                  self:UpdatePlayerSkill()
                  self:UpdateNumPlayersForScoreboard()
-                 self:UpdatePreGameResources()
 
                  self.gameInfo:SetMarineDeadlockTime(self.team1.deadlockTime)
                  self.gameInfo:SetAlienDeadlockTime(self.team2.deadlockTime)
@@ -377,42 +360,7 @@
          end
 
      end
-
-     -- ── Pre-game: 100 p-res on every spawn ───────────────────────────────────
-     -- While the round has NOT started yet (any state before kGameState.Started),
-     -- give every marine/alien player 100 personal resources each time they spawn,
-     -- so players can freely test purchases until the game state changes.
-     -- The grant fires once per life (tracked by a per-entity flag that resets on
-     -- death; respawns create fresh entities, so each spawn re-grants).
-     local kPreGameSpawnResources = 100
-     function NS2Gamerules:UpdatePreGameResources()
-
-         -- Only during the pre-round period; once the game has started, stop.
-         if self:GetGameState() >= kGameState.Started then
-             return
-         end
-
-         local function ProcessPlayer(player)
-             if not player.SetResources or not player.GetIsAlive then return end
-             if player:GetIsAlive() then
-                 if not player._preGameResGranted then
-                     player:SetResources(kPreGameSpawnResources)
-                     player._preGameResGranted = true
-                 end
-             else
-                 player._preGameResGranted = false
-             end
-         end
-
-         for _, player in ipairs(GetEntitiesForTeam("Player", kTeam1Index)) do
-             ProcessPlayer(player)
-         end
-         for _, player in ipairs(GetEntitiesForTeam("Player", kTeam2Index)) do
-             ProcessPlayer(player)
-         end
-
-     end
-
+     
      function NS2Gamerules:BroadCastVO(_name)
          self.worldTeam:PlayPrivateTeamSound(_name)
          self.team1:PlayPrivateTeamSound(_name)

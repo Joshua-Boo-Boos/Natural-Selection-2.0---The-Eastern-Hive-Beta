@@ -1660,12 +1660,9 @@ function CreateGorgeBrainSenses()
         for i = 1, #targets do
             local healTarget = targets[i]
 
-            -- Gorge bots must never try to heal Clogs (they are not a useful heal
-            -- target and the bot gets stuck spraying them).
-            local isValidHealable =
-                not healTarget:isa("Clog") and
+            local isValidHealable = 
             (
-                ( healTarget.GetIsBuilt and healTarget:GetIsBuilt() ) or
+                ( healTarget.GetIsBuilt and healTarget:GetIsBuilt() ) or  
                 ( healTarget:GetIsAlive() )
             )
             if isValidHealable then

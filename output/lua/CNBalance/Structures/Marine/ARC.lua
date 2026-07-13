@@ -12,6 +12,12 @@ end
 
 local baseValidateTargetPosition = ARC.ValidateTargetPosition
 function ARC:ValidateTargetPosition(position)
+    -- The base (vanilla ARC:ValidateTargetPosition) ALREADY returns false when any
+    -- ShadeInk cloud is within kShadeInkDisorientRadius of the target - so an existing
+    -- cloud already blocks the ARC (and cancels a charging shot, since UpdateTargetingPosition
+    -- re-runs this every update). This override only ADDS the auto-ink parry: if no cloud
+    -- exists yet, a READY nearby shade inks on this shot ("oh no, quickly Ink!") and the
+    -- fresh cloud then blocks the ARC via the base check on subsequent updates.
     local successful = baseValidateTargetPosition(self,position)
     if successful then
         successful = not AlienDetectionParry(GetEnemyTeamNumber(self:GetTeamNumber()),position,ShadeInk.kShadeInkDisorientRadius)

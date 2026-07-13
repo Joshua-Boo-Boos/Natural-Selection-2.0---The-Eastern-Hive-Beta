@@ -137,6 +137,10 @@ end
 
 function GUIUnitStatus:Initialize()
 
+    -- REVERTED: capping this at kUpdateIntervalAnimation (50 Hz) made
+    -- health bars/nameplates visibly lag behind smoothly-rendered world
+    -- geometry on high-refresh monitors when panning the camera. Restored
+    -- to vanilla's uncapped per-render-frame update.
     GUIAnimatedScript.Initialize(self, kUpdateIntervalFull)
 
     self.nextUnitStatusUpdate = 0

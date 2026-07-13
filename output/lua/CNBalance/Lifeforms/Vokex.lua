@@ -51,13 +51,11 @@ local kJumpHeight = 1.4
 
 local kVokexScanDuration = 4
 
--- Slow the Vokex down while Shadow Stepping by 10% (from 25 to 22.5).
+-- Slow the Vokex down while Shadow Stepping by 10% (from 25 to 22.5) and increase the cooldown by 0.05 seconds (from 0.4 to 0.45).
 local kShadowStepSpeed = 22.5 -- 25 --40
 local kShadowStepSpeedBonusPerCelerity = 0.66
 Vokex.kShadowStepDuration = 0.2
--- Was 0.4 (matches NS2.0-EN) after a previous change fully removed a 50ms
--- nerf. Re-adding 20ms of that 50ms per request: 0.4 + 0.02 = 0.42.
-local kShadowStepCooldown = 0.42
+local kShadowStepCooldown = 0.45 -- 0.4
 
 local kMaxSpeed = 7.2
 

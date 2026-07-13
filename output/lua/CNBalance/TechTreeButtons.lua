@@ -45,12 +45,6 @@ kTechIdToMaterialOffset[kTechId.CannonPrototypeLab] = 204
 kTechIdToMaterialOffset[kTechId.ExosuitPrototypeLab] = 25
 kTechIdToMaterialOffset[kTechId.JetpackPrototypeLab] = 89
 
--- Experimental Technologies researches — use the BASE ENTITY's icon
--- (Jetpack = 89, Exosuit = 84 (DualMinigunExosuit image), Cannon = 204).
-kTechIdToMaterialOffset[kTechId.JetpackExperimentalTech] = 89
-kTechIdToMaterialOffset[kTechId.ExosuitExperimentalTech] = 84
-kTechIdToMaterialOffset[kTechId.CannonExperimentalTech] = 204
-
 kTechIdToMaterialOffset[kTechId.ProtosMenu] = 25
 kTechIdToMaterialOffset[kTechId.DualMinigunExosuit] = 84
 kTechIdToMaterialOffset[kTechId.DropDualMinigunExosuit] = 84

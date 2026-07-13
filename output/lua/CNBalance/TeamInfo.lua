@@ -183,7 +183,11 @@ function TeamInfo:OnCreate()
 
     if Server then
 
-        self:SetUpdates(true, kRealTimeUpdateRate)
+        -- Perf: TeamInfo carries display-only netvars (res counts, biomass,
+        -- spawn queue, comm ping). 4 Hz is imperceptible on HUD/minimap and
+        -- removes ~87% of the per-tick team scans + structure-count queries
+        -- (AlienTeamInfo alone ran 6 GetBuiltStructureCount queries per tick).
+        self:SetUpdates(true, 0.25)
 
         self:Reset()
 

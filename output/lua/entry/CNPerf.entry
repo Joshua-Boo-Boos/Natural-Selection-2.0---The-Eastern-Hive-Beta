@@ -1,0 +1,9 @@
+-- Performance overlay module. Priority -100: ModLoader sorts entries by
+-- Priority DESCENDING (see NS2-Copy/core/lua/ModLoader.lua:235-244, ties
+-- unordered, default 10), so CNPerf loads strictly LAST and its post-hooks
+-- wrap the FINAL versions of functions defined by every other module
+-- (CNBalance=1, MotionTracker=0, ENFixes=10, Blackout/Ragdoll=500).
+modEntry = {
+    FileHooks = "lua/Perf/FileHooks.lua",
+    Priority = -100
+}

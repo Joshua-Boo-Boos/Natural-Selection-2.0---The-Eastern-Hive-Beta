@@ -15,7 +15,6 @@ ModLoader.SetupFileHook("lua/Utility.lua", "lua/CNBalance/Utility.lua", "post" )
 ModLoader.SetupFileHook("lua/NS2Utility.lua", "lua/CNBalance/NS2Utility.lua", "post" )
 ModLoader.SetupFileHook("lua/NS2Utility_Server.lua", "lua/CNBalance/NS2Utility_Server.lua", "post" )
 ModLoader.SetupFileHook("lua/NS2ConsoleCommands_Server.lua", "lua/CNBalance/NS2ConsoleCommands_Server.lua", "post" )
-ModLoader.SetupFileHook("lua/ConsoleCommands_Server.lua", "lua/CNBalance/ConsoleCommands_Server.lua", "replace" )
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/NetworkMessages.lua", "post" )
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/PrimalScreamFX.lua", "post" )
 ModLoader.SetupFileHook("lua/NetworkMessages_Server.lua", "lua/CNBalance/NetworkMessages_Server.lua", "post" )
@@ -23,8 +22,6 @@ ModLoader.SetupFileHook("lua/DamageMixin.lua", "lua/CNBalance/Mixin/DamageMixin.
 
 ModLoader.SetupFileHook("lua/TechTreeConstants.lua", "lua/CNBalance/TechTreeConstants.lua", "post")
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/TechData.lua", "post")
-ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/PrototypeTechData.lua", "post")
-ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/Mixin/PrototypeUpgradesMixin.lua", "post")
 ModLoader.SetupFileHook("lua/TechTree.lua", "lua/CNBalance/TechTree.lua", "post")
 ModLoader.SetupFileHook("lua/TechTreeButtons.lua", "lua/CNBalance/TechTreeButtons.lua", "post")
 ModLoader.SetupFileHook("lua/BuildUtility.lua", "lua/CNBalance/BuildUtility.lua", "post")
@@ -90,10 +87,6 @@ ModLoader.SetupFileHook("lua/PlayerHallucinationMixin.lua", "lua/CNBalance/Mixin
 ModLoader.SetupFileHook("lua/UmbraMixin.lua", "lua/CNBalance/Mixin/UmbraMixin.lua", "post" )
 ModLoader.SetupFileHook("lua/AutoWeldMixin.lua", "lua/CNBalance/Mixin/AutoWeldMixin.lua", "post")
 ModLoader.SetupFileHook("lua/TeamDeathMessageMixin.lua", "lua/CNBalance/Mixin/TeamDeathMessageMixin.lua", "post" )
-ModLoader.SetupFileHook("lua/GUIDeathMessages.lua", "lua/CNBalance/GUI/GUIDeathMessagesLeap.lua", "post" )
--- Loaded after GUIDeathMessagesLeap.lua - wraps the already-Leap-wrapped
--- DeathMsgUI_GetTechOffset*/AddMessage functions further, for Exo weapon icons.
-ModLoader.SetupFileHook("lua/GUIDeathMessages.lua", "lua/CNBalance/GUI/GUIDeathMessagesExo.lua", "post" )
 ModLoader.SetupFileHook("lua/PointGiverMixin.lua", "lua/CNBalance/Mixin/PointGiverMixin.lua", "post" )
 ModLoader.SetupFileHook("lua/BabblerOwnerMixin.lua", "lua/CNBalance/Mixin/BabblerOwnerMixin.lua", "post")
 ModLoader.SetupFileHook("lua/RegenerationMixin.lua", "lua/CNBalance/Mixin/RegenerationMixin.lua", "post")
@@ -101,7 +94,6 @@ ModLoader.SetupFileHook("lua/BiomassHealthMixin.lua", "lua/CNBalance/Mixin/Bioma
 ModLoader.SetupFileHook("lua/RecycleMixin.lua", "lua/CNBalance/Mixin/RecycleMixin.lua", "post")
 ModLoader.SetupFileHook("lua/GhostStructureMixin.lua", "lua/CNBalance/Mixin/GhostStructureMixin.lua", "post")
 ModLoader.SetupFileHook("lua/PhaseGateUserMixin.lua", "lua/CNBalance/Mixin/PhaseGateUserMixin.lua", "replace")
-ModLoader.SetupFileHook("lua/ParasiteMixin.lua", "lua/CNBalance/Mixin/ParasiteMixin.lua", "post")
 
 ModLoader.SetupFileHook("lua/Player.lua", "lua/CNBalance/Player.lua", "post" )
 ModLoader.SetupFileHook("lua/HitSounds.lua", "lua/CNBalance/HitSounds.lua", "post" )
@@ -120,7 +112,6 @@ ModLoader.SetupFileHook("lua/MarineCommander.lua", "lua/CNBalance/MarineCommande
 ModLoader.SetupFileHook("lua/CommAbilities/Marine/Scan.lua", "lua/CNBalance/CommAbilities/Scan.lua", "post")
 --Marines
 ModLoader.SetupFileHook("lua/Hud/Marine/GUIMarineHUD.lua", "lua/CNBalance/GUI/GUIMarineHUD.lua", "post" )
-ModLoader.SetupFileHook("lua/Hud/Marine/GUIExoHUD.lua",   "lua/CNBalance/GUI/GUIExoHUD.lua",   "post" )
 ModLoader.SetupFileHook("lua/Hud/GUIPlayerResource.lua", "lua/CNBalance/GUI/GUIPlayerResource.lua", "post")
 ModLoader.SetupFileHook("lua/GUIMarineBuyMenu.lua", "lua/CNBalance/GUI/GUIMarineBuyMenu.lua", "replace" )
 
@@ -130,7 +121,6 @@ ModLoader.SetupFileHook("lua/Hud/GUINotificationItem.lua", "lua/CNBalance/GUI/GU
 ModLoader.SetupFileHook("lua/GUIActionIcon.lua", "lua/CNBalance/GUI/GUIActionIcon.lua", "replace")
 ModLoader.SetupFileHook("lua/GUIPickups.lua", "lua/CNBalance/GUI/GUIPickups.lua", "post")
 ModLoader.SetupFileHook("lua/MarineBuy_Client.lua", "lua/CNBalance/MarineBuy_Client.lua", "post" )
-ModLoader.SetupFileHook("lua/Marine_Client.lua", "lua/CNBalance/MarineBuyMenuHook.lua", "post" )
 ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/MarineTeam.lua", "post")
 ModLoader.SetupFileHook("lua/MarineTeamInfo.lua", "lua/CNBalance/MarineTeamInfo.lua", "replace")
 
@@ -159,12 +149,7 @@ ModLoader.SetupFileHook("lua/Marine.lua", "lua/CNBalance/Marine.lua", "post")
 ModLoader.SetupFileHook("lua/MarineSpectator.lua", "lua/CNBalance/MarineSpectator.lua", "post")
 ModLoader.SetupFileHook("lua/Spectator.lua", "lua/CNBalance/Spectator.lua", "post")
 ModLoader.SetupFileHook("lua/JetpackMarine.lua", "lua/CNBalance/JetpackMarine.lua", "post")
-ModLoader.SetupFileHook("lua/Marine_Server.lua", "lua/CNBalance/PrototypeBuyServer.lua", "post")
 ModLoader.SetupFileHook("lua/Exo.lua", "lua/CNBalance/Exo.lua", "post")
--- Task 19: view-model/graph chassis overrides for prototype exo combos.
--- Hooked post ExoWeaponHolder.lua; the kPrototypeChassis* globals are
--- resolved at function call-time (after CNBalance/Exo.lua has loaded them).
-ModLoader.SetupFileHook("lua/Weapons/Marine/ExoWeaponHolder.lua", "lua/CNBalance/Weapons/ExoWeaponHolderModels.lua", "post")
 ModLoader.SetupFileHook("lua/Exosuit.lua", "lua/CNBalance/Exosuit.lua", "post")
 
 ModLoader.SetupFileHook("lua/Weapons/WeaponDisplayManager.lua", "lua/CNBalance/Weapons/WeaponDisplayManager.lua", "post" )
@@ -186,8 +171,6 @@ ModLoader.SetupFileHook("lua/Weapons/Marine/HeavyMachineGun.lua", "lua/CNBalance
 
 ModLoader.SetupFileHook("lua/Weapons/Marine/GrenadeThrower.lua", "lua/CNBalance/Weapons/Marine/GrenadeThrower.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/GrenadeLauncher.lua", "lua/CNBalance/Weapons/Marine/GrenadeLauncher.lua", "post")
--- Task 15: Grenade heavy/flat/contact mode extension (post Grenade.lua; no new class)
-ModLoader.SetupFileHook("lua/Weapons/Marine/Grenade.lua", "lua/Combat/GrenadeHeavyMode.lua", "post")
 
 ModLoader.SetupFileHook("lua/MarineVariantMixin.lua","lua/CNBalance/MarineVariantMixin.lua","post")
 ModLoader.SetupFileHook("lua/ExoVariantMixin.lua","lua/CNBalance/ExoVariantMixin.lua","post")
@@ -204,14 +187,6 @@ ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/SubMach
 ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/LightMachineGun.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/Combat/Cannon.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Marine/Welder.lua", "lua/Combat/CombatBuilder.lua", "post")
--- Tasks 16-18: Special-weapon modes (Flamethrower/Welder/Grenade) are folded into the
--- existing Railgun class via a weaponMode netvar (NO new Shared.LinkClassToMap).
--- Hooked on Railgun.lua so ExoWeaponSlotMixin, TechMixin, TeamMixin, EffectsMixin,
--- ClientWeaponEffectsMixin, PointGiverMixin are all already loaded.
-ModLoader.SetupFileHook("lua/Weapons/Marine/Railgun.lua", "lua/Combat/ExoSpecialWeapon.lua", "post")
--- Claw damage never scaled with Weapons upgrades at all (unlike Minigun/Railgun,
--- which both explicitly implement GetIsAffectedByWeaponUpgrades) - see Combat/Claw.lua.
-ModLoader.SetupFileHook("lua/Weapons/Marine/Claw.lua", "lua/Combat/Claw.lua", "post")
 
 -- Aliens
 ModLoader.SetupFileHook("lua/GUIAlienHUD.lua", "lua/CNBalance/GUI/GUIAlienHUD.lua", "replace" )
@@ -247,7 +222,6 @@ ModLoader.SetupFileHook("lua/Weapons/Alien/Shockwave.lua", "lua/CNBalance/Weapon
 
 ModLoader.SetupFileHook("lua/Weapons/Alien/Ability.lua", "lua/CNBalance/Weapons/Alien/Ability.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Alien/Parasite.lua", "lua/CNBalance/Weapons/Alien/Parasite.lua", "post")
-ModLoader.SetupFileHook("lua/Weapons/Alien/BiteLeap.lua", "lua/CNBalance/Weapons/Alien/BiteLeap.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Alien/XenocideLeap.lua", "lua/CNBalance/Weapons/Alien/XenocideLeap.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Alien/SwipeBlink.lua", "lua/CNBalance/Weapons/Alien/SwipeBlink.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Alien/Gore.lua", "lua/CNBalance/Weapons/Alien/Gore.lua", "post")

@@ -35,9 +35,11 @@ function GUICannonDisplay:Initialize()
     self.clipText, self.clipTextBg = self:CreateItem(45, 134)
     self.ammoText, self.ammoTextBg = self:CreateItem(177, 134)
     
-    -- Separator removed: the "/" character renders as a decimal point in
-    -- LMGFont (a 7-segment LED font), producing "0.04" when clip=0, ammo=04.
-    -- The clip and ammo panels are already visually separated by the texture.
+    local slash, slashBg = self:CreateItem(110, 134)
+    slash:SetFontName(Fonts.kAgencyFB_Large_Bold)
+    slash:SetText("/")
+    slashBg:SetFontName(Fonts.kAgencyFB_Large_Bold)
+    slashBg:SetText("/")
     
     self.flashInOverlay = GUIManager:CreateGraphicItem()
     self.flashInOverlay:SetSize( Vector(256, 256, 0) )

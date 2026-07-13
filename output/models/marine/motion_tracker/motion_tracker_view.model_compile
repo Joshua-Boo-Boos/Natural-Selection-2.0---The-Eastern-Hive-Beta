@@ -1,9 +1,0 @@
-geometry "motion_tracker_view.fbx"
-animation "initial_pose" "motion_tracker_view.fbx" from 0 to 0
-animation "idle" "motion_tracker_view.fbx" loop from 10 to 31
-animation "holster" "motion_tracker_view.fbx" from 40 to 51
-animation "draw" "motion_tracker_view.fbx" from 60 to 71
-animation "sprint" "motion_tracker_view.fbx" loop from 80 to 101
-animation "run" "motion_tracker_view.fbx" loop from 110 to 131
-animation "jump" "motion_tracker_view.fbx" from 140 to 156
-animation "stomped" "motion_tracker_view.fbx" from 165 to 176

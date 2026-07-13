@@ -58,7 +58,9 @@ end
 -- Call all dirty sensorblips
 --
 local gLastUpdate = 0
-local kSensorUpdateInterval = 0
+-- Perf: 0 = flush every server tick. Sensor blips are minimap visuals;
+-- ~7 Hz is visually identical and cuts the flush loop by ~75%.
+local kSensorUpdateInterval = 0.15
 local function DetectableMixinOnUpdateServer()
 
     PROFILE("DetectableMixin:OnUpdateServer")
@@ -146,12 +148,21 @@ function DetectableMixin:OnDestroy()
 
 end
 
+-- Perf: movement only matters to a sensor blip if one exists (to move it)
+-- or the entity is currently detected (to create it). Undetected entities
+-- previously flooded the dirty set on every move tick just to no-op in
+-- UpdateSensorBlip. SetDetected/OnKill still insert unconditionally, so
+-- blip creation and cleanup paths are unchanged.
 function DetectableMixin:SetOrigin()
-    DetectableMixinDirtyTable:Insert(self:GetId())
+    if self.detected or self.sensorBlipId ~= Entity.invalidId then
+        DetectableMixinDirtyTable:Insert(self:GetId())
+    end
 end
 
 function DetectableMixin:SetCoords()
-    DetectableMixinDirtyTable:Insert(self:GetId())
+    if self.detected or self.sensorBlipId ~= Entity.invalidId then
+        DetectableMixinDirtyTable:Insert(self:GetId())
+    end
 end
 
 function DetectableMixin:OnKill()

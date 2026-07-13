@@ -35,22 +35,6 @@ debug.appendtoenum(kDeathMessageIcon, "TeamBuildAbility")
 debug.appendtoenum(kDeathMessageIcon, "AcidRocket")
 debug.appendtoenum(kDeathMessageIcon, "ShadowStep")
 
--- Exo weapon-mode killfeed icons (rendered by CNBalance/GUI/GUIDeathMessagesExo.lua's
--- custom row builder, resolved by Combat/ExoSpecialWeapon.lua's mode-aware
--- GetDeathIconIndex). Console death-message text is generated directly from
--- these enum key names (EnumToString), so the names below ARE the exact
--- console text requested: "ExoFlamethrower", "ExoGrenadeLauncher", "ExoWelder",
--- "ExoSelfDestruct".
---   ExoFlamethrowerBurn = the flamethrower's fire-pool (ground Flame) DOT kills.
---   Rendered with a skull icon before the flamethrower icon; its console text is
---   remapped back to "ExoFlamethrower" (GUIDeathMessagesExo.lua's EnumToString
---   wrap) so ALL flamethrower kills read "ExoFlamethrower" regardless of source.
-debug.appendtoenum(kDeathMessageIcon, "ExoFlamethrower")
-debug.appendtoenum(kDeathMessageIcon, "ExoFlamethrowerBurn")
-debug.appendtoenum(kDeathMessageIcon, "ExoWelder")
-debug.appendtoenum(kDeathMessageIcon, "ExoGrenadeLauncher")
-debug.appendtoenum(kDeathMessageIcon, "ExoSelfDestruct")
-
 debug.appendtoenum(kMinimapBlipType, "HeavyMarine")
 debug.appendtoenum(kMinimapBlipType, "DevouredPlayer")
 debug.appendtoenum(kMinimapBlipType, "BioformSuppressor")
