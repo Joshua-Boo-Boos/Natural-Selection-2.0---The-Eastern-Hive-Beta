@@ -141,6 +141,7 @@ local kButtonLabelOverride =
     [kTechId.Cannon]             = "CANNON",
 }
 
+
 local function BtnLabelText(tid)
     local name = kButtonLabelOverride[tid] or string.upper(GetDisplayName(tid))
     return string.format("%s  %d", name, GetPrototypeCost(tid))
@@ -220,17 +221,17 @@ local function BuildDescriptions()
     d[kTechId.Cannon]  = "GAUSS CANNON\n\nSlow, heavy rounds with\na small area blast."
 
     d[kTechId.DualMinigunExosuit]         = "DUAL MINIGUNS\n\nTwo rapid-fire miniguns\nfor sustained damage."
-    d[kTechId.DualRailgunExosuit]         = "DUAL RAILGUNS\n\nTwo charge railguns.\nHold to charge, release\nto fire a powerful shot."
+    d[kTechId.DualRailgunExosuit]         = "DUAL RAILGUNS\n\nTwo charge railguns.\nHold to charge, release\nto fire a powerful shot.\n\nRequires the Gauss (Cannon)\ntech researched\n(Prototype Lab -> Gauss)."
     d[kTechId.DualFlamethrowerExosuit]    = "DUAL FLAMETHROWERS\n\nTwin flame projectors.\n5 seconds of fire before\noverheat; 5 sec cooldown."
     d[kTechId.MinigunClawExosuit]         = "MINIGUN + CLAW\n\nRight: rapid-fire minigun.\nLeft: claw (melee strike)."
-    d[kTechId.RailgunClawExosuit]         = "RAILGUN + CLAW\n\nRight: charge railgun.\nLeft: claw (melee strike)."
+    d[kTechId.RailgunClawExosuit]         = "RAILGUN + CLAW\n\nRight: charge railgun.\nLeft: claw (melee strike).\n\nRequires the Gauss (Cannon)\ntech researched\n(Prototype Lab -> Gauss)."
     d[kTechId.FlamethrowerClawExosuit]    = "FLAMETHROWER + CLAW\n\nRight: flame projector\n(5 sec before overheat).\nLeft: claw (melee strike)."
 
 
     d[kTechId.PrototypeExoArmour]         = "ARMOUR PLATING\n\n+100 armour points\nto the exosuit."
     d[kTechId.PrototypeExoExtraFuel]      = "EXTRA FUEL\n\nExo thruster fuel\nlasts 30% longer."
     d[kTechId.PrototypeEmergencyEjection] = "EMERGENCY EJECTION\n\nSurvive a lethal hit by\nautomatically ejecting.\nThe exosuit is lost."
-    d[kTechId.PrototypeSelfDestruct]      = "SELF-DESTRUCT\n\nOn death: 200 damage to\nall aliens within 5m."
+    d[kTechId.PrototypeSelfDestruct]      = "SELF-DESTRUCT\n\nOn death: damage to aliens\nwithin 5m.\nDamage: 100/0m -> 0/5m."
     d[kTechId.PrototypeResupply]          = "RESUPPLY\n\nTeammates press USE on\nyou to receive ammo.\n15 second cooldown.\n10 charges per exosuit\n(persists if you eject)."
 
 
@@ -554,6 +555,15 @@ function GUIPrototypeLabBuyMenu:GetTrackUnlocked(track)
     return GetHasTech(Client.GetLocalPlayer(), specId)
 end
 
+-- Whether a base's EXTRA research prerequisite (if any) is met. Bases without an entry in
+-- kPrototypeBaseRequiresTech (shared, PrototypeTechData.lua) are always available; the Railgun
+-- combos require the Gauss (Cannon) tech. Server enforces the same via Marine:AttemptToBuy.
+function GUIPrototypeLabBuyMenu:GetBaseTechAvailable(techId)
+    local reqTech = kPrototypeBaseRequiresTech and kPrototypeBaseRequiresTech[techId]
+    if not reqTech then return true end
+    return GetHasTech(Client.GetLocalPlayer(), reqTech) == true
+end
+
 -- The experimental UPGRADES for a track require the corresponding Experimental
 -- Technologies research (in addition to the base speciality).
 function GUIPrototypeLabBuyMenu:GetExperimentalUnlocked(track)
@@ -594,6 +604,7 @@ function GUIPrototypeLabBuyMenu:GetFinalPurchasable()
         anySelected = true
         if self:GetAlreadyOwnsBase(baseTechId) then return false end
         if not self:GetTrackUnlocked(track) then return false end
+        if not self:GetBaseTechAvailable(baseTechId) then return false end
     end
     if not anySelected then return false end
     return PlayerUI_GetPersonalResources() >= self:GetTotalCost()
@@ -719,7 +730,9 @@ function GUIPrototypeLabBuyMenu:Update(deltaTime)
         elseif btn.Kind == "base" then
             local track      = btn.Track
             local tid        = btn.TechId
-            local unlocked   = self:GetTrackUnlocked(track)
+            -- "unlocked" folds in both the speciality tech AND any extra base prerequisite
+            -- (Gauss for the Railgun combos), so a gated-but-unresearched base shows LOCKED.
+            local unlocked   = self:GetTrackUnlocked(track) and self:GetBaseTechAvailable(tid)
             local owned      = self:GetAlreadyOwnsBase(tid)
             local isSelected = (self.selectedBases[track] == tid)
 
@@ -861,7 +874,7 @@ function GUIPrototypeLabBuyMenu:SendKeyEvent(key, down)
                 local track = btn.Track
                 local tid   = btn.TechId
                 local owned = self:GetAlreadyOwnsBase(tid)
-                if self:GetTrackUnlocked(track) and not owned then
+                if self:GetTrackUnlocked(track) and self:GetBaseTechAvailable(tid) and not owned then
                     local currentBase = self.selectedBases[track]
                     if currentBase == tid then
                         -- Clicking the currently-selected base of this track deselects it.

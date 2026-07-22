@@ -254,9 +254,9 @@ if Server then
     -- the eject (exo stuck at 0 HP) and never damaging nearby enemies.
     local kSelfDestructGLSound = PrecacheAsset("sound/NS2.fev/marine/common/explode")
     local kSelfDestructRange  = 5    -- AOE radius in metres
-    local kSelfDestructDamage = 200
+    local kSelfDestructDamage = 100
 
-    -- Shared helper: 200 damage over a 5 m radius to all "Live" entities, applied
+    -- Shared helper: 100 damage over a 5 m radius to all "Live" entities, applied
     -- EXACTLY like a grenade launcher grenade — LOS-checked (targets behind walls
     -- are spared) with distance falloff, and friendly-fire rules handled by DoDamage.
     -- Called from OnKill (normal death) AND AttemptToKill (Emergency Ejection path).
@@ -307,10 +307,11 @@ if Server then
         -- holds regardless of the server's friendly-fire setting.
         local exoTeam = exo.GetTeamNumber and exo:GetTeamNumber()
 
-        -- Deal EXACTLY kSelfDestructDamage (200) of kDamageType.Normal, LOS-checked
-        -- with linear distance falloff (same shape as a GL grenade). We drive the
-        -- armour/health split ourselves (GetDamageByType -> TakeDamage) so the type
-        -- is guaranteed Normal instead of inheriting whatever the doer weapon's own
+        -- Deal up to kSelfDestructDamage (100) of kDamageType.Normal, LOS-checked, with a
+        -- LINEAR distance falloff: full 100 at 0 m dropping straight to 0 at kSelfDestructRange
+        -- (5 m), so damage = 100 * (1 - dist/5). Closer targets take the most, edge targets take
+        -- almost none. We drive the armour/health split ourselves (GetDamageByType -> TakeDamage)
+        -- so the type is guaranteed Normal instead of inheriting whatever the doer weapon's own
         -- GetDamageType() returns (Railgun / Flame / Structural / ...).
         local ents = GetEntitiesWithMixinWithinRange("Live", origin, kSelfDestructRange)
         local radiusSquared = kSelfDestructRange * kSelfDestructRange
@@ -321,7 +322,10 @@ if Server then
                 local targetOrigin = GetTargetOrigin(target)
                 local distSq = (targetOrigin - origin):GetLengthSquared()
                 if distSq <= radiusSquared and not GetWallBetween(origin, targetOrigin, target) then
-                    local frac = Clamp(distSq / radiusSquared, 0, 1)
+                    -- LINEAR in distance (not distSq): take the actual distance so the damage
+                    -- decreases in a straight line from 100 (0 m) to 0 (5 m).
+                    local dist = math.sqrt(distSq)
+                    local frac = Clamp(dist / kSelfDestructRange, 0, 1)
                     local dmg  = kSelfDestructDamage * (1 - frac)
                     if dmg > 0 then
                         local dir = GetNormalizedVector(targetOrigin - origin)

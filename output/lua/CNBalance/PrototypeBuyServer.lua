@@ -93,6 +93,14 @@ function Marine:AttemptToBuy(techIds)
         return false
     end
 
+    -- Extra research gate (authoritative): the Railgun exo combos require the Gauss (Cannon)
+    -- tech. ProcessBuyAction routes prototype bundles straight here, bypassing the tech tree,
+    -- so this must be checked explicitly or a client could buy a Railgun exo without Gauss.
+    local reqTech = kPrototypeBaseRequiresTech and kPrototypeBaseRequiresTech[baseTechId]
+    if reqTech and not GetHasTech(self, reqTech) then
+        return false
+    end
+
     -- Ownership guards: refuse duplicates.
     if baseTechId == kTechId.Jetpack and self:isa("JetpackMarine") then
         return false

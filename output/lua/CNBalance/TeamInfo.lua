@@ -45,7 +45,7 @@ local networkVars =
     -- Server-computed respawn-time extension for this team, networked so the HUD shows the
     -- SAME value to players and spectators (client-side recompute only knows the local
     -- viewer's tech tree). See GetRespawnTimeExtend / UpdateInfo.
-    respawnTimeExtension = "float (0 to 11 by 0.1)"
+    respawnTimeExtension = "float (-1 to 11 by 0.1)"
 }
 
 AddMixinNetworkVars(TeamMixin, networkVars)

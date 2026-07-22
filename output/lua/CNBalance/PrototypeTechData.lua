@@ -41,6 +41,17 @@ kPrototypeExoCombos = {
     [kTechId.FlamethrowerClawExosuit]  = "FlamethrowerClaw",
 }
 
+-- EXTRA research gate for specific base combos, on TOP of the track speciality. The Railgun
+-- exo weapon is locked behind the Gauss (Cannon) prototype-lab tech, so the Dual Railgun and
+-- Railgun + Claw combos require kTechId.CannonPrototypeLab to be researched before they can be
+-- bought. Enforced in BOTH the buy GUI (button lock) and the server AttemptToBuy (authoritative)
+-- so it cannot be bypassed. Matches the tech tree, which lists CannonPrototypeLab as a
+-- prerequisite of kTechId.DualRailgunExosuit (MarineTeam.lua).
+kPrototypeBaseRequiresTech = {
+    [kTechId.DualRailgunExosuit] = kTechId.CannonPrototypeLab,
+    [kTechId.RailgunClawExosuit] = kTechId.CannonPrototypeLab,
+}
+
 -- Base items: Jetpack, Cannon (NO Jumppack) + all exo combos.
 kPrototypeBaseTechIds = {}
 for _, t in ipairs({ kTechId.Jetpack, kTechId.Cannon }) do

@@ -1,12 +1,32 @@
 if Client then
 
+    -- True once the round is actually running (state == Started). Anything below Started
+    -- (NotStarted / WarmUp / PreGame / Countdown) is the pre-game phase; post-game win/draw
+    -- states are ABOVE Started, so this only treats the genuine pre-game window as "not yet".
+    local function GetGameHasStarted()
+        local gameInfo = GetGameInfoEntity()
+        return gameInfo ~= nil and gameInfo:GetState() >= kGameState.Started
+    end
+
     -- Alien vision is an alien-only screen effect. Marine-team spectators must
     -- never see it - this includes respawning marines, who are MarineSpectators
     -- (a marine-team spectator) for the whole time they are being spawned by an
     -- Infantry Portal. Without this guard such a player could press the toggle
     -- (F) and turn Alien Vision on while spawning.
     local function GetSpectatorCanUseAlienVision(self)
-        return not (self.GetTeamType and self:GetTeamType() == kMarineTeamType)
+        -- Never for marine-team spectators.
+        if self.GetTeamType and self:GetTeamType() == kMarineTeamType then
+            return false
+        end
+        -- Pre-game guard: before the round starts, a player who has chosen marine can briefly
+        -- be an unassigned/neutral spectator (GetTeamType() is not yet kMarineTeamType), which
+        -- previously let a soon-to-be marine turn Alien Vision on during pre-game. In pre-game,
+        -- only allow it for a genuine ALIEN-team spectator; everyone else waits for game start.
+        if not GetGameHasStarted()
+           and not (self.GetTeamType and self:GetTeamType() == kAlienTeamType) then
+            return false
+        end
+        return true
     end
 
     local function SetSpectatorAlienVision(self, state)

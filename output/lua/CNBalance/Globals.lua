@@ -162,6 +162,37 @@ function GetRespawnTimeExtend(player,teamIndex, _gameLength)
         return 0
     end
 
+    -- ── ALIENS: original NON-scaled respawn. Aliens do NOT get the time ramp or the crowd/
+    -- tech growth - MARINES are the only team with the scaled (exponential-like) curve. The
+    -- alien respawn is simply the base (kAlienSpawnTime, 10s) minus 1s per BUILT Hive, held to
+    -- a hard 9s true minimum. Since the base is 10s the extension is floored at -1 (=> 9s) and
+    -- capped at 0 (never longer than the 10s base):
+    --     0 Hives -> 10s   |   1 Hive -> 9s   |   2+ Hives -> 9s (floored, the true minimum).
+    -- An Origin Form start (0 built Hives) sits at the 10s base and reaches the 9s minimum once
+    -- the first Hive finishes. GetNumHives counts only BUILT hives, and is recomputed each tick
+    -- so Hives gained/lost change the respawn live.
+    if teamIndex == kAlienTeamType then
+        -- Count only BUILT hives (alive AND fully constructed). GetActiveHiveCount checks
+        -- GetIsAlive()+GetIsBuilt(); the networked GetNumHives is captured tech points (would
+        -- count a half-built hive), so prefer the real built count. GetRespawnTimeExtend runs
+        -- server-side (Team.lua queue + TeamInfo networking) and the result is networked to
+        -- clients, so the server-only team method is safe here; fall back to the netvar if
+        -- the team object is somehow unavailable.
+        local hives = 0
+        local gr    = GetGamerules and GetGamerules()
+        local team  = gr and gr.GetTeam and gr:GetTeam(teamIndex)
+        if team and team.GetActiveHiveCount then
+            hives = team:GetActiveHiveCount()
+        else
+            local info = GetTeamInfoEntity(teamIndex)
+            hives = (info and info.GetNumHives and info:GetNumHives()) or 0
+        end
+        local base   = kAlienSpawnTime or 10
+        local minExt = 9 - base   -- keep total respawn >= 9s (== -1 when base is 10)
+        return Clamp(-1 * hives, minExt, 0)
+    end
+
+    -- ── MARINES ONLY from here down (scaled ramp + 0.25s per BUILT Infantry Portal). ──
     -- Factors that LENGTHEN respawn: crowd size over the match minimum + researched tech.
     local lengthen = math.max( GetPlayersAboveLimit(teamIndex) , 0 ) * kRespawnSecondsPerPlayer
     -- TEAM-based tech check (the team's tech tree, by team number) so it evaluates the same
@@ -187,34 +218,25 @@ function GetRespawnTimeExtend(player,teamIndex, _gameLength)
     -- late; marines use the higher power so their curve is flatter through the early/mid game.
     -- The convex envelope applies ONLY to the growth, so the rate-of-growth (2nd derivative)
     -- rises over the round as originally requested.
-    local power  = (teamIndex == kMarineTeamType) and kMarineRespawnRampPower or kAlienRespawnRampPower
+    local power  = kMarineRespawnRampPower   -- marine-only path (aliens returned early above)
     local t      = Clamp(x / GetRespawnRampSeconds(), 0, 1)
     local convex = t ^ power
     local convexGrowth = convex * growthTarget
 
-    -- FLAT structure reduction - deliberately NOT scaled by the convex envelope (per request:
-    -- "do not scale the 0.25s per IP and 1s per Hive"). More respawn structures = faster
-    -- respawn, at full strength the whole game:
-    --   Marines: 0.25s per Infantry Portal (ALL IPs), capped at the map-wide limit
-    --            kMaxInfantryPortalsGlobal (=12) -> max 12 * 0.25 = 3s.
-    --   Aliens : 1s per built Hive - NO fixed cap on the count (aliens top out at ~5 Hives).
-    --            The reduction is bounded only by the final Clamp's 0 floor below, which
-    --            guarantees the 10s alien MINIMUM is always respected no matter how many
-    --            Hives exist (e.g. an absurd 100 Hives -> reduction just floors respawn at 10s).
-    -- Recomputed every tick from the CURRENT count, so structures gained/lost change it live.
+    -- FLAT Infantry-Portal reduction - deliberately NOT scaled by the convex envelope: 0.25s
+    -- per BUILT IP, capped at the map-wide limit kMaxInfantryPortalsGlobal (=12) -> max 3s.
+    -- info.numInfantryPortals comes from GetNumActiveInfantryPortals (GetIsUnitActive), so ONLY
+    -- constructed/active IPs count - an unbuilt/ghost IP grants NO reduction until it finishes.
+    -- Recomputed each tick from the CURRENT built count, so IPs gained/lost change it live.
     local flatReduce = 0
     local info = GetTeamInfoEntity(teamIndex)
-    if info then
-        if teamIndex == kMarineTeamType and info.numInfantryPortals then
-            local ipCap = kMaxInfantryPortalsGlobal or 12
-            flatReduce = math.min(info.numInfantryPortals, ipCap) * 0.25
-        elseif teamIndex == kAlienTeamType and info.GetNumHives then
-            flatReduce = info:GetNumHives() * 1
-        end
+    if info and info.numInfantryPortals then
+        local ipCap = kMaxInfantryPortalsGlobal or 12
+        flatReduce = math.min(info.numInfantryPortals, ipCap) * 0.25
     end
 
-    -- Final extension = scaled growth minus the flat structure reduction, clamped to [0, 11].
-    -- The 0 floor guarantees the MINIMUM is always the base (9s marines / 10s aliens) no
-    -- matter how many structures the team has; the +11 cap keeps the MAXIMUM at 20s/21s.
+    -- Final MARINE extension = scaled growth minus the flat IP reduction, clamped to [0, 11].
+    -- The 0 floor guarantees the marine MINIMUM stays the 9s base no matter how many IPs; the
+    -- +11 cap keeps the marine MAXIMUM at 20s.
     return Clamp(convexGrowth - flatReduce, 0, 11)
 end
