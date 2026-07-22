@@ -1,3 +1,78 @@
+-- Fix: vanilla GetWeaponLoadoutClass returns the LEFT slot weapon class name.
+-- For Claw-left configs, "Claw" has no precached cosmetic material → crash.
+-- Remap to the appropriate skin class based on the RIGHT arm weapon:
+--   Claw + Minigun  → "Minigun"  (exosuit_cm textures)
+--   Claw + anything → "Railgun"  (exosuit_cr textures)
+--
+-- ALSO fixes the dropped Exosuit case: vanilla's Exosuit branch only handles
+-- "_mm.model"/"_rr.model" model suffixes and returns nil for everything else.
+-- Now that dropped Exosuits use the correct per-chassis _cm/_cr models
+-- (CNBalance/Exosuit.lua), that nil spams "ERROR: Exo with invalid weapon
+-- class, skin update failure" every render frame (the skin state never
+-- resolves, so it re-dirties forever). Map _cm/_cr here too, and never return
+-- nil (a safe default keeps the skin pipeline happy - claw chassis are forced
+-- to the default variant elsewhere, so the cosmetic-material branch that would
+-- need an exact class match is skipped anyway).
+if Client then
+    local baseGetWeaponLoadoutClass = ExoVariantMixin.GetWeaponLoadoutClass
+    function ExoVariantMixin:GetWeaponLoadoutClass()
+
+        -- Dropped Exosuit / ReadyRoomExo: resolve directly from the model
+        -- suffix (base only knows _mm/_rr).
+        if self:isa("Exosuit") or self:isa("ReadyRoomExo") then
+            local modelName = self:GetModelName()
+            if modelName then
+                if StringEndsWith(modelName, "_mm.model")
+                or StringEndsWith(modelName, "_cm.model") then
+                    return "Minigun"
+                elseif StringEndsWith(modelName, "_rr.model")
+                    or StringEndsWith(modelName, "_cr.model") then
+                    return "Railgun"
+                end
+            end
+            return "Railgun"   -- safe fallback, never nil
+        end
+
+        local cls = baseGetWeaponLoadoutClass(self)
+        if cls == "Claw" then
+            local wep = self:GetActiveWeapon()
+            if wep then
+                local right = wep:GetRightSlotWeapon()
+                if right and right:GetClassName() == "Minigun" then
+                    return "Minigun"
+                end
+            end
+            return "Railgun"
+        end
+        return cls
+    end
+
+    -- Safety net requested for claw combos: if the resolved loadout class has NO
+    -- cosmetic material for the player's chosen skin, render the STANDARD skin
+    -- instead of letting the base render assert on the missing material. With the
+    -- claw->Minigun/Railgun remap above, every real exo skin resolves, so this only
+    -- fires for a genuinely missing texture - exactly the "use the standard skin"
+    -- fallback. Applies to both the view and world models (both go through the base).
+    local baseOnUpdateRender = ExoVariantMixin.OnUpdateRender
+    function ExoVariantMixin:OnUpdateRender()
+        if self.dirtySkinState and self.exoVariant ~= nil and self.exoVariant ~= kDefaultExoVariant then
+            local weaponClass = self.GetWeaponLoadoutClass and self:GetWeaponLoadoutClass()
+            -- Probe for the material: GetPrecachedCosmeticMaterial asserts if the
+            -- class/skin has none, so a failed pcall means "genuinely missing".
+            local hasMat = weaponClass ~= nil
+                and pcall(GetPrecachedCosmeticMaterial, weaponClass, self.exoVariant)
+            if not hasMat then
+                local saved = self.exoVariant
+                self.exoVariant       = kDefaultExoVariant
+                baseOnUpdateRender(self)
+                self.exoVariant       = saved
+                self.clientExoVariant = saved   -- settle skin state (avoid a re-dirty loop)
+                return
+            end
+        end
+        baseOnUpdateRender(self)
+    end
+end
 
 function ExoVariantMixin:SetExoVariant(variant)
     self.exoVariant = self.GetExoVariantOverride and self:GetExoVariantOverride(variant) or variant

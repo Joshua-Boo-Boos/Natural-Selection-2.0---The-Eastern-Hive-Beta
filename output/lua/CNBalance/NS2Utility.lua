@@ -208,7 +208,11 @@ function PlayerUI_GetGameTimeString()
         respawnDuration = respawnDuration + kAlienSpawnTime
     end
     
-    local respawnExtend = GetRespawnTimeExtend(player, teamIndex,gameTime)
+    -- Read the SERVER-computed, networked per-team respawn extension (TeamInfo) so the HUD
+    -- shows the SAME value to players and spectators. Recomputing client-side would only see
+    -- the LOCAL viewer's tech tree (spectators have none) -> the spectator/player mismatch.
+    local teamInfo = GetTeamInfoEntity(teamIndex)
+    local respawnExtend = (teamInfo and teamInfo.GetRespawnTimeExtension and teamInfo:GetRespawnTimeExtension()) or 0
     respawnDuration = respawnDuration + respawnExtend
     
     if respawnDuration > 1 then 

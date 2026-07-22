@@ -14,6 +14,12 @@ AutoWeldMixin.type = "AutoWeld"
 --AutoWeldMixin.kWeldArmorPerSecond = 8
 AutoWeldMixin.kWeldInterval = 0.2 -- weld hits 5x per second.
 AutoWeldMixin.kRegenInterval = 0.5
+-- Delay (seconds) after last taking damage before over-time HP regen begins.
+-- This is the PREVIOUS behaviour's delay (the combat timeout, kCombatTimeOut = 3s)
+-- PLUS 2 seconds = 5s total. Regen also still requires being out of combat (see
+-- SharedUpdate). Applies to Marine/JetpackMarine (the only classes with
+-- GetAutoHealPerSecond). The DELAY only - tech may still change the heal AMOUNT/cap.
+AutoWeldMixin.kHealthRegenDelay = 5
 
 AutoWeldMixin.expectedMixins =
 {
@@ -61,13 +67,12 @@ if Server then
 
     local function SharedUpdate(self)
 
-        -- Don't auto weld if in combat or took damage too recently.
         local now = Shared.GetTime()
-        if self:__GetIsInCombatForAutoRepair(now) then
-            return 
-        end
 
-        if now > self.timeNextWeld then
+        -- Armor auto-weld: unchanged - suppressed for the full combat timeout.
+        local inCombat = self:__GetIsInCombatForAutoRepair(now)
+
+        if not inCombat and now > self.timeNextWeld then
             self.timeNextWeld = now + AutoWeldMixin.kWeldInterval
 
             local armorRegen = self:GetAutoWeldArmorPerSecond(GetHasTech(self, kTechId.ArmorRegen))
@@ -82,18 +87,28 @@ if Server then
             end
         end
 
+        -- Over-time HP regen (Marine/JetpackMarine): tops health back up to the regen
+        -- cap (~80 HP). Requires being OUT of combat (unchanged condition) AND that
+        -- kHealthRegenDelay seconds (previous combat timeout + 2s = 5s) have passed
+        -- since the last damage TAKEN. Independent of tech (tech changes the heal
+        -- AMOUNT/cap, not this delay).
+        if self.GetAutoHealPerSecond then
 
-        if self.GetAutoHealPerSecond and now > self.timeNextSustain then
-            self.timeNextSustain = now + AutoWeldMixin.kRegenInterval
+            local healReady = not inCombat
+                and now > (self:GetTimeOfLastDamage() or 0) + AutoWeldMixin.kHealthRegenDelay
 
-            local lifeSustainResearched = GetHasTech(self, kTechId.ArmorStation)
+            if healReady and now > self.timeNextSustain then
+                self.timeNextSustain = now + AutoWeldMixin.kRegenInterval
 
-            local healthCap = lifeSustainResearched and kLifeSustainMaxCap or kLifeRegenMaxCap
+                local lifeSustainResearched = GetHasTech(self, kTechId.ArmorStation)
 
-            local healthToRegen = self:GetMaxHealth() * healthCap - self:GetHealth()
-            if healthToRegen > 0 then
-                local regenPerSecond = self:GetAutoHealPerSecond(lifeSustainResearched)
-                self:Heal(math.min(AutoWeldMixin.kRegenInterval * regenPerSecond,healthToRegen))
+                local healthCap = lifeSustainResearched and kLifeSustainMaxCap or kLifeRegenMaxCap
+
+                local healthToRegen = self:GetMaxHealth() * healthCap - self:GetHealth()
+                if healthToRegen > 0 then
+                    local regenPerSecond = self:GetAutoHealPerSecond(lifeSustainResearched)
+                    self:Heal(math.min(AutoWeldMixin.kRegenInterval * regenPerSecond,healthToRegen))
+                end
             end
         end
 

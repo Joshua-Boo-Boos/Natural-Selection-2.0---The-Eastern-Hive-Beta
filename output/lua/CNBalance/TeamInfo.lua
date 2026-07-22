@@ -41,7 +41,11 @@ local networkVars =
     spawnQueueTotal = "integer (0 to 64)",  --max val should be ref'd from somewhere
     supplyUsed = "integer (0 to " ..kStartSupply + 10 * kSupplyEachTechPoint .. ")",
     maxSupply = "integer (0 to " .. kStartSupply + 10 * kSupplyEachTechPoint .. ")",
-    kills = "integer (0 to 9999)"
+    kills = "integer (0 to 9999)",
+    -- Server-computed respawn-time extension for this team, networked so the HUD shows the
+    -- SAME value to players and spectators (client-side recompute only knows the local
+    -- viewer's tech tree). See GetRespawnTimeExtend / UpdateInfo.
+    respawnTimeExtension = "float (0 to 11 by 0.1)"
 }
 
 AddMixinNetworkVars(TeamMixin, networkVars)
@@ -304,6 +308,20 @@ function TeamInfo:UpdateInfo()
         self.personalResources = 0
         for index, player in ipairs(self.team:GetPlayers()) do
             self.personalResources = self.personalResources + player:GetResources()
+        end
+
+        -- Authoritative respawn-time extension for this team, computed on the server and
+        -- networked so the HUD shows the SAME value to players and spectators. Only for the
+        -- two playing teams (marine/alien); GetRespawnTimeExtend takes the team NUMBER.
+        local teamNum = self:GetTeamNumber()
+        if (teamNum == kTeam1Index or teamNum == kTeam2Index) and GetRespawnTimeExtend then
+            local gr = GetGamerules and GetGamerules()
+            if gr and gr.GetGameStarted and gr:GetGameStarted() and gr.GetGameStartTime then
+                local gameLength = Shared.GetTime() - gr:GetGameStartTime()
+                self.respawnTimeExtension = GetRespawnTimeExtend(nil, teamNum, gameLength)
+            else
+                self.respawnTimeExtension = 0   -- pre-game: no extension yet
+            end
         end
 
         local rtCount = 0
@@ -612,6 +630,10 @@ end
 
 function TeamInfo:GetPlayerCount()
     return self.playerCount
+end
+
+function TeamInfo:GetRespawnTimeExtension()
+    return self.respawnTimeExtension or 0
 end
 
 Shared.LinkClassToMap("TeamInfo", TeamInfo.kMapName, networkVars)

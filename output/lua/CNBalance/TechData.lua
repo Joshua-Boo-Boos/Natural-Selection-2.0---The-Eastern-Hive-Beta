@@ -1690,5 +1690,27 @@ function BuildTechData()
         [kTechDataCooldown] = kRallyCooldown,
     })
 
+    -- ===== Prototype Lab overhaul (buy-window subset) =====
+    -- Exosuit Experimental Technologies research (gates the exo upgrades).
+    table.insert(techData, {
+        [kTechDataId] = kTechId.ExosuitExperimentalTech,
+        [kTechDataDisplayName] = "Exosuit - Experimental Technologies",
+        [kTechDataTooltipInfo] = "Unlocks the experimental modifications for the Exosuit.",
+        [kTechDataResearchName] = "Exosuit - Experimental Technologies",
+        [kTechDataCostKey] = 15,
+        [kTechDataResearchTimeKey] = 15,
+    })
+    -- Kept exo experimental upgrades (costs match the buy window / GetPrototypeCost).
+    table.insert(techData, { [kTechDataId] = kTechId.PrototypeExoArmour,         [kTechDataDisplayName] = "Armour Plating",     [kTechDataCostKey] = 20 })
+    table.insert(techData, { [kTechDataId] = kTechId.PrototypeExoExtraFuel,      [kTechDataDisplayName] = "Extra Fuel",         [kTechDataCostKey] = 5 })
+    table.insert(techData, { [kTechDataId] = kTechId.PrototypeEmergencyEjection, [kTechDataDisplayName] = "Emergency Ejection",  [kTechDataCostKey] = 5 })
+    table.insert(techData, { [kTechDataId] = kTechId.PrototypeSelfDestruct,      [kTechDataDisplayName] = "Self-Destruct",      [kTechDataCostKey] = 5 })
+    table.insert(techData, { [kTechDataId] = kTechId.PrototypeResupply,          [kTechDataDisplayName] = "Resupply",           [kTechDataCostKey] = 5 })
+    -- Kept exo weapon combos (Dual Minigun/Railgun are vanilla; these are the extras).
+    table.insert(techData, { [kTechDataId] = kTechId.DualFlamethrowerExosuit,    [kTechDataDisplayName] = "Dual Flamethrower",  [kTechDataCostKey] = 55 })
+    table.insert(techData, { [kTechDataId] = kTechId.MinigunClawExosuit,         [kTechDataDisplayName] = "Minigun Claw",       [kTechDataCostKey] = 35 })
+    table.insert(techData, { [kTechDataId] = kTechId.RailgunClawExosuit,         [kTechDataDisplayName] = "Railgun Claw",       [kTechDataCostKey] = 35 })
+    table.insert(techData, { [kTechDataId] = kTechId.FlamethrowerClawExosuit,    [kTechDataDisplayName] = "Flamethrower Claw",  [kTechDataCostKey] = 35 })
+
     return techData
 end

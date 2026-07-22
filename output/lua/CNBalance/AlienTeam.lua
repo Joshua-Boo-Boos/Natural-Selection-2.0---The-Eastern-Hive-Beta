@@ -676,7 +676,14 @@ function AlienTeam:UpdateEggGeneration()
         self.timeLastEggUpdate = Shared.GetTime()
     end
 
-    if self.timeLastEggUpdate + ScaleWithPlayerCount(kEggGenerationRate, #GetEntitiesForTeam("Player", self:GetTeamNumber())) < Shared.GetTime() then
+    local eggInterval = ScaleWithPlayerCount(kEggGenerationRate, #GetEntitiesForTeam("Player", self:GetTeamNumber()))
+
+    -- Origin Form makes every built Hive generate eggs 10% faster (shorter interval).
+    if self:IsOriginForm() then
+        eggInterval = eggInterval * kOriginFormEggGenerationScalar
+    end
+
+    if self.timeLastEggUpdate + eggInterval < Shared.GetTime() then
 
         local hives = GetEntitiesForTeam("Hive", self:GetTeamNumber())
         local builtHives = {}
@@ -853,12 +860,15 @@ function AlienTeam:UpdateTeamAutoHeal()
                         damagePerSecond = math.max(damagePerSecond, kMinOffInfestationHurtPerSecond)
                         local damage = damagePerSecond * deltaTime
 
-                        local attacker
-                        if entity.lastAttackerDidDamageTime and Shared.GetTime() < entity.lastAttackerDidDamageTime + 60 then
-                            attacker = entity:GetLastAttacker()
-                        end
-
-                        entity:DeductHealth(damage, attacker)
+                        -- Off-infestation decay is an ENVIRONMENTAL death: never credit
+                        -- the last player attacker for it. Vanilla passed the last
+                        -- attacker (if they damaged this entity within the past 60s),
+                        -- which mis-credited kills to a marine who had merely grazed the
+                        -- structure/egg earlier. The concrete bug: an Exo self-destruct
+                        -- clips a nearby Egg, the Egg later dies to off-infestation decay,
+                        -- and the kill (with a skull) was wrongly awarded to the Exo.
+                        -- Passing nil makes the decay death uncredited (natural causes).
+                        entity:DeductHealth(damage, nil)
                     end
 
                 end

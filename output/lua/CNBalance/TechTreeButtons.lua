@@ -5,6 +5,8 @@ kTechIdToMaterialOffset[kTechId.MilitaryProtocol] = 190
 kTechIdToMaterialOffset[kTechId.MotionTrack] = 219
 
 kTechIdToMaterialOffset[kTechId.AdvancedArmory] = 99
+-- Prototype Lab overhaul: Exosuit Experimental Technologies research button icon.
+kTechIdToMaterialOffset[kTechId.ExosuitExperimentalTech] = 84
 kTechIdToMaterialOffset[kTechId.GrenadeLauncherUpgrade] = 196
 kTechIdToMaterialOffset[kTechId.CombatBuilder] = 207
 kTechIdToMaterialOffset[kTechId.CombatBuilderTech] = 207

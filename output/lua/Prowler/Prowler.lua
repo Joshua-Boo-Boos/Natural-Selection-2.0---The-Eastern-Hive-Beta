@@ -426,6 +426,17 @@ function Prowler:ModifyVelocity(input, velocity, deltaTime)
                     if (hitTarget.SetCorroded) then
                         hitTarget:SetCorroded()
                     end
+
+                    -- Record that this Prowler reeled/pulled this marine. If the marine
+                    -- then dies to lava or a void (a DeathTrigger) within
+                    -- kProwlerReelKillWindow seconds and no alien lands the killing blow,
+                    -- the Prowler is credited with the kill (see NS2Gamerules:OnEntityKilled).
+                    -- isa("Marine") covers Marine + JetpackMarine and excludes Exos (which
+                    -- cannot be pulled), exactly as required.
+                    if Server and hitTarget:isa("Marine") then
+                        hitTarget._prowlerReelTime     = now
+                        hitTarget._prowlerReelPullerId = self:GetId()
+                    end
                 end
             end
         end

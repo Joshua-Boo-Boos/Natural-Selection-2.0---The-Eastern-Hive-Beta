@@ -161,6 +161,9 @@ function MarineTeam:InitTechTree()
     self.techTree:AddTechInheritance(kTechId.PrototypeLab,kTechId.JetpackPrototypeLab)
     self.techTree:AddTechInheritance(kTechId.PrototypeLab,kTechId.ExosuitPrototypeLab)
     self.techTree:AddTechInheritance(kTechId.PrototypeLab,kTechId.CannonPrototypeLab)
+    -- Prototype Lab overhaul: Exosuit Experimental Technologies research (unlocks the
+    -- exo experimental upgrades in the buy window), researched at the Exosuit Prototype Lab.
+    self.techTree:AddResearchNode(kTechId.ExosuitExperimentalTech, kTechId.ExosuitPrototypeLab, kTechId.None)
     
     -- Jetpack
     self.techTree:AddUpgradeNode(kTechId.JetpackProtoUpgrade,           kTechId.PrototypeLab)

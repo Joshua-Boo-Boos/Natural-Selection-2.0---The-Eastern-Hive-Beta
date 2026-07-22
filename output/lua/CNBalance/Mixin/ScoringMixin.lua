@@ -1,6 +1,9 @@
 ScoringMixin.networkVars.bountyCurrentLife = "integer"
 
 local kBountyCooldownTick = 2
+-- Bounty still decays while in combat, but its decay accrues 40% slower than
+-- when out of combat.
+local kBountyCombatDecaySlow = 0.4
 local baseInitMixin = ScoringMixin.__initmixin
 function ScoringMixin:__initmixin()
     baseInitMixin(self)
@@ -91,21 +94,22 @@ if Server then
     end
 
     function ScoringMixin:CheckBountyCooldown()
-        if self.bountyCurrentLife <= 0 then 
+        if self.bountyCurrentLife <= 0 then
             return true
         end
 
-        if self.GetIsInCombat and self:GetIsInCombat() then     --Reset it during combat
-            self.bountyCooldown = 0
-            return true
+        -- Bounty decays even while in combat now, just 40% slower than out of combat.
+        local decayTick = kBountyCooldownTick
+        if self.GetIsInCombat and self:GetIsInCombat() then
+            decayTick = decayTick * (1 - kBountyCombatDecaySlow)
         end
-        
-        self.bountyCooldown = self.bountyCooldown + kBountyCooldownTick
+
+        self.bountyCooldown = self.bountyCooldown + decayTick
         if self.bountyCooldown > kBountyCooldown then
             self.bountyCooldown = self.bountyCooldown - kBountyCooldown
             self.bountyCurrentLife = math.max(self.bountyCurrentLife - 1,0)
         end
-        
+
         return true
     end
 

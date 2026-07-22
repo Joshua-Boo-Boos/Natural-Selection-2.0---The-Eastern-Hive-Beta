@@ -120,3 +120,20 @@ debug.appendtoenum(kTechId, "AcidRocket")
 debug.appendtoenum(kTechId, "Vortex")
 debug.appendtoenum(kTechId, "VortexShadowStep")
 debug.appendtoenum(kTechId, "PrimalScream")
+
+-- ===== Prototype Lab overhaul (buy-window subset) =====
+-- Kept exo weapon COMBOS (DualMinigunExosuit / DualRailgunExosuit are vanilla).
+-- Grenade-launcher and welder combos are intentionally NOT ported.
+debug.appendtoenum(kTechId, "DualFlamethrowerExosuit")
+debug.appendtoenum(kTechId, "MinigunClawExosuit")
+debug.appendtoenum(kTechId, "RailgunClawExosuit")
+debug.appendtoenum(kTechId, "FlamethrowerClawExosuit")
+-- Exosuit Experimental Technologies research (gates the exo upgrades below).
+-- Jetpack/Cannon experimental tech intentionally NOT ported.
+debug.appendtoenum(kTechId, "ExosuitExperimentalTech")
+-- Kept exo experimental UPGRADES (Power Smash intentionally NOT ported).
+debug.appendtoenum(kTechId, "PrototypeExoArmour")
+debug.appendtoenum(kTechId, "PrototypeExoExtraFuel")
+debug.appendtoenum(kTechId, "PrototypeEmergencyEjection")
+debug.appendtoenum(kTechId, "PrototypeSelfDestruct")
+debug.appendtoenum(kTechId, "PrototypeResupply")

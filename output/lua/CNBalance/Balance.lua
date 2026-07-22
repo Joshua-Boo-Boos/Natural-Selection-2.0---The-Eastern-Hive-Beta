@@ -74,6 +74,11 @@ kAlienSpawnTime = 10 -- 10
 
 kEggGenerationRate = 12  --13
 kAlienEggsPerHive = 2
+-- With the Origin Form tech researched, every built Hive has a 10% HIGHER egg
+-- spawn RATE. Rate = 1/interval, so a +10% rate means the interval is divided by
+-- 1.1 (i.e. multiplied by 1/1.1 ~= 0.90909), NOT multiplied by 0.9 (which would be
+-- a rate of 1/0.9 = +11.11%).
+kOriginFormEggGenerationScalar = 1 / 1.1
 
 kWelderDropCost = 2
 kWelderDropCooldown = 0
@@ -452,7 +457,7 @@ kBlinkEnergyCost = 30 --32
 kHealthOnBlink = 0
 
 --Vokex
-kVokexCost = 42
+kVokexCost = 39
 kVokexUpgradeCost = 5
 
 kVokexShadowStepEnergyCost = 14 -- 13

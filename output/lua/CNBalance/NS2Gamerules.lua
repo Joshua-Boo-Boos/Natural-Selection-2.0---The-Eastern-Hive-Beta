@@ -54,6 +54,22 @@
                  SendTeamMessage(self.team1, kTeamMessageTypes.GameStarted)
                  SendTeamMessage(self.team2, kTeamMessageTypes.GameStarted)
 
+                 -- Reset player resources to normal starting amounts when the game
+                 -- transitions from pre-game to Started (force-start or countdown end).
+                 -- Pre-game grants 100 p-res for testing; clear that on real start.
+                 local function ResetPlayerRes(player, startingRes)
+                     if player.SetResources and player.GetIsAlive and player:GetIsAlive() then
+                         player:SetResources(startingRes)
+                     end
+                     player._preGameResGranted = false
+                 end
+                 for _, p in ipairs(GetEntitiesForTeam("Player", kTeam1Index)) do
+                     ResetPlayerRes(p, kMarineInitialIndivRes)
+                 end
+                 for _, p in ipairs(GetEntitiesForTeam("Player", kTeam2Index)) do
+                     ResetPlayerRes(p, kAlienInitialIndivRes)
+                 end
+
              end
 
              -- On end game, check for map switch conditions
@@ -348,6 +364,7 @@
 
                  self:UpdatePlayerSkill()
                  self:UpdateNumPlayersForScoreboard()
+                 self:UpdatePreGameResources()
 
                  self.gameInfo:SetMarineDeadlockTime(self.team1.deadlockTime)
                  self.gameInfo:SetAlienDeadlockTime(self.team2.deadlockTime)
@@ -361,6 +378,41 @@
 
      end
      
+     -- ── Pre-game: 100 p-res on every spawn ───────────────────────────────────
+     -- While the round has NOT started yet (any state before kGameState.Started),
+     -- give every marine/alien player 100 personal resources each time they spawn,
+     -- so players can freely test purchases until the game state changes.
+     -- The grant fires once per life (tracked by a per-entity flag that resets on
+     -- death; respawns create fresh entities, so each spawn re-grants).
+     local kPreGameSpawnResources = 100
+     function NS2Gamerules:UpdatePreGameResources()
+
+         -- Only during the pre-round period; once the game has started, stop.
+         if self:GetGameState() >= kGameState.Started then
+             return
+         end
+
+         local function ProcessPlayer(player)
+             if not player.SetResources or not player.GetIsAlive then return end
+             if player:GetIsAlive() then
+                 if not player._preGameResGranted then
+                     player:SetResources(kPreGameSpawnResources)
+                     player._preGameResGranted = true
+                 end
+             else
+                 player._preGameResGranted = false
+             end
+         end
+
+         for _, player in ipairs(GetEntitiesForTeam("Player", kTeam1Index)) do
+             ProcessPlayer(player)
+         end
+         for _, player in ipairs(GetEntitiesForTeam("Player", kTeam2Index)) do
+             ProcessPlayer(player)
+         end
+
+     end
+
      function NS2Gamerules:BroadCastVO(_name)
          self.worldTeam:PlayPrivateTeamSound(_name)
          self.team1:PlayPrivateTeamSound(_name)
@@ -429,5 +481,43 @@
 
          return canHear
 
+     end
+
+     -- Credit a Prowler for an environmental (lava / void) kill of a marine it reeled.
+     -- Lava and void pits kill via a DeathTrigger entity, which is passed as BOTH the
+     -- attacker and the doer (see DeathTrigger:DoDamageOverTime / :KillEntity) - never an
+     -- alien weapon. So "attacker is a DeathTrigger" is exactly the case where the game
+     -- world (not an alien) landed the killing blow. If the marine was reeled by a Prowler
+     -- within kProwlerReelKillWindow seconds, reattribute the kill to that Prowler + its
+     -- Rappel weapon. If instead an alien (e.g. a Fade's swipe) dealt the killing blow, the
+     -- attacker is that alien, this branch is skipped, and the alien correctly keeps the kill.
+     local kProwlerReelKillWindow = 5
+
+     local baseOnEntityKilled = NS2Gamerules.OnEntityKilled
+     function NS2Gamerules:OnEntityKilled(targetEntity, attacker, doer, point, direction)
+
+         -- isa("Marine") = Marine + JetpackMarine, and excludes Exos (which cannot be pulled).
+         if targetEntity and targetEntity:isa("Marine")
+            and attacker and attacker:isa("DeathTrigger") then
+
+             local reelTime = targetEntity._prowlerReelTime
+             if reelTime and (Shared.GetTime() - reelTime) <= kProwlerReelKillWindow then
+
+                 local prowler = targetEntity._prowlerReelPullerId
+                                 and Shared.GetEntity(targetEntity._prowlerReelPullerId)
+
+                 -- If the Prowler has died or changed form its entity is gone / no longer a
+                 -- Prowler, so this safely skips (no credit) rather than erroring.
+                 if prowler and prowler:isa("Prowler") then
+                     attacker = prowler
+                     -- Doer = the Prowler's Rappel weapon so the kill is credited "with the
+                     -- Rappel weapon" (its death icon); fall back to the Prowler itself.
+                     local rappelMapName = VolleyRappel and VolleyRappel.kMapName or "volley"
+                     doer = (prowler.GetWeapon and prowler:GetWeapon(rappelMapName)) or prowler
+                 end
+             end
+         end
+
+         baseOnEntityKilled(self, targetEntity, attacker, doer, point, direction)
      end
  end

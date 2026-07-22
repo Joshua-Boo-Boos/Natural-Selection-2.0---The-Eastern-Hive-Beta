@@ -13,6 +13,19 @@ local function GetResearchAllowed(self, techId)
     return available and techId or kTechId.None
 end
 
+-- Each specialised lab offers its "Experimental Technologies" research.
+-- (Only the Exosuit track is ported; jetpack/cannon experimental are intentionally out.)
+PrototypeLab.kExperimentalTechForLab =
+{
+    [kTechId.ExosuitPrototypeLab] = kTechId.ExosuitExperimentalTech,
+}
+
+-- Show the experimental research button only while it is not researched / researching.
+local function GetExperimentalResearchButton(self, techId)
+    local available = not GetHasTech(self, techId) and not GetIsTechResearching(self, techId)
+    return available and techId or kTechId.None
+end
+
 function PrototypeLab:GetTechButtons()
 
     local techId = self:GetTechId()
@@ -22,15 +35,14 @@ function PrototypeLab:GetTechButtons()
         techButtons[1] = GetResearchAllowed(self,kTechId.JetpackProtoUpgrade)
         techButtons[2] = GetResearchAllowed(self,kTechId.ExosuitProtoUpgrade)
         techButtons[5] = GetResearchAllowed(self,kTechId.CannonProtoUpgrade)
+    else
+        -- A specialised lab offers its Experimental Technologies research.
+        local expTech = PrototypeLab.kExperimentalTechForLab[techId]
+        if expTech then
+            techButtons[1] = GetExperimentalResearchButton(self, expTech)
+        end
     end
-    --elseif techId == kTechId.JetpackPrototypeLab then
-    --    techButtons[1] = kTechId.JetpackTech
-    --elseif techId == kTechId.CannonPrototypeLab then
-    --    techButtons[1] = kTechId.CannonTech
-    --elseif techId == kTechId.ExosuitPrototypeLab then
-    --    techButtons[1] = kTechId.ExosuitTech
-    --end
-    
+
     return techButtons
 end
 
@@ -39,27 +51,31 @@ if Server then
     function PrototypeLab:UpdateResearch()
 
         local researchId = self:GetResearchingId()
-        local stationTypeTechId = PrototypeLab.kUpgradeToTargetType[researchId]
+        -- Structure-upgrade research drives the TARGET (variant) node; a normal
+        -- research (Experimental Technologies) drives its OWN node.
+        local nodeId = PrototypeLab.kUpgradeToTargetType[researchId] or researchId
 
-        if stationTypeTechId then
+        if nodeId then
 
             local techTree = self:GetTeam():GetTechTree()
-            local researchNode = techTree:GetTechNode(stationTypeTechId)
-            researchNode:SetResearchProgress(self.researchProgress)
-            techTree:SetTechNodeChanged(researchNode, string.format("researchProgress = %.2f", self.researchProgress))
+            local researchNode = techTree:GetTechNode(nodeId)
+            if researchNode then
+                researchNode:SetResearchProgress(self.researchProgress)
+                techTree:SetTechNodeChanged(researchNode, string.format("researchProgress = %.2f", self.researchProgress))
+            end
 
         end
     end
 
     function PrototypeLab:OnResearchCancel(researchId)
 
-        local stationTypeTechId = PrototypeLab.kUpgradeToTargetType[researchId]
-        if stationTypeTechId then
+        local nodeId = PrototypeLab.kUpgradeToTargetType[researchId] or researchId
+        if nodeId then
 
             local team = self:GetTeam()
             if team then
                 local techTree = team:GetTechTree()
-                local researchNode = techTree:GetTechNode(stationTypeTechId)
+                local researchNode = techTree:GetTechNode(nodeId)
                 if researchNode then
                     researchNode:ClearResearching()
                     techTree:SetTechNodeChanged(researchNode, string.format("researchProgress = %.2f", 0))
@@ -69,16 +85,20 @@ if Server then
     end
 
     function PrototypeLab:OnResearchComplete(researchId)
+        -- Structure-upgrade research morphs the lab into the specialised variant.
         local upgradeTech = PrototypeLab.kUpgradeToTargetType[researchId]
         if upgradeTech then
             self:UpgradeToTechId(upgradeTech)
         end
+        -- Mark the correct node researched: the variant node for a structure upgrade,
+        -- otherwise the research node itself (Experimental Technologies).
+        local nodeId = upgradeTech or researchId
         local techTree = self:GetTeam():GetTechTree()
-        local researchNode = techTree:GetTechNode(upgradeTech)
+        local researchNode = techTree:GetTechNode(nodeId)
 
         if researchNode then
             researchNode:SetResearchProgress(1)
-            techTree:SetTechNodeChanged(researchNode, string.format("researchProgress = %.2f", self.researchProgress))
+            techTree:SetTechNodeChanged(researchNode, string.format("researchProgress = %.2f", 1))
             researchNode:SetResearched(true)
         end
     end

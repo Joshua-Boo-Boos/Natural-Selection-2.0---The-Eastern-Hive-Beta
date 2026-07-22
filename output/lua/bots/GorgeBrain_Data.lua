@@ -1673,7 +1673,11 @@ function CreateGorgeBrainSenses()
         local dist, target = GetMinTableEntry( healables,
             function(target)
                 if target then
-                    if target ~= gorge and target:GetIsHealable() and target:GetHealthScalar() < 1.0 then --orginal < 0.9
+                    -- GetCanBeHealed() (unlike GetIsHealable(), which falls back to
+                    -- GetIsAlive()) respects GetCanBeHealedOverride - notably Clogs
+                    -- return false. Without this, a bot Gorge keeps picking a damaged
+                    -- Clog it can never heal (AddHealth early-returns 0), looping forever.
+                    if target ~= gorge and target:GetIsHealable() and target:GetCanBeHealed() and target:GetHealthScalar() < 1.0 then --orginal < 0.9
                         return select(2, GetTunnelDistanceForAlien(gorge, target))
                     end
                 end

@@ -22,6 +22,9 @@ ModLoader.SetupFileHook("lua/DamageMixin.lua", "lua/CNBalance/Mixin/DamageMixin.
 
 ModLoader.SetupFileHook("lua/TechTreeConstants.lua", "lua/CNBalance/TechTreeConstants.lua", "post")
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/TechData.lua", "post")
+-- Prototype Lab overhaul (buy-window subset). Load after the mod TechData hook.
+ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/PrototypeTechData.lua", "post")
+ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/Mixin/PrototypeUpgradesMixin.lua", "post")
 ModLoader.SetupFileHook("lua/TechTree.lua", "lua/CNBalance/TechTree.lua", "post")
 ModLoader.SetupFileHook("lua/TechTreeButtons.lua", "lua/CNBalance/TechTreeButtons.lua", "post")
 ModLoader.SetupFileHook("lua/BuildUtility.lua", "lua/CNBalance/BuildUtility.lua", "post")
@@ -87,6 +90,9 @@ ModLoader.SetupFileHook("lua/PlayerHallucinationMixin.lua", "lua/CNBalance/Mixin
 ModLoader.SetupFileHook("lua/UmbraMixin.lua", "lua/CNBalance/Mixin/UmbraMixin.lua", "post" )
 ModLoader.SetupFileHook("lua/AutoWeldMixin.lua", "lua/CNBalance/Mixin/AutoWeldMixin.lua", "post")
 ModLoader.SetupFileHook("lua/TeamDeathMessageMixin.lua", "lua/CNBalance/Mixin/TeamDeathMessageMixin.lua", "post" )
+-- Exo killfeed rendering: "Exo" white prefix + weapon icon (Minigun/Railgun/Claw/
+-- Flamethrower), skull for fire-pool, and text-only "Exo Self-Destruct".
+ModLoader.SetupFileHook("lua/GUIDeathMessages.lua", "lua/CNBalance/GUI/GUIDeathMessagesExo.lua", "post" )
 ModLoader.SetupFileHook("lua/PointGiverMixin.lua", "lua/CNBalance/Mixin/PointGiverMixin.lua", "post" )
 ModLoader.SetupFileHook("lua/BabblerOwnerMixin.lua", "lua/CNBalance/Mixin/BabblerOwnerMixin.lua", "post")
 ModLoader.SetupFileHook("lua/RegenerationMixin.lua", "lua/CNBalance/Mixin/RegenerationMixin.lua", "post")
@@ -112,6 +118,7 @@ ModLoader.SetupFileHook("lua/MarineCommander.lua", "lua/CNBalance/MarineCommande
 ModLoader.SetupFileHook("lua/CommAbilities/Marine/Scan.lua", "lua/CNBalance/CommAbilities/Scan.lua", "post")
 --Marines
 ModLoader.SetupFileHook("lua/Hud/Marine/GUIMarineHUD.lua", "lua/CNBalance/GUI/GUIMarineHUD.lua", "post" )
+ModLoader.SetupFileHook("lua/Hud/Marine/GUIExoHUD.lua", "lua/CNBalance/GUI/GUIExoHUD.lua", "post" )
 ModLoader.SetupFileHook("lua/Hud/GUIPlayerResource.lua", "lua/CNBalance/GUI/GUIPlayerResource.lua", "post")
 ModLoader.SetupFileHook("lua/GUIMarineBuyMenu.lua", "lua/CNBalance/GUI/GUIMarineBuyMenu.lua", "replace" )
 
@@ -135,6 +142,9 @@ ModLoader.SetupFileHook("lua/SentryBattery.lua", "lua/CNBalance/Structures/Marin
 ModLoader.SetupFileHook("lua/ARC.lua", "lua/CNBalance/Structures/Marine/ARC.lua", "post")
 ModLoader.SetupFileHook("lua/ArmsLab.lua", "lua/CNBalance/Structures/Marine/ArmsLab.lua", "post")
 ModLoader.SetupFileHook("lua/PrototypeLab.lua", "lua/CNBalance/Structures/Marine/PrototypeLab.lua", "post")
+-- Prototype Lab buy window: open hook (client) + bundle purchase handler (server).
+ModLoader.SetupFileHook("lua/Marine_Client.lua", "lua/CNBalance/MarineBuyMenuHook.lua", "post")
+ModLoader.SetupFileHook("lua/Marine_Server.lua", "lua/CNBalance/PrototypeBuyServer.lua", "post")
 ModLoader.SetupFileHook("lua/CommandStation.lua", "lua/CNBalance/Structures/Marine/CommandStation.lua", "post")
 ModLoader.SetupFileHook("lua/Extractor.lua", "lua/CNBalance/Structures/Marine/Extractor.lua", "replace")
 ModLoader.SetupFileHook("lua/PowerPoint.lua", "lua/CNBalance/Structures/Marine/PowerPoint.lua", "post" )
@@ -150,7 +160,14 @@ ModLoader.SetupFileHook("lua/MarineSpectator.lua", "lua/CNBalance/MarineSpectato
 ModLoader.SetupFileHook("lua/Spectator.lua", "lua/CNBalance/Spectator.lua", "post")
 ModLoader.SetupFileHook("lua/JetpackMarine.lua", "lua/CNBalance/JetpackMarine.lua", "post")
 ModLoader.SetupFileHook("lua/Exo.lua", "lua/CNBalance/Exo.lua", "post")
+-- ExoWeaponHolderModels adds the claw/flamethrower world models + death icons; it
+-- must load AFTER CNBalance/Exo.lua (which defines the layout tables it resolves at
+-- call time), so keep it here right after the Exo hook.
+ModLoader.SetupFileHook("lua/Weapons/Marine/ExoWeaponHolder.lua", "lua/CNBalance/Weapons/ExoWeaponHolderModels.lua", "post")
 ModLoader.SetupFileHook("lua/Exosuit.lua", "lua/CNBalance/Exosuit.lua", "post")
+-- Exo special weapons (Flamethrower / Grenade Launcher / Welder exo arms) live in a
+-- post-hook on Railgun.lua (loads alongside the exo weapon classes).
+ModLoader.SetupFileHook("lua/Weapons/Marine/Railgun.lua", "lua/Combat/ExoSpecialWeapon.lua", "post")
 
 ModLoader.SetupFileHook("lua/Weapons/WeaponDisplayManager.lua", "lua/CNBalance/Weapons/WeaponDisplayManager.lua", "post" )
 ModLoader.SetupFileHook("lua/Weapons/Weapon.lua", "lua/CNBalance/Weapons/Weapon.lua", "post")

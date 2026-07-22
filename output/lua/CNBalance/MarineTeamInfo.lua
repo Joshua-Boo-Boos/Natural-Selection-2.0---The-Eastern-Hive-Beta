@@ -16,8 +16,12 @@ class "MarineTeamInfo" (TeamInfo)
 
 MarineTeamInfo.kMapName = "MarineTeamInfo"
 
--- waaaaay more than can be reasonably expected in a normal game.
-kMarineTeamInfoMaxInfantryPortalCount = 10
+-- Cap on the networked numInfantryPortals count. Set to the map-wide IP limit
+-- (kMaxInfantryPortalsGlobal, = 12) so the full IP count is reported - the respawn-time
+-- code (Globals.lua GetRespawnTimeExtend) reads this value, and clamping it below the real
+-- cap would silently ignore IPs 11-12. `or 12` guards against load-order (BalanceMisc.lua
+-- defining the global after this file); the fallback equals the global's value anyway.
+kMarineTeamInfoMaxInfantryPortalCount = kMaxInfantryPortalsGlobal or 12
 
 local userTrackerNetVarDef = string.format("integer (0 to %d)", kMaxPlayers - 1)
 local networkVars =
