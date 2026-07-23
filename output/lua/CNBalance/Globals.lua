@@ -162,22 +162,31 @@ function GetRespawnTimeExtend(player,teamIndex, _gameLength)
         return 0
     end
 
-    -- ── ALIENS: original NON-scaled respawn. Aliens do NOT get the time ramp or the crowd/
-    -- tech growth - MARINES are the only team with the scaled (exponential-like) curve. The
-    -- alien respawn is simply the base (kAlienSpawnTime, 10s) minus 1s per BUILT Hive, held to
-    -- a hard 9s true minimum. Since the base is 10s the extension is floored at -1 (=> 9s) and
-    -- capped at 0 (never longer than the 10s base):
-    --     0 Hives -> 10s   |   1 Hive -> 9s   |   2+ Hives -> 9s (floored, the true minimum).
-    -- An Origin Form start (0 built Hives) sits at the 10s base and reaches the 9s minimum once
-    -- the first Hive finishes. GetNumHives counts only BUILT hives, and is recomputed each tick
-    -- so Hives gained/lost change the respawn live.
+    -- ── ALIENS: original NON-scaled respawn (no exponential time ramp - that is MARINES only).
+    -- The base is the 10s kAlienSpawnTime MINIMUM. Crowd size over the match minimum + researched
+    -- tech (kTechRespawnTimeExtension, e.g. higher Biomass) can LENGTHEN it. Each BUILT Hive then
+    -- trims 1s back off - but ONLY as far as cancelling that lengthening (the math.min below), so
+    -- the respawn NEVER drops below the 10s base: with no lengthening, Hives do nothing and the
+    -- respawn stays at 10s; if it has been pushed up, each Hive claws 1s back toward the 10s min.
+    -- Returns an extension of 0..11, i.e. total alien respawn 10s..21s.
     if teamIndex == kAlienTeamType then
+        -- Lengthening factors (flat, NOT time-scaled) - the ORIGINAL alien increase: +1s per
+        -- player over the match minimum (the original rate, NOT the marines' reduced 0.25s/player)
+        -- plus researched tech from kTechRespawnTimeExtension.
+        local increase = math.max( GetPlayersAboveLimit(teamIndex) , 0 ) * 1
+        local teamTechTree = GetTechTree and GetTechTree(teamIndex)
+        if teamTechTree and teamTechTree.GetHasTech then
+            for k, v in pairs(kTechRespawnTimeExtension) do
+                if teamTechTree:GetHasTech(k, true) then increase = increase + v end
+            end
+        end
+        increase = Clamp(increase, 0, 11)   -- cap so the alien maximum respawn stays 21s
+
         -- Count only BUILT hives (alive AND fully constructed). GetActiveHiveCount checks
         -- GetIsAlive()+GetIsBuilt(); the networked GetNumHives is captured tech points (would
         -- count a half-built hive), so prefer the real built count. GetRespawnTimeExtend runs
         -- server-side (Team.lua queue + TeamInfo networking) and the result is networked to
-        -- clients, so the server-only team method is safe here; fall back to the netvar if
-        -- the team object is somehow unavailable.
+        -- clients, so the server-only team method is safe; fall back to the netvar otherwise.
         local hives = 0
         local gr    = GetGamerules and GetGamerules()
         local team  = gr and gr.GetTeam and gr:GetTeam(teamIndex)
@@ -187,9 +196,10 @@ function GetRespawnTimeExtend(player,teamIndex, _gameLength)
             local info = GetTeamInfoEntity(teamIndex)
             hives = (info and info.GetNumHives and info:GetNumHives()) or 0
         end
-        local base   = kAlienSpawnTime or 10
-        local minExt = 9 - base   -- keep total respawn >= 9s (== -1 when base is 10)
-        return Clamp(-1 * hives, minExt, 0)
+
+        -- math.min mitigation: the 1s-per-Hive reduction can only offset the lengthening, so the
+        -- total can never fall under the 10s base minimum. (0 increase -> Hives change nothing.)
+        return increase - math.min(1 * hives, increase)
     end
 
     -- ── MARINES ONLY from here down (scaled ramp + 0.25s per BUILT Infantry Portal). ──

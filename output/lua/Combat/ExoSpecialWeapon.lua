@@ -46,17 +46,22 @@ local kFlameLoopSound = PrecacheAsset("sound/NS2.fev/marine/flamethrower/attack_
 
 -- Flamethrower: cone damage while charged. NEEDS IN-GAME TUNING.
 --
--- Capture the ADVANCED ARMORY flamethrower's damage range (the global
--- kFlamethrowerRange, Balance.lua = 9) before the local below shadows it.  The Exo
--- flame cone must never reach more than 25% further than the hand flamethrower, so
--- the +12.5% increase is clamped against that ceiling.
+-- Capture the ADVANCED ARMORY (hand) flamethrower's globals (Balance.lua: range 9,
+-- damage 9.918) before the local kFlamethrowerRange below shadows them. The Exo flamethrower
+-- is defined RELATIVE to the hand FT so it stays a fixed % stronger at EVERY Weapons level
+-- (both run through the same DoDamage pipeline).
 local kArmouryFlamethrowerRange   = kFlamethrowerRange or 9
-local kExoFlamethrowerRangeCap    = kArmouryFlamethrowerRange * 1.25   -- 11.25
--- 70% of original 8 (=5.6), +12.5% (previous), +12.5% again → 7.0875, under the cap.
-local kFlamethrowerRange          = math.min(5.6 * 1.125 * 1.125, kExoFlamethrowerRangeCap)
-local kFlamethrowerConeWidth      = 0.6  -- TraceMeleeBox extents; tune in-game
-local kFlamethrowerDamagePerSec   = 25   -- per second
-local kFlamethrowerDamageRate     = 0.15 -- apply damage/flames every 0.15s (~6.7 Hz)
+local kArmouryFlamethrowerDamage  = kFlamethrowerDamage or 9.918
+-- RANGE (the flame cone's box-sweep DEPTH): exactly 25% longer than the hand FT - a SINGLE
+-- application of +25%, no stacking.
+local kFlamethrowerRange          = kArmouryFlamethrowerRange * 1.25          -- 9 * 1.25 = 11.25
+-- Hitbox WIDTH & HEIGHT (the cone box's perpendicular half-extents): 15% larger than the base.
+-- (The DEPTH is the range above; it is NOT scaled here, so there is no double +25%.)
+local kFlamethrowerConeWidth      = 0.6 * 1.15                                -- 0.69
+-- DAMAGE per application: 20% more PURE weapon damage than the hand FT, at the SAME fire cadence
+-- (kFlamethrowerDamageRate). Flame-pool DoT is separate and NOT part of this figure.
+local kExoFlamethrowerDamage      = kArmouryFlamethrowerDamage * 1.2          -- 9.918 * 1.2 = 11.9016
+local kFlamethrowerDamageRate     = 0.15 -- apply damage every 0.15s (mirrors the hand FT cadence)
 
 -- kChargeTime in vanilla Railgun.lua = 2 seconds; we mirror it for arm-glow mapping.
 local kExoFlameThrowerChargeTime = 2
@@ -138,6 +143,22 @@ Railgun.GetWeaponMode = function(self)
     local m = self.weaponMode
     if not m or m == 0 then return kExoSpecialMode.Railgun end
     return m
+end
+
+-- Damage TYPE per mode. The Exo flame arm MUST deal kDamageType.Flame (identical to the hand
+-- Advanced Armory flamethrower) so it gets EXACTLY the same target/structure multipliers -
+-- most importantly Flame's big bonus vs flammable structures (Clogs) and its bonus vs other
+-- structures. Without this the arm dealt the Railgun's Structural type (no flammable bonus), so
+-- vs a Clog it did LESS than the hand FT despite the higher base, instead of a clean +20%.
+-- With matching types the multipliers cancel and ONE Exo flame arm = exactly 1.2x the hand FT
+-- against EVERY target (aliens, structures, Clogs alike). Railgun mode is unchanged: it returns
+-- the same value DamageMixin:DoDamage would have looked up itself (the weapon's TechData type,
+-- kRailgunDamageType), so nothing about the actual railgun shot changes.
+function Railgun:GetDamageType()
+    if self:GetWeaponMode() == kExoSpecialMode.Flamethrower then
+        return kDamageType.Flame
+    end
+    return LookupTechData(self:GetTechId(), kTechDataDamageType, kDamageType.Normal)
 end
 
 -- Override GetChargeAmount so the arm-glow / charge HUD reflects each mode correctly:
@@ -489,7 +510,20 @@ function Railgun:ProcessMoveOnWeapon(player, input)
                 local fireDir    = player:GetViewCoords().zAxis
                 local extents    = Vector(kFlamethrowerConeWidth, kFlamethrowerConeWidth, kFlamethrowerConeWidth)
                 local filterEnts = { self, player }
-                local dmgAmount  = kFlamethrowerDamagePerSec * kFlamethrowerDamageRate
+                -- 1.2x the hand FT base. Also neutralise the Weapons-upgrade scaling MISMATCH:
+                -- this weapon (Exo railgun) is upgrade-scaled at the DEFAULT rate (+0.1/level)
+                -- while the hand FT uses the flamethrower rate (+0.07/level), so a flat base would
+                -- drift to +29% by Weapons 3. Pre-scale by (FT scalar / this weapon's own scalar):
+                -- the damage pipeline then re-applies THIS weapon's own scalar, leaving a net
+                -- upgrade factor exactly equal to the hand FT's - so one Exo flame arm stays
+                -- exactly 1.2x the hand FT at EVERY Weapons level. (Guarded: falls back to the flat
+                -- base if the scalar lookups are unavailable.)
+                local dmgAmount = kExoFlamethrowerDamage
+                local ownScalar = NS2Gamerules_GetUpgradedDamageScalar(player, self:GetTechId())
+                local ftScalar  = NS2Gamerules_GetUpgradedDamageScalar(player, kTechId.Flamethrower)
+                if ownScalar and ftScalar and ownScalar > 0 then
+                    dmgAmount = dmgAmount * (ftScalar / ownScalar)
+                end
 
                 local trace = TraceMeleeBox(self, eyePos, fireDir, extents, kFlamethrowerRange,
                                             PhysicsMask.Flame, EntityFilterList(filterEnts))
@@ -533,8 +567,11 @@ function Railgun:ProcessMoveOnWeapon(player, input)
                     end
                 end
 
-                -- Damage nearby entities in the cone (matches vanilla ApplyConeDamage).
-                local dmgRadius = kFlamethrowerConeWidth * 2
+                -- Damage nearby entities in the cone (matches vanilla ApplyConeDamage). Use the
+                -- HAND flamethrower's own splash radius (kFlameRadius = 1.8, = kFlamethrowerDamageRadius)
+                -- so the Exo hits exactly the same structures/clusters the AA flamethrower does -
+                -- previously the smaller radius could leave Clogs/structures just outside the splash.
+                local dmgRadius = kFlamethrowerDamageRadius or kFlameRadius or (kFlamethrowerConeWidth * 2)
                 local nearbyEnts = GetEntitiesWithMixinWithinXZRange("Live", trace.endPoint, dmgRadius)
                 for _, ent in ipairs(nearbyEnts) do
                     if ent ~= player and ent ~= trace.entity and ent:GetCanTakeDamage()

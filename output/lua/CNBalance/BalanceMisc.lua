@@ -56,6 +56,16 @@ kMaxCommanderMines = 12
 kMaxAlienCommanderWhips = 6
 kNumMines = 2 -- Was 4 mines for 20 p-res
 
+-- LOAD-ORDER FIX (alien respawn showing 5s/8s): kAlienSpawnTime is defined in BOTH Balance.lua
+-- (=10, the mod's intent) AND vanilla BalanceMisc.lua (=2). Vanilla loads BalanceMisc.lua AFTER
+-- Balance.lua, so the =2 clobbers the mod's =10, and this mod BalanceMisc post-hook was the only
+-- later writer but never re-set it -> the resolved value was 2. kAlienSpawnTime is the alien
+-- WAVE-SPAWN base (AlienSpectator.timeWaveSpawnEnd = entryTime + kAlienSpawnTime) AND the value
+-- the respawn HUD adds to the extension, so a base of 2 made aliens actually spawn at 2+ext
+-- (~5-8s), under the intended 10s minimum. Re-assert 10 here (the LAST write) so both the real
+-- spawn timing and the alien/spectator HUD use 10s. Total alien respawn = 10 + extension (0..11).
+kAlienSpawnTime = 10
+
 kGrenadeLauncherPlayersAlert = 0.15
 kFlameThrowerPlayersAlert = 0.15
 kCannonPlayersAlert = 0.15
