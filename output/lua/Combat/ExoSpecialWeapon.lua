@@ -67,7 +67,7 @@ local kFlamethrowerDamageRate     = 0.15 -- apply damage every 0.15s (mirrors th
 local kExoFlameThrowerChargeTime = 2
 -- Flamethrower: arm glow tracks _flameHeat directly (0→1 over 5 s) via override.
 
--- Heat accumulation: 5 seconds of continuous fire to reach 100%, 3 seconds to cool.
+-- Heat accumulation: 5 seconds of continuous fire to reach 100%.
 local kFlameHeatRate = 1.0 / 5.0   -- heat/second while firing (5 s from 0 to 100%)
 -- Cool-down time reduced 30%: full cool was 5 s, now 5 * 0.7 = 3.5 s (rate = 1/3.5).
 local kFlameCoolRate = 1.0 / 3.5   -- heat/second while cooling (3.5 s from 100% to 0)
