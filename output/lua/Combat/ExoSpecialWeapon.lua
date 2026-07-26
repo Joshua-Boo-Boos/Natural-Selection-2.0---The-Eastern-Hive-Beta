@@ -60,7 +60,7 @@ local kFlamethrowerRange          = kArmouryFlamethrowerRange * 1.25          --
 local kFlamethrowerConeWidth      = 0.6 * 1.15                                -- 0.69
 -- DAMAGE per application: 20% more PURE weapon damage than the hand FT, at the SAME fire cadence
 -- (kFlamethrowerDamageRate). Flame-pool DoT is separate and NOT part of this figure.
-local kExoFlamethrowerDamage      = kArmouryFlamethrowerDamage * 1.2          -- 9.918 * 1.2 = 11.9016
+local kExoFlamethrowerDamage      = kArmouryFlamethrowerDamage * 1.4          -- 1.4x the AA FT (9.918 * 1.4 = 13.8852)
 local kFlamethrowerDamageRate     = 0.15 -- apply damage every 0.15s (mirrors the hand FT cadence)
 
 -- kChargeTime in vanilla Railgun.lua = 2 seconds; we mirror it for arm-glow mapping.
@@ -68,8 +68,9 @@ local kExoFlameThrowerChargeTime = 2
 -- Flamethrower: arm glow tracks _flameHeat directly (0→1 over 5 s) via override.
 
 -- Heat accumulation: 5 seconds of continuous fire to reach 100%, 3 seconds to cool.
-local kFlameHeatRate = 1.0 / 5.0   -- heat/second while firing
-local kFlameCoolRate = 1.0 / 5.0   -- heat/second while cooling (5 s from 100% to 0)
+local kFlameHeatRate = 1.0 / 5.0   -- heat/second while firing (5 s from 0 to 100%)
+-- Cool-down time reduced 30%: full cool was 5 s, now 5 * 0.7 = 3.5 s (rate = 1/3.5).
+local kFlameCoolRate = 1.0 / 3.5   -- heat/second while cooling (3.5 s from 100% to 0)
 
 -- Railgun-style attach-point names (same exo model bones, copied from Railgun.lua).
 local kFirstPersonAttachPoints = {
@@ -117,7 +118,13 @@ local networkVars =
     railgunAttacking  = "boolean",
     lockCharging      = "boolean",
     timeOfLastShot    = "time",
-    weaponMode        = "enum kExoSpecialMode",   -- ADDED: the only new field
+    weaponMode        = "enum kExoSpecialMode",   -- ADDED: the special-mode field
+    -- ADDED: Flamethrower heat (0→1). MUST be networked: GetChargeAmount returns it in
+    -- Flamethrower mode, and the spectator charge bar (GUIInsight_PlayerHealthbars) reads
+    -- GetChargeAmount on the SPECTATOR's client. _flameHeat was only updated in the predicted
+    -- ProcessMoveOnWeapon (server + owner), so spectators - who never predict the exo's moves -
+    -- always saw 0 and the bar never filled. Same rationale as railgunAttacking being networked.
+    flameHeat         = "float (0 to 1 by 0.01)",
 }
 
 AddMixinNetworkVars(TechMixin,          networkVars)
@@ -132,6 +139,7 @@ function Railgun:OnCreate()
     baseRGOnCreate(self)
     self.weaponMode = kExoSpecialMode.Railgun
     self.timeLastFlameDamage = 0
+    self.flameHeat = 0
 end
 
 -- ── Mode accessors ────────────────────────────────────────────────────────────
@@ -176,7 +184,7 @@ function Railgun:GetChargeAmount()
             and math.min(1, (Shared.GetTime() - self.timeChargeStarted) / Railgun.kChargeTime)
             or 0
     elseif mode == kExoSpecialMode.Flamethrower then
-        return self._flameHeat or 0
+        return self.flameHeat or 0
     end
     return baseGetChargeAmount(self)
 end
@@ -490,8 +498,8 @@ function Railgun:ProcessMoveOnWeapon(player, input)
             -- At 100% set _flameOverheated and stop firing; the railgunAttacking→false
             -- transition lets the FSM play the shoot-flourish animation (simulating
             -- a critical heat burst). Player cannot fire again until heat returns to 0.
-            self._flameHeat = math.min(1.0, (self._flameHeat or 0) + dt * kFlameHeatRate)
-            if self._flameHeat >= 1.0 then
+            self.flameHeat = math.min(1.0, (self.flameHeat or 0) + dt * kFlameHeatRate)
+            if self.flameHeat >= 1.0 then
                 self._flameOverheated = true
                 self.railgunAttacking = false
                 -- Open a short, explicit window (_flameShootAnimEnd) during which
@@ -509,8 +517,27 @@ function Railgun:ProcessMoveOnWeapon(player, input)
                 local eyePos     = player:GetEyePos()
                 local fireDir    = player:GetViewCoords().zAxis
                 local extents    = Vector(kFlamethrowerConeWidth, kFlamethrowerConeWidth, kFlamethrowerConeWidth)
+                -- Filter EVERY entity belonging to this Exo: this arm, the player, the
+                -- ExoWeaponHolder AND the OTHER arm. Previously only { self, player } was
+                -- filtered, so on an FT + Claw combo the CLAW arm (a separate entity sitting in
+                -- front of the player) could BLOCK this arm's flame trace at ~0 range. That
+                -- collapsed trace.endPoint onto the player, which (a) crippled the cone damage and
+                -- (b) made BurnSporesAndUmbra - which walks eyePos -> trace.endPoint in 2m steps -
+                -- break out immediately and burn NOTHING (no Bilebomb / Corrode / Vortex / Spores).
                 local filterEnts = { self, player }
-                -- 1.2x the hand FT base. Also neutralise the Weapons-upgrade scaling MISMATCH:
+                local holder = player.GetActiveWeapon and player:GetActiveWeapon()
+                if holder then
+                    table.insert(filterEnts, holder)
+                    if holder.leftWeaponId then
+                        local w = Shared.GetEntity(holder.leftWeaponId)
+                        if w then table.insert(filterEnts, w) end
+                    end
+                    if holder.rightWeaponId then
+                        local w = Shared.GetEntity(holder.rightWeaponId)
+                        if w then table.insert(filterEnts, w) end
+                    end
+                end
+                -- 1.4x the hand FT base. Also neutralise the Weapons-upgrade scaling MISMATCH:
                 -- this weapon (Exo railgun) is upgrade-scaled at the DEFAULT rate (+0.1/level)
                 -- while the hand FT uses the flamethrower rate (+0.07/level), so a flat base would
                 -- drift to +29% by Weapons 3. Pre-scale by (FT scalar / this weapon's own scalar):
@@ -586,9 +613,9 @@ function Railgun:ProcessMoveOnWeapon(player, input)
             end
         else
             -- Not firing: cool down the heat at kFlameCoolRate.
-            self._flameHeat = math.max(0, (self._flameHeat or 0) - dt * kFlameCoolRate)
+            self.flameHeat = math.max(0, (self.flameHeat or 0) - dt * kFlameCoolRate)
             -- Clear overheat only when heat reaches exactly 0 (not just below 1).
-            if self._flameOverheated and self._flameHeat <= 0 then
+            if self._flameOverheated and self.flameHeat <= 0 then
                 self._flameOverheated = false
             end
         end
@@ -687,6 +714,12 @@ if Client then
             -- Lazily create the trail cinematic.
             if not self._flameTrail and exoPlayer then
                 local trail = Client.CreateTrailCinematic(RenderScene.Zone_Default)
+                -- MUST repeat endlessly, exactly like the hand Flamethrower's trail
+                -- (Flamethrower_Client.lua:InitTrailCinematic). Without this the trail plays a
+                -- SINGLE pass and then stops, so it renders unreliably / not at all - which is
+                -- why other players (e.g. an alien watching) could not see it. This is NOT related
+                -- to the Weapon Tracers option: neither the hand FT nor this trail is gated on it.
+                trail:SetRepeatStyle(Cinematic.Repeat_Endless)
 
                 if isFirstPerson then
                     -- 1P: orient from the player's eye position in view direction.
@@ -709,14 +742,24 @@ if Client then
                     trail:AttachTo(exoPlayer, TRAIL_ALIGN_X, Vector(0.3, 0, 0), bone)
                 end
 
+                -- View-dependent segment/hardening, EXACTLY like vanilla's InitTrailCinematic.
+                -- Using the 1P values (6 segments / 0.5 hardening) for the 3P WORLD trail was the
+                -- bug: too few segments + stiff hardening over the longer Exo trail rendered as a
+                -- string of discrete cones instead of one smooth stream. The 3P trail needs MORE
+                -- segments and MUCH softer hardening (0.1) so adjacent segments blend together.
+                --   1P: 6 segments / 0.5 hardening  (matches the 6-entry 1P cinematic table)
+                --   3P: 8 segments / 0.1 hardening  (matches the 8-entry 3P cinematic table)
+                local numSegments  = isFirstPerson and 6 or 8
+                local minHardening = isFirstPerson and 0.5 or 0.1
+
                 trail:SetOptions({
-                    numSegments              = 6,
+                    numSegments              = numSegments,
                     collidesWithWorld        = true,
                     visibilityChangeDuration = 0.2,
                     fadeOutCinematics        = true,
                     stretchTrail             = false,
                     trailLength              = kFlamethrowerRange + 0.5,
-                    minHardening             = 0.5,
+                    minHardening             = minHardening,
                     maxHardening             = 2,
                     hardeningModifier        = 0.8,
                     trailWeight              = 0.2,

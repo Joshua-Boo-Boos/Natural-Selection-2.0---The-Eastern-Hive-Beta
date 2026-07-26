@@ -105,90 +105,62 @@ local function GetRespawnRampSeconds()
     if not ramp or ramp <= 0 then ramp = kRespawnRampFallbackSeconds end
     return math.min(ramp, kRespawnRampMaxSeconds)
 end
--- Respawn "blue curve" tuning (see GetRespawnTimeExtend).
---
--- Design goal: BOTH teams start the round at their base respawn (marines 9s,
--- aliens 10s) and the respawn-time INCREASE stays small through early+mid game,
--- then accelerates toward late-game (convex ramp). Crucially the crowd-size and
--- tech lengthening are ALSO scaled by that same time curve - otherwise the flat
--- crowd term (+1s per player over kMatchMinPlayers, i.e. up to +10s at 20v20)
--- pins respawn near the cap from minute one and there is no "start at 9/10".
---
--- Marines are the statistically weaker early/mid team, so they get a HIGHER ramp
--- power (flatter early, steeper late): their respawn hugs the 9s base longer and
--- only lengthens sharply in the late game once their tech/Exo power spike lands.
--- Aliens use a lower power so their respawn increase kicks in a little sooner.
--- All values are tuning knobs - adjust after watching win-rate-vs-time.
---
--- The player-count (+1s per player over kMatchMinPlayers), tech (kTechRespawnTimeExtension
--- seconds) and Infantry-Portal reduction factors keep their CURRENT values and meaning -
--- they are summed exactly as before. The only new behaviour is an OVERALL time envelope
--- (the convex factor below) multiplying that whole sum: ~0 at round start (respawn == base
--- 9s/10s, fast), rising to full value by the deadlock start time (slow), still capped at
--- +11 so the maximum respawn stays 20s marines / 21s aliens. At a full 25v25 server the
--- player-count term alone (+15) already exceeds the +11 cap, so late-game respawn always
--- reaches the 20/21 max; tech/IP then mainly shape HOW SOON the cap is approached.
--- Ramp powers. Higher = flatter early / steeper late. These were 4/2, which (together with
--- the long deadlock ramp) kept respawn glued to the base for ~30 min. Lowered to 2/1.5 so the
--- increase is actually visible through the early/mid game while marines still climb a touch
--- more gently than aliens (marines are the weaker early team).
-local kMarineRespawnRampPower  = 2      -- marines: still a little flatter early than aliens
-local kAlienRespawnRampPower   = 1.5    -- aliens: ramp up a bit sooner
--- Seconds of respawn extension added per player OVER kMatchMinPlayers (10). The old
--- value was 1.0s/player, which on a full 25v25 server meant +15s from crowd alone -
--- that single-handedly blew past the +11 cap and made tech/round-length irrelevant.
--- 0.25s/player (=> ~+3.75s at a full 25-player team) keeps the crowd term a real but
--- modest contributor, so the respawn accrues NATURALLY from tech + round length +
--- player count + IPs and, under the convex envelope below, reaches the 20s/21s max only
--- around the deadlock start time rather than well before it. Appropriate for 25v25.
-local kRespawnSecondsPerPlayer = 0.25
--- Small GUARANTEED baseline the respawn ramps toward, so it still climbs on a low-tech game
--- and never sits flat. Kept LOW (headroom option, for 25v25) so the crowd + tech + IP factors
--- actually drive how high it goes: at 25v25 the crowd term is only +3.75, so with this small
--- baseline the +11 cap is NOT auto-saturated - a fully-teched team reaches the 20s/21s max,
--- a low-tech team maxes lower, and extra Infantry Portals shave it down. Raise this toward
--- ~8 if you'd rather it always reach the cap by deadlock regardless of tech.
-local kRespawnTimeRampMax = 2
+-- Respawn scaling (see GetRespawnTimeExtend). BOTH teams grow with GAME LENGTH + researched TECH
+-- toward a +11 cap (=> 20s marines / 21s aliens); PLAYER COUNT is NEVER a factor. Game length is
+-- shaped per team: MARINES use a CONVEX ramp (slower early, faster late); ALIENS use a LINEAR ramp.
+-- Tech adds on top for both, so a normally-teched team reaches the cap in the late game. Structures
+-- then shave the total (0.5s per built IP for marines, 2s per built Hive for aliens); the [0,11]
+-- clamp means neither can push below the 9s/10s base - so structures have NO effect at the minimum.
+local kMarineRampPower = 3   -- marines: higher power => flatter early / steeper late. Raised 2->3
+                             -- to exaggerate the convex shape (slower early game, sharper late-game
+                             -- climb) while still reaching the 20s cap by the ramp end.
 
-function GetRespawnTimeExtend(player,teamIndex, _gameLength)
-    --_gameLength = _gameLength * 60
-    local x = _gameLength or 0   -- guard: never nil (would break the x/ramp division)
+function GetRespawnTimeExtend(player, teamIndex, _gameLength)
+    local x = _gameLength or 0   -- seconds since round start; never nil (guards the x/ramp divide)
 
-    -- No extension before the round starts. GetGameStartTime() returns 0 in pre-game, which
-    -- would make _gameLength (= now - 0) huge and force the ramp to full - so guard it here so
-    -- both the actual respawn (Team.lua) and the networked HUD value read 0 during pre-game.
+    -- No extension before the round starts -> base respawn only during pre-game.
     local gr = GetGamerules and GetGamerules()
     if gr and gr.GetGameStarted and not gr:GetGameStarted() then
         return 0
     end
 
-    -- ── ALIENS: original NON-scaled respawn (no exponential time ramp - that is MARINES only).
-    -- The base is the 10s kAlienSpawnTime MINIMUM. Crowd size over the match minimum + researched
-    -- tech (kTechRespawnTimeExtension, e.g. higher Biomass) can LENGTHEN it. Each BUILT Hive then
-    -- trims 1s back off - but ONLY as far as cancelling that lengthening (the math.min below), so
-    -- the respawn NEVER drops below the 10s base: with no lengthening, Hives do nothing and the
-    -- respawn stays at 10s; if it has been pushed up, each Hive claws 1s back toward the 10s min.
-    -- Returns an extension of 0..11, i.e. total alien respawn 10s..21s.
-    if teamIndex == kAlienTeamType then
-        -- Lengthening factors (flat, NOT time-scaled) - the ORIGINAL alien increase: +1s per
-        -- player over the match minimum (the original rate, NOT the marines' reduced 0.25s/player)
-        -- plus researched tech from kTechRespawnTimeExtension.
-        local increase = math.max( GetPlayersAboveLimit(teamIndex) , 0 ) * 1
-        local teamTechTree = GetTechTree and GetTechTree(teamIndex)
-        if teamTechTree and teamTechTree.GetHasTech then
-            for k, v in pairs(kTechRespawnTimeExtension) do
-                if teamTechTree:GetHasTech(k, true) then increase = increase + v end
-            end
+    -- TECH (both teams): researched respawn-lengthening tech (kTechRespawnTimeExtension - marine
+    -- Weapons/Armor 2-3 & Exo/Jetpack labs, alien higher Biomass). Team-based tech tree so it is
+    -- correct server-side; the computed extension is networked to every HUD via TeamInfo.
+    local tech = 0
+    local techTree = GetTechTree and GetTechTree(teamIndex)
+    if techTree and techTree.GetHasTech then
+        for k, v in pairs(kTechRespawnTimeExtension) do
+            if techTree:GetHasTech(k, true) then tech = tech + v end
         end
-        increase = Clamp(increase, 0, 11)   -- cap so the alien maximum respawn stays 21s
+    end
 
-        -- Count only BUILT hives (alive AND fully constructed). GetActiveHiveCount checks
-        -- GetIsAlive()+GetIsBuilt(); the networked GetNumHives is captured tech points (would
-        -- count a half-built hive), so prefer the real built count. GetRespawnTimeExtend runs
-        -- server-side (Team.lua queue + TeamInfo networking) and the result is networked to
-        -- clients, so the server-only team method is safe; fall back to the netvar otherwise.
+    -- GAME LENGTH fraction over the ramp: 0 at round start -> 1 by the deadlock time.
+    local t = Clamp(x / GetRespawnRampSeconds(), 0, 1)
+
+    if teamIndex == kMarineTeamType then
+        -- MARINES: CONVEX game-length growth (slower early, faster late) + tech.
+        -- IMPORTANT: the growth is clamped to [0,11] FIRST, THEN the structure deduction is
+        -- subtracted. If the deduction were inside the same clamp as the growth, a high tech
+        -- total (convexTime + tech can be ~25) would keep the pre-clamp value far above 11, so
+        -- the deduction would be swallowed by the +11 cap and never show up at the 20s maximum.
+        -- Deducting AFTER the cap means the built-IP reduction ALWAYS lands, even at full respawn.
+        -- 0.5s per BUILT Infantry Portal (numInfantryPortals = GetNumActiveInfantryPortals, so
+        -- built/active only). The final [0,11] clamp keeps total respawn in [9s base, 20s cap]
+        -- and gives the reduction NO effect at the 9s minimum (grown is already 0 there).
+        local grown = Clamp( (t ^ kMarineRampPower) * 11 + tech, 0, 11 )
+        local ip   = 0
+        local info = GetTeamInfoEntity(teamIndex)
+        if info and info.numInfantryPortals then ip = info.numInfantryPortals end
+        return Clamp( grown - ip / 3, 0, 11 )   -- 1/3 s reduction per built IP
+    else
+        -- ALIENS: LINEAR game-length growth + tech, same two-stage clamp as marines so the Hive
+        -- deduction always lands even at the 21s maximum (see the marine note above). Minus 2s per
+        -- BUILT Hive (GetActiveHiveCount = alive AND built; falls back to the networked hive count
+        -- when the team object is not available). Final [0,11] clamp keeps total respawn in [10s
+        -- base, 21s cap]; the reduction has NO effect at the 10s minimum.
+        local grown = Clamp( 11 * t + tech, 0, 11 )
         local hives = 0
-        local gr    = GetGamerules and GetGamerules()
         local team  = gr and gr.GetTeam and gr:GetTeam(teamIndex)
         if team and team.GetActiveHiveCount then
             hives = team:GetActiveHiveCount()
@@ -196,57 +168,43 @@ function GetRespawnTimeExtend(player,teamIndex, _gameLength)
             local info = GetTeamInfoEntity(teamIndex)
             hives = (info and info.GetNumHives and info:GetNumHives()) or 0
         end
+        return Clamp( grown - hives * 2, 0, 11 )
+    end
+end
 
-        -- math.min mitigation: the 1s-per-Hive reduction can only offset the lengthening, so the
-        -- total can never fall under the 10s base minimum. (0 increase -> Hives change nothing.)
-        return increase - math.min(1 * hives, increase)
+-- ── Prowler reel kill credit ──────────────────────────────────────────────────────────────────
+-- Lava and void pits kill via a DeathTrigger entity, which is passed as BOTH the attacker and the
+-- doer (DeathTrigger:DoDamageOverTime / :KillEntity) - never an alien weapon. So "attacker is a
+-- DeathTrigger" is exactly the case where the game world, not an alien, landed the killing blow.
+-- If the victim was reeled by a Prowler within kProwlerReelKillWindow seconds, that Prowler earned
+-- the kill. If an alien actually landed the killing blow the attacker is that alien, this returns
+-- nil, and the alien correctly keeps the kill.
+--
+-- SHARED so every path agrees. Two completely separate systems need this:
+--   * NS2Gamerules:OnEntityKilled -> the KILLFEED entry
+--   * PointGiverMixin:PreOnKill   -> the SCOREBOARD kill (AddKill), the bounty and ALL p-res
+-- Previously only the gamerules path reattributed, which is why the killfeed showed the Prowler
+-- but the scoreboard never awarded it.
+kProwlerReelKillWindow = 5
+
+function GetProwlerReelKillCredit(targetEntity, attacker)
+
+    if not targetEntity or not attacker then return nil end
+
+    -- isa("Marine") covers Marine AND JetpackMarine, and excludes Exos (which cannot be reeled).
+    if not targetEntity.isa or not targetEntity:isa("Marine") then return nil end
+    if not attacker.isa or not attacker:isa("DeathTrigger") then return nil end
+
+    local reelTime = targetEntity._prowlerReelTime
+    if not reelTime or (Shared.GetTime() - reelTime) > kProwlerReelKillWindow then return nil end
+
+    -- If the Prowler has since died or changed form its entity is gone / no longer a Prowler, so
+    -- this safely returns nil (no credit) rather than erroring.
+    local prowler = targetEntity._prowlerReelPullerId
+                    and Shared.GetEntity(targetEntity._prowlerReelPullerId)
+    if prowler and prowler.isa and prowler:isa("Prowler") then
+        return prowler
     end
 
-    -- ── MARINES ONLY from here down (scaled ramp + 0.25s per BUILT Infantry Portal). ──
-    -- Factors that LENGTHEN respawn: crowd size over the match minimum + researched tech.
-    local lengthen = math.max( GetPlayersAboveLimit(teamIndex) , 0 ) * kRespawnSecondsPerPlayer
-    -- TEAM-based tech check (the team's tech tree, by team number) so it evaluates the same
-    -- on the server and reflects the TEAM's research - not GetHasTech(localPlayer), which on
-    -- a client only knows the local viewer's tree (the spectator-vs-player mismatch). The
-    -- per-team result is networked (TeamInfo) for the HUD.
-    local teamTechTree = GetTechTree and GetTechTree(teamIndex)
-    if teamTechTree and teamTechTree.GetHasTech then
-        for k,v in pairs(kTechRespawnTimeExtension) do
-            if teamTechTree:GetHasTech(k, true) then
-                lengthen = lengthen + v
-            end
-        end
-    end
-
-    -- Growth target the ramp climbs toward = the guaranteed time-ramp max PLUS the factors
-    -- that lengthen (crowd + tech). Capped at +11 so the SCALED part alone reaches at most
-    -- base+11 = 20s/21s. The flat structure reduction below is subtracted on TOP of this.
-    local growthTarget = Clamp(kRespawnTimeRampMax + lengthen, 0, 11)
-
-    -- Convex time envelope: 0 at game start -> 1 at the ramp end (see GetRespawnRampSeconds).
-    -- power > 1 keeps the OVERALL respawn increase shallow early (fast respawns) and steep
-    -- late; marines use the higher power so their curve is flatter through the early/mid game.
-    -- The convex envelope applies ONLY to the growth, so the rate-of-growth (2nd derivative)
-    -- rises over the round as originally requested.
-    local power  = kMarineRespawnRampPower   -- marine-only path (aliens returned early above)
-    local t      = Clamp(x / GetRespawnRampSeconds(), 0, 1)
-    local convex = t ^ power
-    local convexGrowth = convex * growthTarget
-
-    -- FLAT Infantry-Portal reduction - deliberately NOT scaled by the convex envelope: 0.25s
-    -- per BUILT IP, capped at the map-wide limit kMaxInfantryPortalsGlobal (=12) -> max 3s.
-    -- info.numInfantryPortals comes from GetNumActiveInfantryPortals (GetIsUnitActive), so ONLY
-    -- constructed/active IPs count - an unbuilt/ghost IP grants NO reduction until it finishes.
-    -- Recomputed each tick from the CURRENT built count, so IPs gained/lost change it live.
-    local flatReduce = 0
-    local info = GetTeamInfoEntity(teamIndex)
-    if info and info.numInfantryPortals then
-        local ipCap = kMaxInfantryPortalsGlobal or 12
-        flatReduce = math.min(info.numInfantryPortals, ipCap) * 0.25
-    end
-
-    -- Final MARINE extension = scaled growth minus the flat IP reduction, clamped to [0, 11].
-    -- The 0 floor guarantees the marine MINIMUM stays the 9s base no matter how many IPs; the
-    -- +11 cap keeps the marine MAXIMUM at 20s.
-    return Clamp(convexGrowth - flatReduce, 0, 11)
+    return nil
 end

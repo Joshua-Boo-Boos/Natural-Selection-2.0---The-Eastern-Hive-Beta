@@ -400,6 +400,11 @@ if Server then
                 end
             end
 
+            -- Return the pilot's ACTUAL weapons (same as PerformEject): refill any recorded
+            -- loadout weapon whose stored entity didn't survive, so an emergency-ejected pilot
+            -- gets exactly the weapons they had - never left weaponless.
+            CNBExoRefillLoadout(marine, self.exoStoredLoadout)
+
             marine:SetHUDSlotActive(1)
 
             if marine:isa("JetpackMarine") then
@@ -480,6 +485,35 @@ if Server then
 
     end
 
+    -- ── Record the pilot's actual loadout (weapon map names) alongside the stored
+    -- weapon entities ─────────────────────────────────────────────────────────
+    -- Vanilla stores weapon ENTITY ids (storedWeaponsIds) and re-adds those exact entities on
+    -- eject. That relies on the detached weapon entities surviving the whole exo lifetime; if
+    -- any don't, the pilot ejects with nothing (preventWeapons also suppresses the default axe).
+    -- We additionally record each stored weapon's MAP NAME so the eject paths can recreate the
+    -- exact same weapons if the entities are gone - the player always gets THEIR weapons back.
+    local baseExoStoreWeapon = Exo.StoreWeapon
+    function Exo:StoreWeapon(weapon)
+        baseExoStoreWeapon(self, weapon)
+        if weapon and weapon.GetMapName then
+            self.exoStoredLoadout = self.exoStoredLoadout or {}
+            table.insert(self.exoStoredLoadout, weapon:GetMapName())
+        end
+    end
+
+    -- Re-give any recorded loadout weapons the ejected marine is missing (because the stored
+    -- entity didn't survive). Skips weapons already restored so nothing is duplicated. Global
+    -- so BOTH eject paths (AttemptToKill, declared earlier, and PerformEject) can call it.
+    function CNBExoRefillLoadout(marine, loadout)
+        if not marine or not loadout or not marine.GetWeapon or not marine.GiveItem then return end
+        for _, mapName in ipairs(loadout) do
+            if not marine:GetWeapon(mapName) then
+                marine:GiveItem(mapName, false)
+            end
+        end
+        if marine.SetHUDSlotActive then marine:SetHUDSlotActive(1) end
+    end
+
     -- ── Preserve the previous player's prototype upgrades across the exo ───────
     -- When a marine / jetpack marine becomes this exo, remember its prototype
     -- upgrade bits (e.g. the Jetpack's Boost) so they can be restored when the
@@ -496,6 +530,10 @@ if Server then
                 self.prevHadJetpack        = player.prevHadJetpack
                 self.prevHadCannon         = player.prevHadCannon
                 self.prevCannonUpgradeBits = player.prevCannonUpgradeBits
+                -- Carry the recorded loadout so an exo→exo Replace (upgrade / combo change)
+                -- never drops the record of what weapons to hand back on eject. (Vanilla
+                -- CopyPlayerDataFrom already carries the storedWeaponsIds entity list.)
+                self.exoStoredLoadout      = player.exoStoredLoadout
             else
                 if player.prototypeUpgradeBits ~= nil then
                     self.prevPrototypeUpgradeBits = player.prototypeUpgradeBits
@@ -534,11 +572,22 @@ if Server then
     -- constant across the eject/re-enter cycle instead of resetting to 10.
     local baseExoPerformEject = Exo.PerformEject
     function Exo:PerformEject()
+        local client  = Server and Server.GetOwner and Server.GetOwner(self)
+        local loadout = self.exoStoredLoadout
         _G.gEjectingExoPrototypeBits    = self.prototypeUpgradeBits or 0
         _G.gEjectingExoResupplyCharges  = self.resupplyChargesRemaining or kResupplyMaxCharges
         baseExoPerformEject(self)
         _G.gEjectingExoPrototypeBits    = nil
         _G.gEjectingExoResupplyCharges  = nil
+
+        -- Return the pilot's ACTUAL weapons. vanilla PerformEject re-adds the stored weapon
+        -- ENTITIES; if any didn't survive, preventWeapons would otherwise leave the marine with
+        -- nothing (no axe, no gun - feels like spectating). Refill from the recorded loadout so
+        -- exactly the weapons they entered the exo with come back (only the ones actually
+        -- missing are re-created, so surviving entities are kept and nothing is duplicated).
+        if client and client.GetControllingPlayer then
+            CNBExoRefillLoadout(client:GetControllingPlayer(), loadout)
+        end
     end
 
 end

@@ -279,7 +279,7 @@ kLocales["ABM_DISABLED"] ="Developing"
 kLocales["RESPAWN_EXTEND_TEAM0"] = "Round Finishing"
 
 kLocales["GAME_LENGTH_TEAM1"] = "Cleaning:[%s:%s]"
-kLocales["RESPAWN_EXTEND_TEAM1"] = "Reinforce:[%is]"
+kLocales["RESPAWN_EXTEND_TEAM1"] = "Reinforce:[%.2fs]"
 kLocales["DEADLOCK_UNTIL_TEAM1"] = "Cleaning [%i:%02i->%i:%02i]"
 kLocales["DEADLOCK_ACTIVATED_TEAM1"] = "Self-Destructing [%i:%02i->%i:%02i]"
 kLocales["DEADLOCK_ACTIVATING_TEAM1"] = "Station Self-Destructing,Suppress bio-factor ASAP."

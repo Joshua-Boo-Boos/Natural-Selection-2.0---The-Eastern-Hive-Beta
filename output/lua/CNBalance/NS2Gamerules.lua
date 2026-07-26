@@ -491,31 +491,20 @@
      -- within kProwlerReelKillWindow seconds, reattribute the kill to that Prowler + its
      -- Rappel weapon. If instead an alien (e.g. a Fade's swipe) dealt the killing blow, the
      -- attacker is that alien, this branch is skipped, and the alien correctly keeps the kill.
-     local kProwlerReelKillWindow = 5
-
+     -- The reel-window / DeathTrigger / Prowler-still-alive test lives in ONE place
+     -- (GetProwlerReelKillCredit, CNBalance/Globals.lua) so this killfeed path and the
+     -- PointGiverMixin:PreOnKill path (scoreboard kill + bounty + p-res) can never disagree.
      local baseOnEntityKilled = NS2Gamerules.OnEntityKilled
      function NS2Gamerules:OnEntityKilled(targetEntity, attacker, doer, point, direction)
 
-         -- isa("Marine") = Marine + JetpackMarine, and excludes Exos (which cannot be pulled).
-         if targetEntity and targetEntity:isa("Marine")
-            and attacker and attacker:isa("DeathTrigger") then
-
-             local reelTime = targetEntity._prowlerReelTime
-             if reelTime and (Shared.GetTime() - reelTime) <= kProwlerReelKillWindow then
-
-                 local prowler = targetEntity._prowlerReelPullerId
-                                 and Shared.GetEntity(targetEntity._prowlerReelPullerId)
-
-                 -- If the Prowler has died or changed form its entity is gone / no longer a
-                 -- Prowler, so this safely skips (no credit) rather than erroring.
-                 if prowler and prowler:isa("Prowler") then
-                     attacker = prowler
-                     -- Doer = the Prowler's Rappel weapon so the kill is credited "with the
-                     -- Rappel weapon" (its death icon); fall back to the Prowler itself.
-                     local rappelMapName = VolleyRappel and VolleyRappel.kMapName or "volley"
-                     doer = (prowler.GetWeapon and prowler:GetWeapon(rappelMapName)) or prowler
-                 end
-             end
+         local prowler = GetProwlerReelKillCredit
+                         and GetProwlerReelKillCredit(targetEntity, attacker)
+         if prowler then
+             attacker = prowler
+             -- Doer = the Prowler's Rappel weapon so the kill is credited "with the
+             -- Rappel weapon" (its death icon); fall back to the Prowler itself.
+             local rappelMapName = VolleyRappel and VolleyRappel.kMapName or "volley"
+             doer = (prowler.GetWeapon and prowler:GetWeapon(rappelMapName)) or prowler
          end
 
          baseOnEntityKilled(self, targetEntity, attacker, doer, point, direction)

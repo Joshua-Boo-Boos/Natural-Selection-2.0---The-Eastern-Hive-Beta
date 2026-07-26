@@ -13,6 +13,35 @@ if Server then
         local totalDamageDone = self:GetMaxHealth() + self:GetMaxArmor() * 2
         local points = self:GetPointValue()
 
+        -- Prowler reel credit (see GetProwlerReelKillCredit in CNBalance/Globals.lua).
+        -- This MUST be applied here as well as in NS2Gamerules:OnEntityKilled: the killfeed is
+        -- driven from the gamerules path, but the SCOREBOARD kill (AddKill), the bounty and ALL
+        -- p-res are awarded right here - and this function receives the ORIGINAL attacker (the
+        -- DeathTrigger). That is exactly why the killfeed showed the Prowler while the scoreboard
+        -- awarded it nothing.
+        if GetProwlerReelKillCredit then
+            local prowler = GetProwlerReelKillCredit(self, attacker)
+            if prowler then
+
+                attacker = prowler
+
+                -- A reel deals no damage, so the Prowler is normally absent from damagePoints and
+                -- the reward loop below would skip it entirely (no p-res at all). Insert it with
+                -- full damage credit so it is processed AS THE KILLER, which is what unlocks:
+                --   * its p-res share of pResReward, and
+                --   * AlienTeam:CollectKillReward - the ORIGIN FORM kill reward, which only pays
+                --     out when isKiller is true (kOriginPersonalResourcesPerKill, 0 without Origin
+                --     Form). So Origin Form is honoured automatically via the normal path.
+                local prowlerId = prowler:GetId()
+                if self.damagePoints and self.damagePoints.attackers
+                   and not self.damagePoints[prowlerId] then
+                    table.insert(self.damagePoints.attackers, prowlerId)
+                    self.damagePoints[prowlerId] = totalDamageDone
+                end
+
+            end
+        end
+
         local selfIsPlayer = self:isa("Player")
 
         local _techID = self:GetTechId()

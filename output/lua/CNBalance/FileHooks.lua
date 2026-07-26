@@ -168,6 +168,9 @@ ModLoader.SetupFileHook("lua/Exosuit.lua", "lua/CNBalance/Exosuit.lua", "post")
 -- Exo special weapons (Flamethrower / Grenade Launcher / Welder exo arms) live in a
 -- post-hook on Railgun.lua (loads alongside the exo weapon classes).
 ModLoader.SetupFileHook("lua/Weapons/Marine/Railgun.lua", "lua/Combat/ExoSpecialWeapon.lua", "post")
+-- Minigun: self-healing fallback for the permanently-stuck `overheated` flag (vanilla only
+-- clears it from an animation tag that some Exo layouts never fire).
+ModLoader.SetupFileHook("lua/Weapons/Marine/Minigun.lua", "lua/CNBalance/Minigun.lua", "post")
 
 ModLoader.SetupFileHook("lua/Weapons/WeaponDisplayManager.lua", "lua/CNBalance/Weapons/WeaponDisplayManager.lua", "post" )
 ModLoader.SetupFileHook("lua/Weapons/Weapon.lua", "lua/CNBalance/Weapons/Weapon.lua", "post")
