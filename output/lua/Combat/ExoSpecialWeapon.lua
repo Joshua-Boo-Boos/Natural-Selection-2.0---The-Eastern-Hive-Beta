@@ -58,9 +58,9 @@ local kFlamethrowerRange          = kArmouryFlamethrowerRange * 1.25          --
 -- Hitbox WIDTH & HEIGHT (the cone box's perpendicular half-extents): 15% larger than the base.
 -- (The DEPTH is the range above; it is NOT scaled here, so there is no double +25%.)
 local kFlamethrowerConeWidth      = 0.6 * 1.15                                -- 0.69
--- DAMAGE per application: 20% more PURE weapon damage than the hand FT, at the SAME fire cadence
+-- DAMAGE per application: 30% more PURE weapon damage than the hand FT, at the SAME fire cadence
 -- (kFlamethrowerDamageRate). Flame-pool DoT is separate and NOT part of this figure.
-local kExoFlamethrowerDamage      = kArmouryFlamethrowerDamage * 1.4          -- 1.4x the AA FT (9.918 * 1.4 = 13.8852)
+local kExoFlamethrowerDamage      = kArmouryFlamethrowerDamage * 1.3          -- 1.3x the AA FT (9.918 * 1.3 = 12.8934)
 local kFlamethrowerDamageRate     = 0.15 -- apply damage every 0.15s (mirrors the hand FT cadence)
 
 -- kChargeTime in vanilla Railgun.lua = 2 seconds; we mirror it for arm-glow mapping.
