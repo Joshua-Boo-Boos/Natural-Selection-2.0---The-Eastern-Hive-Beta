@@ -72,6 +72,7 @@ ModLoader.SetupFileHook("lua/Weapons/BulletsMixin.lua", "lua/CNBalance/Mixin/Bul
 ModLoader.SetupFileHook("lua/FireMixin.lua", "lua/CNBalance/Mixin/FireMixin.lua", "replace")
 ModLoader.SetupFileHook("lua/RailgunTargetMixin.lua", "lua/CNBalance/Mixin/RailgunTargetMixin.lua", "replace")
 ModLoader.SetupFileHook("lua/ResearchMixin.lua", "lua/CNBalance/Mixin/ResearchMixin.lua", "post")
+ModLoader.SetupFileHook("lua/RagdollMixin.lua", "lua/CNBalance/Mixin/RagdollMixin.lua", "post")
 ModLoader.SetupFileHook("lua/TechMixin.lua", "lua/CNBalance/Mixin/TechMixin.lua", "post")
 ModLoader.SetupFileHook("lua/MaturityMixin.lua", "lua/CNBalance/Mixin/MaturityMixin.lua", "post")
 ModLoader.SetupFileHook("lua/LiveMixin.lua", "lua/CNBalance/Mixin/LiveMixin.lua", "post")
@@ -119,6 +120,9 @@ ModLoader.SetupFileHook("lua/CommAbilities/Marine/Scan.lua", "lua/CNBalance/Comm
 --Marines
 ModLoader.SetupFileHook("lua/Hud/Marine/GUIMarineHUD.lua", "lua/CNBalance/GUI/GUIMarineHUD.lua", "post" )
 ModLoader.SetupFileHook("lua/Hud/Marine/GUIExoHUD.lua", "lua/CNBalance/GUI/GUIExoHUD.lua", "post" )
+ModLoader.SetupFileHook("lua/GUIExoThruster.lua", "lua/CNBalance/GUI/GUIExoThruster.lua", "post" )
+ModLoader.SetupFileHook("lua/GUIInsight_PlayerFrames.lua", "lua/CNBalance/GUI/GUIInsight_PlayerFrames.lua", "post" )
+ModLoader.SetupFileHook("lua/GUIScoreboard.lua", "lua/CNBalance/GUIScoreboard.lua", "post" )
 ModLoader.SetupFileHook("lua/Hud/GUIPlayerResource.lua", "lua/CNBalance/GUI/GUIPlayerResource.lua", "post")
 ModLoader.SetupFileHook("lua/GUIMarineBuyMenu.lua", "lua/CNBalance/GUI/GUIMarineBuyMenu.lua", "replace" )
 
@@ -286,3 +290,11 @@ ModLoader.SetupFileHook("lua/Whip.lua", "lua/CNBalance/Structures/Alien/Whip.lua
 ModLoader.SetupFileHook("lua/Harvester.lua", "lua/CNBalance/Structures/Alien/Harvester.lua", "post")
 ModLoader.SetupFileHook("lua/Weapons/Alien/Web.lua", "lua/CNBalance/Structures/Alien/Web.lua", "post")
 ModLoader.SetupFileHook("lua/Egg.lua", "lua/CNBalance/Structures/Alien/Egg.lua", "post")
+
+-- Commander map tools: all-player pings (with names) + commander map drawing. Shared file
+-- registers the network messages (on NetworkMessages.lua, loaded early in every VM); the server /
+-- client / minimap files load later so the messages already exist when they hook them.
+ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/CommMapTools_Shared.lua", "post")
+ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/CNBalance/CommMapTools_Server.lua", "post")
+ModLoader.SetupFileHook("lua/NetworkMessages_Client.lua", "lua/CNBalance/CommMapTools_Client.lua", "post")
+ModLoader.SetupFileHook("lua/GUIMinimapFrame.lua", "lua/CNBalance/GUIMinimapFrame.lua", "post")

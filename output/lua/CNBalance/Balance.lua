@@ -50,7 +50,9 @@ kAssistMinimumDamageFraction = 0.35      --Avoid parasiter or babbler assists ,f
 kBountyScoreEachAssist = 1 kBountyScoreEachKill = 2 kMaxBountyScore = 512       --You can't kill 256 players in a row?
 kBountyClaimMinMarine = 5 kBountyClaimMinJetpack = 8 kBountyClaimMinExo = 12
 kBountyClaimMinSkulk = 5 kBountyClaimMinAlien = 8 kBountyClaimMinFade = 10 kBountyClaimMinOnos = 12
-kBountyCooldown = 20 kBountyClaimMultiplier = 2
+-- Bounty decays by exactly ONE point per kBountyCooldown seconds, in combat or not (was 20s with an
+-- in-combat slowdown; now a flat 60s - see ScoringMixin:CheckBountyCooldown).
+kBountyCooldown = 60 kBountyClaimMultiplier = 2
 
 --Toy for marine commander (remove all marines passive income)
 kMilitaryProtocolResearchCost = 0
@@ -717,8 +719,27 @@ kGorgeAbilitiesCost = {
 }
 
 kGorgeStructureScorePerRes = 0.3
+-- ORIGIN FORM kill reward. The base p-res is now decided by the KILLER's LIFEFORM, not the victim:
+-- weaker lifeforms earn more per kill, so a commander-less Origin Form team cannot snowball its
+-- economy off Onos/Fade kills (the value a killer gets for a standard Marine).
 kOriginPersonalResourcesPerKill = {
-    [kTechId.Marine] = 2, [kTechId.JetpackMarine] = 3, [kTechId.Exo] = 4, [kTechId.Exosuit] = 2,
+    [kTechId.Skulk] = 2,   [kTechId.Gorge] = 2,
+    [kTechId.Prowler] = 1.8,
+    [kTechId.Lerk] = 1.7,
+    [kTechId.Vokex] = 1,   [kTechId.Fade] = 1,   [kTechId.Onos] = 1,
+}
+-- Base for any NON-LIFEFORM alien killer: Hydras, Whips, Spore clouds, Babbler eggs, Contamination,
+-- etc. Deliberately 2, because 2 x the victim scalars below reproduces the ORIGINAL pre-rework
+-- rewards EXACTLY (Marine 2, Jetpack 3, Exo 4, Exosuit 2). Structures therefore pay out exactly what
+-- they always have - only the alien LIFEFORMS above have had their rewards rebalanced.
+kOriginPersonalResourcesPerKillDefault = 2
+
+-- Multiplier applied to the killer's base value for the VICTIM's marine entity type. Keeps the
+-- previous Marine : Jetpack : Exo reward ratio of 2 : 3 : 4 (i.e. 1x : 1.5x : 2x), so tougher
+-- targets stay proportionally more rewarding under the new killer-based scaling. Only entities
+-- listed here pay an Origin Form kill reward at all.
+kOriginKillRewardVictimScalar = {
+    [kTechId.Marine] = 1, [kTechId.JetpackMarine] = 1.5, [kTechId.Exo] = 2, [kTechId.Exosuit] = 1,
 }
 
 kGorgeHiveBuildTime = kHiveBuildTime

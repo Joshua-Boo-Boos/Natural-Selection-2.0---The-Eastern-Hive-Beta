@@ -484,7 +484,7 @@ function Vokex:OnProcessMove(input)
         end
 
         -- Bot AI: grant AcidRocket (the Vokex's ranged weapon) once it is unlocked by
-        -- Biomass (kTechId.AcidRocket <- kTechId.BioMassSix). Human Vokex buy it via the
+        -- Biomass (kTechId.AcidRocket <- kTechId.BioMassFive). Human Vokex buy it via the
         -- Vokex menu; bots do not use menus, so give it directly when the tech is
         -- available. Checked periodically (not every tick) and never force-switched to.
         if self:GetIsVirtual() and AcidRocket and (not self.tehNextAcidCheck or Shared.GetTime() >= self.tehNextAcidCheck) then

@@ -69,6 +69,9 @@ TeamInfo.kRelevantTechIdsMarine =
     kTechId.JetpackPrototypeLab,
     kTechId.ExosuitPrototypeLab,
     kTechId.CannonPrototypeLab,
+    -- Exosuit Experimental Technologies: listed so its research icon appears in the
+    -- commander/spectator production-and-research bar (GUIProduction) lower-left.
+    kTechId.ExosuitExperimentalTech,
 
     kTechId.Weapons1,
     kTechId.Weapons2,

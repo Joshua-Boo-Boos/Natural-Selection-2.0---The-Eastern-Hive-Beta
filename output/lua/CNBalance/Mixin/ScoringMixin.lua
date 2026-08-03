@@ -1,13 +1,14 @@
 ScoringMixin.networkVars.bountyCurrentLife = "integer"
 
 local kBountyCooldownTick = 2
--- Bounty still decays while in combat, but its decay accrues 40% slower than
--- when out of combat.
-local kBountyCombatDecaySlow = 0.4
 local baseInitMixin = ScoringMixin.__initmixin
 function ScoringMixin:__initmixin()
     baseInitMixin(self)
     self.bountyCurrentLife = 0
+    -- Must be initialised here: the decay accumulator is no longer seeded by AddBounty (the 60s
+    -- countdown runs continuously and is never reset by kills/assists/claims), so without this it
+    -- would be nil the first time CheckBountyCooldown does arithmetic on it.
+    self.bountyCooldown = 0
     if Server then
         self:AddTimedCallback( self.CheckBountyCooldown, kBountyCooldownTick )
     end
@@ -58,13 +59,24 @@ if Server then
     function ScoringMixin:CopyPlayerDataFrom(player)
         baseCopyPlayerDataFrom(self,player)
         self.bountyCurrentLife = player.bountyCurrentLife
-        self.bountyCooldown = 0
+        -- CARRY the decay accumulator across entity replacement (respawn, lifeform change). Zeroing
+        -- it here would restart the 60s countdown every time a player died or evolved.
+        self.bountyCooldown = player.bountyCooldown or 0
     end
 
     local function AddBounty(self,value)
         --if GetWarmupActive() then return end
+        -- Going from ZERO bounty to some bounty starts a FRESH full 60s countdown, so a player who
+        -- earns their first point never gets an instantly-short first tick from a leftover part
+        -- cycle. While they ALREADY have bounty the countdown keeps running untouched - a kill or
+        -- assist must never postpone the next -1 tick.
+        local wasZero = ( self.bountyCurrentLife or 0 ) <= 0
+
         self.bountyCurrentLife = Clamp(self.bountyCurrentLife + value, 0, kMaxBountyScore)
-        self.bountyCooldown = 0
+
+        if wasZero and self.bountyCurrentLife > 0 then
+            self.bountyCooldown = 0
+        end
     end
     
     local baseAddKill = ScoringMixin.AddKill
@@ -90,7 +102,8 @@ if Server then
 
         local claim = math.min(self.bountyCurrentLife, math.floor(self.kBountyThreshold * kBountyClaimMultiplier))
         self.bountyCurrentLife = self.bountyCurrentLife - claim
-        self.bountyCooldown = 0
+        -- Decay countdown is NOT reset: dying (having your bounty claimed) must not postpone the
+        -- next -1 tick either.
     end
 
     function ScoringMixin:CheckBountyCooldown()
@@ -98,14 +111,13 @@ if Server then
             return true
         end
 
-        -- Bounty decays even while in combat now, just 40% slower than out of combat.
-        local decayTick = kBountyCooldownTick
-        if self.GetIsInCombat and self:GetIsInCombat() then
-            decayTick = decayTick * (1 - kBountyCombatDecaySlow)
-        end
-
-        self.bountyCooldown = self.bountyCooldown + decayTick
-        if self.bountyCooldown > kBountyCooldown then
+        -- FLAT decay: the bounty drops by exactly one point every kBountyCooldown seconds (60),
+        -- whether or not the player is in combat. The old in-combat slowdown has been removed.
+        -- NOTE: the test is >= , not > . With the 2s tick, a strict > meant the accumulator had to
+        -- reach 62 before the first drop (62s, then 60s thereafter); >= makes every interval an
+        -- exact 60s.
+        self.bountyCooldown = self.bountyCooldown + kBountyCooldownTick
+        if self.bountyCooldown >= kBountyCooldown then
             self.bountyCooldown = self.bountyCooldown - kBountyCooldown
             self.bountyCurrentLife = math.max(self.bountyCurrentLife - 1,0)
         end

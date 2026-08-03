@@ -127,7 +127,8 @@ function MarineTeam:InitTechTree()
     -- Standard
     self.techTree:AddUpgradeNode(kTechId.StandardSupply, kTechId.CommandStation)
     self.techTree:AddTargetedActivation(kTechId.CatPack, kTechId.StandardStation)
-    self.techTree:AddResearchNode(kTechId.DragonBreath , kTechId.StandardStation)
+    -- Fire Bullets (DragonBreath) now also requires Weapons 2.
+    self.techTree:AddResearchNode(kTechId.DragonBreath , kTechId.StandardStation, kTechId.Weapons2)
     self.techTree:AddPassive(kTechId.LightMachineGunUpgrade , kTechId.StandardStation)
     
     self.techTree:AddBuyNode(kTechId.LightMachineGun,               kTechId.StandardStation)
@@ -137,7 +138,8 @@ function MarineTeam:InitTechTree()
     self.techTree:AddUpgradeNode(kTechId.ArmorSupply, kTechId.CommandStation)
     self.techTree:AddTargetedActivation(kTechId.NanoShield,kTechId.ArmorStation)
     self.techTree:AddPassive(kTechId.LifeSustain,kTechId.ArmorStation)
-    self.techTree:AddResearchNode(kTechId.ArmorRegen,kTechId.ArmorStation)
+    -- Nano Armour (ArmorRegen) now also requires Armor 2.
+    self.techTree:AddResearchNode(kTechId.ArmorRegen,kTechId.ArmorStation, kTechId.Armor2)
 
     --Explosive
     self.techTree:AddUpgradeNode(kTechId.ExplosiveSupply, kTechId.CommandStation)

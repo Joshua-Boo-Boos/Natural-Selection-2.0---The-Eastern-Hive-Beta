@@ -202,34 +202,45 @@ local function ClearPlayerNow(player)
 end
 
 function Devour:ClearPlayer(isOnosDying)
+    -- IMPORTANT: key off eatingPlayerId, NOT the parent Onos. When the Onos is KILLED, this runs
+    -- from Devour:OnDestroy while the Onos entity is being torn down, so self:GetParent() is often
+    -- already nil. The old `if onos and ...` guard then skipped the release entirely and left the
+    -- marine stuck as a DevouredPlayer (the "marine saved but bugged" state). The Onos is only
+    -- needed for the little death-spot reposition, which we simply skip when it's already gone.
+    if self.eatingPlayerId == 0 then return end
+
+    local devouredplayer = Shared.GetEntity(self.eatingPlayerId)
+    if not devouredplayer then
+        self.eatingPlayerId = 0
+        return
+    end
+
     local onos = self:GetParent()
     local onosDied = isOnosDying or false
-    if onos and self.eatingPlayerId ~= 0 then
-        local devouredplayer = Shared.GetEntity(self.eatingPlayerId)
-        if devouredplayer then
-            if onosDied then
-                local onosHorizontalFacing = GetNormalizedVectorXZ(onos:GetViewCoords().zAxis)
-                devouredplayer:SetOrigin(onos:GetOrigin() + Vector(onosHorizontalFacing.x * 0.25, Onos.YExtents, onosHorizontalFacing.z * 0.25))
-                local playerVelocity = Vector(0, 0, 0)
-                if devouredplayer.SetIsOnosDying then
-                    devouredplayer:SetIsOnosDying(true)
-                end
-                if devouredplayer.SetDevouringOnosId then
-                    devouredplayer:SetDevouringOnosId(0)
-                end
-                devouredplayer:SetVelocity(playerVelocity)
-                self:TriggerEffects("combat_stop_effects")
-                self.devouringScalar = 0
-                self.eatingPlayerId = 0
-                self.lastDevourTime = nil
-            else
-                if devouredplayer.SetIsOnosDying then
-                    devouredplayer:SetIsOnosDying(false)
-                end
-            end
-            devouredplayer:AddTimedCallback(ClearPlayerNow, 0.01)
+
+    if onosDied then
+        if onos then
+            local onosHorizontalFacing = GetNormalizedVectorXZ(onos:GetViewCoords().zAxis)
+            devouredplayer:SetOrigin(onos:GetOrigin() + Vector(onosHorizontalFacing.x * 0.25, Onos.YExtents, onosHorizontalFacing.z * 0.25))
+        end
+        if devouredplayer.SetIsOnosDying then
+            devouredplayer:SetIsOnosDying(true)
+        end
+        if devouredplayer.SetDevouringOnosId then
+            devouredplayer:SetDevouringOnosId(0)
+        end
+        devouredplayer:SetVelocity(Vector(0, 0, 0))
+        self:TriggerEffects("combat_stop_effects")
+        self.devouringScalar = 0
+        self.eatingPlayerId = 0
+        self.lastDevourTime = nil
+    else
+        if devouredplayer.SetIsOnosDying then
+            devouredplayer:SetIsOnosDying(false)
         end
     end
+
+    devouredplayer:AddTimedCallback(ClearPlayerNow, 0.01)
 end
 
 function Devour:GetDeathIconIndex()

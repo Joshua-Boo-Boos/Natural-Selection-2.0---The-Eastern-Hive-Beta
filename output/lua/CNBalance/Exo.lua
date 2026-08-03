@@ -615,6 +615,59 @@ function Exo:GetExoVariantOverride(variant)
 end
 
 
+-- ── Scoreboard combo name ──────────────────────────────────────────────────────
+-- Vanilla returns a flat kPlayerStatus.Exo ("Exo").  We instead report the exact
+-- weapon combination ("Dual-FT Exo", "Claw-Minigun Exo", …) and append a "+"
+-- (the "…Plus" enum variant) whenever this Exo carries ANY Experimental Technology
+-- upgrade.  The "+" and the upgrades live on the Exo entity's own
+-- prototypeUpgradeBits, so they PERSIST even if the researching Prototype Lab is
+-- destroyed.  When a Marine/JetpackMarine manually exits the suit the entity is no
+-- longer an Exo, so Marine:GetPlayerStatusDesc runs instead and the normal weapon
+-- name (e.g. "JP/Rifle") is shown automatically.
+Exo.kLayoutToStatus = {
+    -- layout key       = { base status,                    plus status }
+    MinigunMinigun   = { kPlayerStatus.ExoDualMinigun,   kPlayerStatus.ExoDualMinigunPlus },
+    DualMinigun      = { kPlayerStatus.ExoDualMinigun,   kPlayerStatus.ExoDualMinigunPlus },
+    RailgunRailgun   = { kPlayerStatus.ExoDualRail,      kPlayerStatus.ExoDualRailPlus },
+    DualRailgun      = { kPlayerStatus.ExoDualRail,      kPlayerStatus.ExoDualRailPlus },
+    DualFlamethrower = { kPlayerStatus.ExoDualFT,        kPlayerStatus.ExoDualFTPlus },
+    ClawMinigun      = { kPlayerStatus.ExoClawMinigun,   kPlayerStatus.ExoClawMinigunPlus },
+    MinigunClaw      = { kPlayerStatus.ExoClawMinigun,   kPlayerStatus.ExoClawMinigunPlus },
+    ClawRailgun      = { kPlayerStatus.ExoClawRail,      kPlayerStatus.ExoClawRailPlus },
+    RailgunClaw      = { kPlayerStatus.ExoClawRail,      kPlayerStatus.ExoClawRailPlus },
+    FlamethrowerClaw = { kPlayerStatus.ExoClawFT,        kPlayerStatus.ExoClawFTPlus },
+}
+
+function Exo:GetHasAnyExperimentalUpgrade()
+    local ups = kPrototypeUpgradesForTrack and kPrototypeUpgradesForTrack.exo
+    if ups and self.GetHasPrototypeUpgrade then
+        for _, techId in ipairs(ups) do
+            if self:GetHasPrototypeUpgrade(techId) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function Exo:GetPlayerStatusDesc()
+    if not self:GetIsAlive() then
+        return kPlayerStatus.Dead
+    end
+
+    local entry = Exo.kLayoutToStatus[self.layout]
+    if entry then
+        -- The trailing `or kPlayerStatus.Exo` guarantees a non-nil status even in the
+        -- (impossible-in-practice) case the combo enum values were unavailable when the
+        -- table was built — a nil networked status would otherwise error server-side.
+        return (self:GetHasAnyExperimentalUpgrade() and entry[2]) or entry[1] or kPlayerStatus.Exo
+    end
+
+    -- Unknown / unmapped layout: fall back to the plain "Exo" status.
+    return kPlayerStatus.Exo
+end
+
+
 function Exo:GetArmorAmount(armorLevels)
 
     if not armorLevels then
@@ -649,14 +702,20 @@ end
 
 function Exo:GetFuel()
 
+    -- Extra Fuel = a bigger tank at the SAME real drain/fill rate. We keep fuel as a 0->1
+    -- fraction of the tank (so the HUD bar, the >= activation threshold, the == 0 stop check
+    -- and the "0 to 1" netvar all stay valid), and model the bigger tank by making BOTH the
+    -- drain and the recharge 1.3x SLOWER. Net effect: thrust lasts 1.3x longer AND the full
+    -- recharge takes 1.3x longer (2.5s -> ~3.25s) - exactly a larger tank at an unchanged rate.
+    local divisor = self:GetHasPrototypeUpgrade(kTechId.PrototypeExoExtraFuel) and 1.3 or 1.0
+
     local slope
     local changeCooldownPeriod
     if self.thrustersActive then
-        local divisor = self:GetHasPrototypeUpgrade(kTechId.PrototypeExoExtraFuel) and 1.3 or 1.0
         slope = -1.0 / (kThrusterDuration * divisor)
         changeCooldownPeriod = 0
     else
-        slope = 1.0 / kThrustersCooldownTime
+        slope = 1.0 / (kThrustersCooldownTime * divisor)
         changeCooldownPeriod = kThrusterRefuelCooldownTime
     end
 

@@ -20,6 +20,23 @@ debug.appendtoenum(kPlayerStatus, "ProwlerEgg")
 debug.appendtoenum(kPlayerStatus, "Vokex")
 debug.appendtoenum(kPlayerStatus, "VokexEgg")
 
+-- Prototype-Exo scoreboard combo statuses.  One per weapon combination, plus a
+-- "…Plus" variant used when the Exo carries ANY Experimental Technology upgrade
+-- (the trailing "+" on the scoreboard).  Exo:GetPlayerStatusDesc (Exo.lua) picks
+-- which one to return from self.layout + GetHasPrototypeUpgrade.
+debug.appendtoenum(kPlayerStatus, "ExoDualMinigun")
+debug.appendtoenum(kPlayerStatus, "ExoDualRail")
+debug.appendtoenum(kPlayerStatus, "ExoDualFT")
+debug.appendtoenum(kPlayerStatus, "ExoClawMinigun")
+debug.appendtoenum(kPlayerStatus, "ExoClawRail")
+debug.appendtoenum(kPlayerStatus, "ExoClawFT")
+debug.appendtoenum(kPlayerStatus, "ExoDualMinigunPlus")
+debug.appendtoenum(kPlayerStatus, "ExoDualRailPlus")
+debug.appendtoenum(kPlayerStatus, "ExoDualFTPlus")
+debug.appendtoenum(kPlayerStatus, "ExoClawMinigunPlus")
+debug.appendtoenum(kPlayerStatus, "ExoClawRailPlus")
+debug.appendtoenum(kPlayerStatus, "ExoClawFTPlus")
+
 debug.appendtoenum(kDeathMessageIcon, "Devour")
 debug.appendtoenum(kDeathMessageIcon, "Volley")
 debug.appendtoenum(kDeathMessageIcon, "Rappel")
@@ -66,109 +83,104 @@ function GetPlayersAboveLimit(team)
     return math.max(0,(info.playerCount or 0) - kMatchMinPlayers)
 end
 
--- Ramp endpoint for the respawn "blue curve" = the DEADLOCK START TIME (as an offset
--- in seconds from round start). Sourced LIVE from the deadlock config rather than
--- hardcoded, so if the deadlock start time is reconfigured the respawn ramp follows
--- it automatically:
---   * Server: NS2Gamerules.kBalanceConfig.deadlockInitialTime (from NS2.0Config.json;
---     this is the exact value PlayingTeam:OnGameStateChanged uses to schedule deadlock).
---   * Client: derived from the networked GameInfo entity (deadlock absolute time minus
---     round-start time), which the server publishes every tick from round start on.
---   * Fallback: kRespawnRampFallbackSeconds, only if neither source is available yet.
--- NOTE: if the round's deadlock start is later EXTENDED mid-game, the server keeps using
--- the original configured offset (a fixed curve) while the client's GameInfo-derived
--- value tracks the current projected deadlock - a display-only divergence on the HUD
--- respawn readout, never a gameplay difference (the server value is authoritative).
-local kRespawnRampFallbackSeconds = 1500  -- 25 min; used if no deadlock time is available yet
--- HARD CAP on the ramp length. The deadlock config DEFAULTS to 2400s (40 min); with a 40-min
--- ramp the convex factor (gameTime/ramp)^power stays ~0 for almost the whole game, so respawn
--- never visibly climbs off the base - which is the "Marines stuck at 8s all game" bug. Capping
--- the ramp at 25 min means the respawn curve reaches its max by ~25 min no matter how late the
--- deadlock is set, while still tracking a SHORTER deadlock if one is configured.
-local kRespawnRampMaxSeconds = 1500  -- 25 min
-
-local function GetRespawnRampSeconds()
-    local ramp = kRespawnRampFallbackSeconds
-    if Server and NS2Gamerules and NS2Gamerules.kBalanceConfig
-       and NS2Gamerules.kBalanceConfig.deadlockInitialTime then
-        ramp = NS2Gamerules.kBalanceConfig.deadlockInitialTime
-    else
-        local info = GetGameInfoEntity and GetGameInfoEntity()
-        if info and info.GetMarineDeadlockTime and info.GetStartTime then
-            local offset = info:GetMarineDeadlockTime() - info:GetStartTime()
-            if offset and offset > 0 then ramp = offset end
-        end
-    end
-    -- Guard against a 0/negative/nil ramp (e.g. a misconfigured deadlockInitialTime): a 0 here
-    -- would make x/ramp a divide-by-zero (inf/nan) and poison the whole curve. Floor at the
-    -- fallback so the ramp length is always a sane positive number.
-    if not ramp or ramp <= 0 then ramp = kRespawnRampFallbackSeconds end
-    return math.min(ramp, kRespawnRampMaxSeconds)
-end
--- Respawn scaling (see GetRespawnTimeExtend). BOTH teams grow with GAME LENGTH + researched TECH
--- toward a +11 cap (=> 20s marines / 21s aliens); PLAYER COUNT is NEVER a factor. Game length is
--- shaped per team: MARINES use a CONVEX ramp (slower early, faster late); ALIENS use a LINEAR ramp.
--- Tech adds on top for both, so a normally-teched team reaches the cap in the late game. Structures
--- then shave the total (0.5s per built IP for marines, 2s per built Hive for aliens); the [0,11]
--- clamp means neither can push below the 9s/10s base - so structures have NO effect at the minimum.
-local kMarineRampPower = 3   -- marines: higher power => flatter early / steeper late. Raised 2->3
-                             -- to exaggerate the convex shape (slower early game, sharper late-game
-                             -- climb) while still reaching the 20s cap by the ramp end.
-
 function GetRespawnTimeExtend(player, teamIndex, _gameLength)
-    local x = _gameLength or 0   -- seconds since round start; never nil (guards the x/ramp divide)
+    -- player is not used in the code so ignore this variable
 
-    -- No extension before the round starts -> base respawn only during pre-game.
+    -- Sanity checks
+    if not teamIndex or not _gameLength then return 0 end
+
+    -- Has the round started?
     local gr = GetGamerules and GetGamerules()
     if gr and gr.GetGameStarted and not gr:GetGameStarted() then
         return 0
     end
 
-    -- TECH (both teams): researched respawn-lengthening tech (kTechRespawnTimeExtension - marine
-    -- Weapons/Armor 2-3 & Exo/Jetpack labs, alien higher Biomass). Team-based tech tree so it is
-    -- correct server-side; the computed extension is networked to every HUD via TeamInfo.
-    local tech = 0
-    local techTree = GetTechTree and GetTechTree(teamIndex)
-    if techTree and techTree.GetHasTech then
-        for k, v in pairs(kTechRespawnTimeExtension) do
-            if techTree:GetHasTech(k, true) then tech = tech + v end
+    local kEndGameBegin = 1500
+
+    local kDesiredMarinesMaximumRespawnTime = 18
+    local kDesiredAliensMaximumRespawnTime = 19
+
+    local kDifferenceBetweenMarinesMaximumAndMinimumRespawnTime = kDesiredMarinesMaximumRespawnTime - kMarineRespawnTime
+    local kDifferenceBetweenAliensMaximumAndMinimumRespawnTime = kDesiredAliensMaximumRespawnTime - kAlienSpawnTime
+
+    -- Without Military Protocol Marines tech increases their respawn time less compared to Aliens tech for Aliens
+    local kMarinesTechScaleFactor = 1/3
+    local kAliensTechScaleFactor = 1/2
+
+    -- Handle simple cases (and stop division by zero occuring)
+    if _gameLength >= kEndGameBegin then
+        if teamIndex == kMarineTeamType then
+            return kDifferenceBetweenMarinesMaximumAndMinimumRespawnTime
+        elseif teamIndex == kAlienTeamType then
+            return kDifferenceBetweenAliensMaximumAndMinimumRespawnTime
         end
     end
 
-    -- GAME LENGTH fraction over the ramp: 0 at round start -> 1 by the deadlock time.
-    local t = Clamp(x / GetRespawnRampSeconds(), 0, 1)
-
-    if teamIndex == kMarineTeamType then
-        -- MARINES: CONVEX game-length growth (slower early, faster late) + tech.
-        -- IMPORTANT: the growth is clamped to [0,11] FIRST, THEN the structure deduction is
-        -- subtracted. If the deduction were inside the same clamp as the growth, a high tech
-        -- total (convexTime + tech can be ~25) would keep the pre-clamp value far above 11, so
-        -- the deduction would be swallowed by the +11 cap and never show up at the 20s maximum.
-        -- Deducting AFTER the cap means the built-IP reduction ALWAYS lands, even at full respawn.
-        -- 0.5s per BUILT Infantry Portal (numInfantryPortals = GetNumActiveInfantryPortals, so
-        -- built/active only). The final [0,11] clamp keeps total respawn in [9s base, 20s cap]
-        -- and gives the reduction NO effect at the 9s minimum (grown is already 0 there).
-        local grown = Clamp( (t ^ kMarineRampPower) * 11 + tech, 0, 11 )
-        local ip   = 0
-        local info = GetTeamInfoEntity(teamIndex)
-        if info and info.numInfantryPortals then ip = info.numInfantryPortals end
-        return Clamp( grown - ip / 3, 0, 11 )   -- 1/3 s reduction per built IP
-    else
-        -- ALIENS: LINEAR game-length growth + tech, same two-stage clamp as marines so the Hive
-        -- deduction always lands even at the 21s maximum (see the marine note above). Minus 2s per
-        -- BUILT Hive (GetActiveHiveCount = alive AND built; falls back to the networked hive count
-        -- when the team object is not available). Final [0,11] clamp keeps total respawn in [10s
-        -- base, 21s cap]; the reduction has NO effect at the 10s minimum.
-        local grown = Clamp( 11 * t + tech, 0, 11 )
-        local hives = 0
-        local team  = gr and gr.GetTeam and gr:GetTeam(teamIndex)
-        if team and team.GetActiveHiveCount then
-            hives = team:GetActiveHiveCount()
-        else
-            local info = GetTeamInfoEntity(teamIndex)
-            hives = (info and info.GetNumHives and info:GetNumHives()) or 0
+    -- Handle tech
+    local tech = 0
+    local techTree = GetTechTree and GetTechTree(teamIndex)
+    if techTree and techTree.GetHasTech then
+        
+        -- Check Marines for Military Protocol
+        if techTree:GetHasTech(kTechId.MilitaryProtocol, true) then kMarinesTechScaleFactor = 1/2 end
+        for k, v in pairs(kTechRespawnTimeExtension) do
+            if techTree:GetHasTech(k, true) then
+                if teamIndex == kTeam1Index then
+                    tech = tech + kMarinesTechScaleFactor * v
+                elseif teamIndex == kTeam2Index then
+                    tech = tech + kAliensTechScaleFactor * v
+                end
+            end
         end
-        return Clamp( grown - hives * 2, 0, 11 )
+    end
+
+    local timeToRemoveForMarines = 0
+    local timeToRemoveForAliens = 0
+
+    local timeToRemovePerBuiltIP = 1/3
+    local timeToRemovePerBuiltHive = 1
+
+    -- Time at any point has less of an impact on Marines respawn time compared to later on up to the maximum respawn time for Marines
+    local exponentScaleFactorForRoundLengthAffectingMarinesRespawnTime = 2
+    local exponentScaleFactorForRoundLengthAffectingAliensRespawnTime = 1
+
+    -- Handle Marines considerations
+    if teamIndex == kMarineTeamType then
+
+        -- Built IPs
+        local builtIPs = 0
+        local ip = GetEntitiesForTeam("InfantryPortal", kTeam1Index)
+        for _, ent in ipairs(ip) do
+            if ent.GetIsBuilt and ent:GetIsBuilt() then builtIPs = builtIPs + 1 end
+        end
+
+        timeToRemoveForMarines = builtIPs * timeToRemovePerBuiltIP
+
+        -- Clamp respawn time increase between 0 and the maximum difference between respawn times for Marines considering tech and built IPs
+        local consideredMarinesTechAndBuiltIPs = Clamp(tech - timeToRemoveForMarines, 0, kDesiredMarinesMaximumRespawnTime - kMarineRespawnTime)
+        local restOfMarinesRespawnTimeRequired = kDifferenceBetweenMarinesMaximumAndMinimumRespawnTime - consideredMarinesTechAndBuiltIPs
+
+        -- Add a potentially non-linearly scaled amount of the rest of the respawn time increase needed to get to the desired maximum for Marines and return the result
+        return consideredMarinesTechAndBuiltIPs + ((_gameLength / kEndGameBegin) ^ exponentScaleFactorForRoundLengthAffectingMarinesRespawnTime) * restOfMarinesRespawnTimeRequired
+
+    -- Handle Aliens considerations
+    elseif teamIndex == kAlienTeamType then
+
+        -- Built Hives
+        local builtHives = 0
+        local hives = GetEntitiesForTeam("Hive", kTeam2Index)
+        for _, ent in ipairs(hives) do
+            if ent.GetIsBuilt and ent.GetIsAlive and ent:GetIsBuilt() and ent:GetIsAlive() then builtHives = builtHives + 1 end
+        end
+
+        timeToRemoveForAliens = builtHives * timeToRemovePerBuiltHive
+
+        -- Clamp respawn time increase between 0 and the maximum difference between respawn times for Aliens considering tech and built Hives
+        local consideredAliensTechAndBuiltHives = Clamp(tech - timeToRemoveForAliens, 0, kDesiredAliensMaximumRespawnTime - kAlienSpawnTime)
+        local restOfAliensRespawnTimeRequired = kDifferenceBetweenAliensMaximumAndMinimumRespawnTime - consideredAliensTechAndBuiltHives
+
+        -- Add a potentially non-linearly scaled amount of the rest of the respawn time increase needed to get to the desired maximum for Aliens and return the result
+        return consideredAliensTechAndBuiltHives + ((_gameLength / kEndGameBegin) ^ exponentScaleFactorForRoundLengthAffectingAliensRespawnTime) * restOfAliensRespawnTimeRequired
     end
 end
 

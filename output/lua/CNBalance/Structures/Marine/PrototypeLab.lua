@@ -110,6 +110,26 @@ function PrototypeLab:GetItemList(forPlayer)
     return { kTechId.Jetpack, kTechId.DualMinigunExosuit, kTechId.DualRailgunExosuit, kTechId.Cannon}
 end
 
+-- Show extra text on the lab's NAME once its Experimental Technologies research is complete, so
+-- players and SPECTATORS can tell which specific Prototype Lab carries the research. GetUnitName
+-- (UnitStatusMixin) calls this override for the whole name, so we rebuild the base display name
+-- and append the suffix. Runs on both realms (the name is shown client-side), and is fully
+-- guarded so a lab without an experimental tech (jetpack/cannon) is unaffected.
+function PrototypeLab:GetUnitNameOverride(viewer)
+    local unitName = GetDisplayName(self)
+
+    if HasMixin(self, "Construct") and self.GetIsBuilt and not self:GetIsBuilt() then
+        return string.format(Locale.ResolveString("UNBUILT_STRUCTURE"), unitName)
+    end
+
+    local expTech = PrototypeLab.kExperimentalTechForLab[self:GetTechId()]
+    if expTech and GetHasTech(self, expTech) then
+        unitName = unitName .. " - Experimental Tech"
+    end
+
+    return unitName
+end
+
 
 class 'ExosuitPrototypeLab' (PrototypeLab)
 ExosuitPrototypeLab.kMapName = "exosuit_prototypelab"

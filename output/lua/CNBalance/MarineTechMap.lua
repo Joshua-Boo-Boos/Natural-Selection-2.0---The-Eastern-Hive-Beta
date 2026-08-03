@@ -26,8 +26,8 @@ kMarineTechMap =
                     { kTechId.AdvancedWeaponry, 6, 6.5 },                        { kTechId.HeavyMachineGunTech, 8, 6.5 },
     --R
                                                         { kTechId.JetpackPrototypeLab, 11, 4.5 },       --{ kTechId.JetpackFuelTech, 12, 6.5 },  
-                { kTechId.PrototypeLab, 10, 5.5 },       { kTechId.ExosuitPrototypeLab, 11,5.5 },{ kTechId.DualRailgunExosuit,12 , 5.5 },
-                                                            { kTechId.CannonPrototypeLab,11 ,6.5 },
+                { kTechId.PrototypeLab, 10, 5.5 },       { kTechId.ExosuitPrototypeLab, 11,5.5 },{ kTechId.ExosuitExperimentalTech, 12, 5.5 },
+                                                            { kTechId.CannonPrototypeLab,11 ,6.5 },  { kTechId.DualRailgunExosuit, 12, 6.5 },
 
 
                                                                                                                                                     { kTechId.MilitaryProtocol, 5, 8 },{ kTechId.CommandStation, 7, 8 }, {kTechId.InfantryPortal, 9, 8 },
@@ -118,4 +118,9 @@ kMarineLines =
 
     GetLinePositionForTechMap(kMarineTechMap, kTechId.DualRailgunExosuit, kTechId.ExosuitPrototypeLab),
     GetLinePositionForTechMap(kMarineTechMap, kTechId.DualRailgunExosuit, kTechId.CannonPrototypeLab),
+
+    -- Exosuit - Experimental Technologies research node, wired to the Exosuit Prototype Lab that
+    -- researches it, so it appears (with its icon, blue/red by availability) in the commander tech
+    -- tree that spectators view.
+    GetLinePositionForTechMap(kMarineTechMap, kTechId.ExosuitExperimentalTech, kTechId.ExosuitPrototypeLab),
 }

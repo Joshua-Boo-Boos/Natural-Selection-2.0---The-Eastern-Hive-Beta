@@ -303,7 +303,19 @@ end
 local kErrorColor = Color(1, 0, 0, 1)
 local baseUpdate = GUICommanderButtons.Update
 function GUICommanderButtons:Update(deltaTime)
-    baseUpdate(self,deltaTime)
+    -- AdvancedHud's base GUICommanderButtons:Update indexes self.selectAllArcs - a MARINE-only
+    -- element ("select all ARCs") - WITHOUT guarding for the ALIEN commander, where it is nil.
+    -- An alien commander (e.g. one seated by the CommNom vote) therefore throws every frame at
+    -- AdvancedHud/GUICommanderButtons.lua:231. Aliens have no ARCs, so nothing of value is lost:
+    -- run the base Update in a protected call on the alien side so the error can't flood, while
+    -- the rest of our own Update below still runs. Marines keep the unguarded call (full
+    -- functionality, and they always have selectAllArcs so they never hit this).
+    local isAlienComm = PlayerUI_GetTeamType and PlayerUI_GetTeamType() == kAlienTeamType
+    if isAlienComm then
+        pcall(baseUpdate, self, deltaTime)
+    else
+        baseUpdate(self, deltaTime)
+    end
     SyncLifeformEggButtonIconColors(self)
 
     local player = Client.GetLocalPlayer()

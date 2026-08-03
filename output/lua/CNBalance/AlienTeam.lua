@@ -1173,9 +1173,9 @@ function AlienTeam:InitTechTree()
     -- vokex researches
     self.techTree:AddUnlockActivation(kTechId.ShadowStep,             kTechId.BioMassOne, kTechId.None,kTechId.AllAliens)
     self.techTree:AddUnlockActivation(kTechId.MetabolizeShadowStep,        kTechId.BioMassTwo, kTechId.None,kTechId.AllAliens)
-    self.techTree:AddUnlockActivation(kTechId.AcidRocket,                        kTechId.BioMassSix,  kTechId.None,kTechId.AllAliens)
+    self.techTree:AddUnlockActivation(kTechId.AcidRocket,                        kTechId.BioMassFive,  kTechId.None,kTechId.AllAliens)
     --self.techTree:AddActivation(kTechId.MetabolizeShadowStepHealth,        kTechId.BioMassFive, kTechId.None,kTechId.AllAliens)
-    self.techTree:AddActivation(kTechId.VortexShadowStep,                  kTechId.BioMassEight,  kTechId.None,kTechId.AllAliens)
+    self.techTree:AddActivation(kTechId.VortexShadowStep,                  kTechId.BioMassSeven,  kTechId.None,kTechId.AllAliens)
 
     self.techTree:AddResearchNode(kTechId.OriginForm)
     self.techTree:AddPassive(kTechId.OriginFormPassive)
@@ -1416,9 +1416,20 @@ function AlienTeam:CollectTeamResources(teamRes,playerRes)
     PlayingTeam.CollectTeamResources(self,teamRes,playerRes)
 end
 
-function AlienTeam:CollectKillReward(_techId,_fraction)
+-- _techId is the VICTIM's tech id; _killer is the entity that got the kill. The reward is the
+-- KILLER LIFEFORM's base value scaled by the victim's type (see kOriginPersonalResourcesPerKill /
+-- kOriginKillRewardVictimScalar in Balance.lua).
+function AlienTeam:CollectKillReward(_techId,_fraction,_killer)
     if self:IsOriginForm() then
-        return (kOriginPersonalResourcesPerKill[_techId] or 0) * _fraction
+        -- Only marine entities in the victim table pay out; anything else gives nothing.
+        local victimScalar = kOriginKillRewardVictimScalar[_techId]
+        if not victimScalar then return 0 end
+
+        local killerTechId = _killer and _killer.GetTechId and _killer:GetTechId()
+        local base = ( killerTechId and kOriginPersonalResourcesPerKill[killerTechId] )
+            or kOriginPersonalResourcesPerKillDefault
+
+        return base * victimScalar * _fraction
     end
     return 0
 end

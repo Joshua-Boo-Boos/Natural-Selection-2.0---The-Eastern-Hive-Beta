@@ -128,7 +128,20 @@ function Extractor:OnUpdate(deltaTime)
     if Server then
         local techID = self:GetTechId()
         
-        self.charged = techID == kTechId.PoweredExtractor and Shared.GetTime() - self.chargeTime > kPoweredExtractorChargingInterval
+        -- The upgraded (Powered) Extractor only electrifies while its ROOM ACTUALLY HAS POWER. With
+        -- the room unpowered the RT is unpowered too, so it must not charge, must not shock nearby
+        -- aliens, and must not show the electrified material - self.charged drives all three (it is
+        -- networked and read by the Client block below).
+        local isPowered = ( self.GetIsPowered == nil ) or self:GetIsPowered()
+
+        self.charged = isPowered and techID == kTechId.PoweredExtractor
+            and Shared.GetTime() - self.chargeTime > kPoweredExtractorChargingInterval
+
+        -- While unpowered, keep the charge timer reset so restoring power does not immediately
+        -- discharge a shock that had been "charging" the whole time the room was dark.
+        if not isPowered then
+            self.chargeTime = Shared.GetTime()
+        end
 
         if self.charged then
             if not self.electrifyCheck or Shared.GetTime() - self.electrifyCheck > .5 then

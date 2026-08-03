@@ -136,8 +136,8 @@ end
 -- Per-button label overrides for the buy window (does not touch global display names).
 local kButtonLabelOverride =
 {
-    [kTechId.DualMinigunExosuit] = "DUAL MINIGUNS",
-    [kTechId.DualRailgunExosuit] = "DUAL RAILGUNS",
+    [kTechId.DualMinigunExosuit] = "DUAL MINIGUN",
+    [kTechId.DualRailgunExosuit] = "DUAL RAILGUN",
     [kTechId.Cannon]             = "CANNON",
 }
 

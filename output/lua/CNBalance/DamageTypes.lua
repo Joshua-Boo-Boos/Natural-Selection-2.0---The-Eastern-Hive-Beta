@@ -482,6 +482,18 @@ local function GrenadeLauncherForStructure(target, _, _, damage, armorFractionUs
     return damage, armorFractionUsed, healthPerArmor
 end
 
+-- GL does 25% LESS damage to alien PLAYERS (lifeforms only - structures are untouched and keep
+-- their x3 structural bonus above, so the GL stays a demolition weapon).
+local kGLAlienPlayerDamageScalar = 0.75
+local function GrenadeLauncherForAlienPlayer(target, _, _, damage, armorFractionUsed, healthPerArmor)
+
+    if target.isa and target:isa("Alien") then
+        damage = damage * kGLAlienPlayerDamageScalar
+    end
+
+    return damage, armorFractionUsed, healthPerArmor
+end
+
 local kExosuitDamageScarlar = 1.5
 local function ExosuitForStructure(target, _, _, damage, armorFractionUsed, healthPerArmor, damageType)
 
@@ -588,7 +600,8 @@ local function BuildDamageTypeRules()
     
     -- Grenade Launcher rules
     kDamageTypeRules[kDamageType.GrenadeLauncher] = {
-        GrenadeLauncherForStructure
+        GrenadeLauncherForStructure,
+        GrenadeLauncherForAlienPlayer
     }
     -- ------------------------------
 

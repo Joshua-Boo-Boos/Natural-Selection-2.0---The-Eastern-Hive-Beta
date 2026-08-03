@@ -31,7 +31,8 @@ local kExoBodyColor   = Color(0.85, 0.9, 0.95, 0.95)
 
 -- Panel geometry (design px, GUIScale'd at use).
 local kExoInfoLeftInset   = 40
-local kExoInfoBottomInset = 300   -- box BOTTOM edge sits this many px above the screen bottom (grows upward). Tune to sit just above the Exo fuel HUD element.
+local kExoInfoBottomInset = 300   -- FALLBACK only: box BOTTOM px above screen bottom, used if the fuel-bar top global isn't published yet.
+local kExoInfoBottomMargin = 16    -- gap (design px) kept between the box bottom and the Exo Fuel bar's real top edge.
 local kExoInfoPadX        = 12
 local kExoInfoPadY        = 10
 local kExoInfoLineH       = 20    -- body line height
@@ -181,12 +182,24 @@ function GUIExoHUD:UpdateExoInfoPanel(player)
         self.exoInfoLines[i]:SetPosition(Vector(0, padY + titleH + (i - 1) * lineH, 0))
     end
 
-    -- ── Position: left inset, BOTTOM edge fixed at kExoInfoBottomInset above the
-    -- screen bottom; the box grows UPWARD so it never reaches down into the fuel HUD.
+    -- ── Position: HORIZONTALLY CENTRED on screen (so it sits directly above the
+    -- bottom-centre Exo Fuel bar), with its BOTTOM edge parked a fixed margin ABOVE the
+    -- fuel bar's real top edge (published by CNBalance/GUI/GUIExoThruster.lua as
+    -- _G.gExoFuelBarTopAbsY). The box grows UPWARD from there, so it can NEVER clip the
+    -- fuel bar no matter how many upgrades are listed, at any resolution.
+    -- If the fuel bar global isn't available yet, fall back to the fixed inset.
     local sh = Client.GetScreenHeight()
-    local boxTopY = sh - GUIScale(kExoInfoBottomInset) - h
+    local sw = Client.GetScreenWidth()
+    local bottomEdgeY
+    if _G.gExoFuelBarTopAbsY then
+        bottomEdgeY = _G.gExoFuelBarTopAbsY - GUIScale(kExoInfoBottomMargin)
+    else
+        bottomEdgeY = sh - GUIScale(kExoInfoBottomInset)
+    end
+    local boxTopY = bottomEdgeY - h
+    local boxX = (sw - w) * 0.5
     self.exoInfoBg:SetSize(Vector(w, h, 0))
-    self.exoInfoBg:SetPosition(Vector(GUIScale(kExoInfoLeftInset), boxTopY, 0))
+    self.exoInfoBg:SetPosition(Vector(boxX, boxTopY, 0))
 
     -- Publish the box's top edge so any panel that stacks above it can follow.
     _G.gExoUpgradePanelTopAbsY = boxTopY

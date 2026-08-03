@@ -18,7 +18,9 @@ LightMachineGun.kLaserSightWorldModelAttachPoint = "fxnode_riflemuzzle"
 LightMachineGun.kLaserSightViewModelAttachPoint = "fxnode_riflemuzzle"
 
 local kRange = 100
-local kSpread = Math.Radians(2.4)
+-- Spread widened 2.4 -> 2.65 so the LMG is no longer near-pinpoint, while staying tighter (more
+-- accurate) than the Rifle's 2.8 - it remains an accuracy upgrade, just not a laser.
+local kSpread = Math.Radians(2.65)
 
 local kButtRange = 1.1
 

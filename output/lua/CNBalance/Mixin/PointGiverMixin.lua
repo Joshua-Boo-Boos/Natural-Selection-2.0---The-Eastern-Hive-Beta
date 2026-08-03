@@ -88,7 +88,8 @@ if Server then
                 local team = currentAttacker:GetTeam()
                 local isKiller = attacker == currentAttacker
                 if isKiller and team and team.CollectKillReward then
-                    resReward = resReward + team:CollectKillReward(_techID,resRewardFraction)
+                    -- Pass the KILLER: the Origin Form reward is based on the killer's lifeform.
+                    resReward = resReward + team:CollectKillReward(_techID,resRewardFraction,currentAttacker)
                 end
                 
                 resReward = currentAttacker:AddResources(resReward,true)

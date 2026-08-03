@@ -52,25 +52,31 @@ local kFlameLoopSound = PrecacheAsset("sound/NS2.fev/marine/flamethrower/attack_
 -- (both run through the same DoDamage pipeline).
 local kArmouryFlamethrowerRange   = kFlamethrowerRange or 9
 local kArmouryFlamethrowerDamage  = kFlamethrowerDamage or 9.918
--- RANGE (the flame cone's box-sweep DEPTH): exactly 25% longer than the hand FT - a SINGLE
--- application of +25%, no stacking.
-local kFlamethrowerRange          = kArmouryFlamethrowerRange * 1.25          -- 9 * 1.25 = 11.25
--- Hitbox WIDTH & HEIGHT (the cone box's perpendicular half-extents): 15% larger than the base.
--- (The DEPTH is the range above; it is NOT scaled here, so there is no double +25%.)
-local kFlamethrowerConeWidth      = 0.6 * 1.15                                -- 0.69
+-- RANGE (the flame box-sweep DEPTH): exactly 25% longer than the hand FT, then -1/3 -> 7.5. This
+-- is the ONE Exo-specific value for the hit VOLUME; the cross-section (box width + splash radius)
+-- is taken straight from the AA FT at runtime (Flamethrower.kConeWidth / .kDamageRadius) so it is
+-- always identical to the hand FT - only the length differs (a cuboid has a constant cross-section,
+-- so a shorter length does not change its cross-sectional area).
+local kFlamethrowerRange          = kArmouryFlamethrowerRange * 1.25 * (2/3) * 1.1  -- 7.5, then +10% -> 8.25
 -- DAMAGE per application: 30% more PURE weapon damage than the hand FT, at the SAME fire cadence
 -- (kFlamethrowerDamageRate). Flame-pool DoT is separate and NOT part of this figure.
-local kExoFlamethrowerDamage      = kArmouryFlamethrowerDamage * 1.3          -- 1.3x the AA FT (9.918 * 1.3 = 12.8934)
-local kFlamethrowerDamageRate     = 0.15 -- apply damage every 0.15s (mirrors the hand FT cadence)
+local kExoFlamethrowerDamage      = kArmouryFlamethrowerDamage * 1.1 * 1.15    -- 1.1x AA FT, then +15% -> 1.265x (9.918 * 1.265 = 12.546)
+-- kExoFlamethrowerDamage is the damage for ONE application at this REFERENCE cadence. The actual
+-- per-tick damage is scaled by (actual rate / base rate) so the DPS is IDENTICAL no matter how
+-- fine the tick rate is: DPS = kExoFlamethrowerDamage / kExoFlamethrowerBaseRate, always.
+local kExoFlamethrowerBaseRate    = 0.15
+-- Tick FASTER (every 0.05s = 3x more ticks) for smoother, more responsive damage. Because the
+-- per-tick amount scales with the rate above, 3x ticks each do 1/3 the damage -> same total DPS.
+local kFlamethrowerDamageRate     = 0.05
 
 -- kChargeTime in vanilla Railgun.lua = 2 seconds; we mirror it for arm-glow mapping.
 local kExoFlameThrowerChargeTime = 2
 -- Flamethrower: arm glow tracks _flameHeat directly (0→1 over 5 s) via override.
 
--- Heat accumulation: 5 seconds of continuous fire to reach 100%.
-local kFlameHeatRate = 1.0 / 5.0   -- heat/second while firing (5 s from 0 to 100%)
--- Cool-down time reduced 30%: full cool was 5 s, now 5 * 0.7 = 3.5 s (rate = 1/3.5).
-local kFlameCoolRate = 1.0 / 3.5   -- heat/second while cooling (3.5 s from 100% to 0)
+-- Heat accumulation: 6 seconds of continuous fire to reach 100% (overheat).
+local kFlameHeatRate = 1.0 / 6.0   -- heat/second while firing (6 s from 0 to 100%)
+-- Cool-down: 3 seconds from 100% heat back to 0%.
+local kFlameCoolRate = 1.0 / 3.0   -- heat/second while cooling (3 s from 100% to 0)
 
 -- Railgun-style attach-point names (same exo model bones, copied from Railgun.lua).
 local kFirstPersonAttachPoints = {
@@ -139,6 +145,9 @@ function Railgun:OnCreate()
     baseRGOnCreate(self)
     self.weaponMode = kExoSpecialMode.Railgun
     self.timeLastFlameDamage = 0
+    -- Flame-pool spawns are rate-limited SEPARATELY from damage (which ticks at 0.05s): pools
+    -- keep the ORIGINAL 0.15s cadence so shrinking the damage tick doesn't triple the pools.
+    self.timeLastFlamePool = 0
     self.flameHeat = 0
 end
 
@@ -171,7 +180,9 @@ end
 
 -- Override GetChargeAmount so the arm-glow / charge HUD reflects each mode correctly:
 --   Railgun   → charge over Railgun.kChargeTime (2/3 of vanilla's 2s) while railgunAttacking
---   Flamethr. → directly equals _flameHeat (0→1 while heating, 1→0 while cooling)
+--   Flamethr. → _flameHeat (unchanged). NOTE: the exo's arm charge BARS are NOT driven off this
+--               value; they're fed FUEL (1 - heat) directly in OnUpdateRender below, so the bars
+--               read full when cool and empty at overheat WITHOUT changing the ammo % readout.
 local baseGetChargeAmount = Railgun.GetChargeAmount
 function Railgun:GetChargeAmount()
     local mode = self:GetWeaponMode()
@@ -514,9 +525,18 @@ function Railgun:ProcessMoveOnWeapon(player, input)
             if Server and (self.timeLastFlameDamage + kFlamethrowerDamageRate) <= now then
                 self.timeLastFlameDamage = now
 
+                local viewCoords = player:GetViewCoords()
                 local eyePos     = player:GetEyePos()
-                local fireDir    = player:GetViewCoords().zAxis
-                local extents    = Vector(kFlamethrowerConeWidth, kFlamethrowerConeWidth, kFlamethrowerConeWidth)
+                local fireDir    = viewCoords.zAxis
+                -- THIS arm's MUZZLE origin (same lateral offset as Minigun:GetBarrelPoint and the
+                -- flame trail attach). xAxis is lateral; +0.65 = left arm, -0.65 = right arm; 0.9
+                -- forward + 0.19 down place it at the barrel. It is used ONLY for (a) this arm's
+                -- flame pool and (b) the per-arm line-of-sight fairness check below - NOT for
+                -- detecting which targets are in the flame (that is done from the EYE, like the AA
+                -- FT). Each arm runs THIS block independently, so a Dual-FT's two arms each gate
+                -- their own damage on their own muzzle's visibility.
+                local isLeft     = self:GetExoWeaponSlot() == ExoWeaponHolder.kSlotNames.Left
+                local muzzle     = eyePos + fireDir * 0.9 + viewCoords.xAxis * (isLeft and 0.65 or -0.65) + viewCoords.yAxis * (-0.19)
                 -- Filter EVERY entity belonging to this Exo: this arm, the player, the
                 -- ExoWeaponHolder AND the OTHER arm. Previously only { self, player } was
                 -- filtered, so on an FT + Claw combo the CLAW arm (a separate entity sitting in
@@ -545,32 +565,65 @@ function Railgun:ProcessMoveOnWeapon(player, input)
                 -- upgrade factor exactly equal to the hand FT's - so one Exo flame arm stays
                 -- exactly 1.2x the hand FT at EVERY Weapons level. (Guarded: falls back to the flat
                 -- base if the scalar lookups are unavailable.)
-                local dmgAmount = kExoFlamethrowerDamage
+                -- Per-tick damage = the reference application scaled by (tick rate / base rate),
+                -- so shrinking the tick interval keeps the DPS unchanged (see the constants above).
+                local dmgAmount = kExoFlamethrowerDamage * (kFlamethrowerDamageRate / kExoFlamethrowerBaseRate)
                 local ownScalar = NS2Gamerules_GetUpgradedDamageScalar(player, self:GetTechId())
                 local ftScalar  = NS2Gamerules_GetUpgradedDamageScalar(player, kTechId.Flamethrower)
                 if ownScalar and ftScalar and ownScalar > 0 then
                     dmgAmount = dmgAmount * (ftScalar / ownScalar)
                 end
 
+                -- ===== AA FT hit-check VOLUME (eye-based), at the Exo's OWN range =====
+                -- EXACTLY the hand Flamethrower's ApplyConeDamage volume: a swept melee BOX of the
+                -- AA FT's own cone width, cast from the EYE along the aim, then a splash to Live
+                -- entities around where the flame lands (the AA FT's damage radius). The box has a
+                -- CONSTANT cross-section (a cuboid, NOT a widening cone), so using the Exo's shorter
+                -- range leaves that cross-sectional area exactly equal to the AA FT's - only the
+                -- length differs. Starting from the eye (not the arm) removes the aim-low dead zone
+                -- the old per-arm cylinders had. Damage/DPS, fire rate, range and pool cadence stay
+                -- the Exo's own (see below) - only this hit VOLUME is borrowed from the AA FT.
+                local coneExtent   = (Flamethrower and Flamethrower.kConeWidth) or 0.3
+                local splashRadius = (Flamethrower and Flamethrower.kDamageRadius) or 1.8
+                local extents = Vector(coneExtent, coneExtent, coneExtent)
+
                 local trace = TraceMeleeBox(self, eyePos, fireDir, extents, kFlamethrowerRange,
                                             PhysicsMask.Flame, EntityFilterList(filterEnts))
+                local endPoint = trace.endPoint
 
-                -- Burn away hazards in the cone, exactly like the hand Flamethrower
-                -- (CNBalance/Weapons/Marine/Flamethrower.lua:32). The Exo's flame mode
-                -- is built on the Railgun class (not Flamethrower), so it never
-                -- inherited this at all - the Exo flamethrower previously could not
-                -- destroy Spores/Umbra/BileBomb/AcidSpray/etc.
-                -- self here is a Railgun instance (kExoSpecialMode.Flamethrower), which
-                -- has everything BurnSporesAndUmbra needs (DamageMixin's self:DoDamage,
-                -- EffectsMixin's self:TriggerEffects, self:GetParent() returning the Exo
-                -- player) - so the exact same function can just be called directly on
-                -- it (Flamethrower.BurnSporesAndUmbra(self, ...), not self:BurnSporesAndUmbra(...),
-                -- since Railgun does not inherit from Flamethrower).
-                Flamethrower.BurnSporesAndUmbra(self, eyePos, trace.endPoint)
+                -- Burn hazards (bile / whip / vortex / spores / umbra) along the flame, as before.
+                Flamethrower.BurnSporesAndUmbra(self, eyePos, endPoint)
 
-                -- Create a Flame entity on the ground below the hit point.
+                -- Gather the AA FT candidate targets: the box-hit entity + the end splash (Live
+                -- entities within the damage radius in XZ and half that in height of the landing pt).
+                local ents = {}
                 if trace.fraction ~= 1 then
-                    local hitPt = trace.endPoint
+                    local traceEnt = trace.entity
+                    if traceEnt and HasMixin(traceEnt, "Live") and traceEnt:GetCanTakeDamage() then
+                        ents[#ents + 1] = traceEnt
+                    end
+                    local hitEntities = GetEntitiesWithMixinWithinXZRange("Live", endPoint, splashRadius)
+                    local damageHeight = splashRadius / 2
+                    for i = 1, #hitEntities do
+                        local ent = hitEntities[i]
+                        if ent ~= traceEnt and ent:GetCanTakeDamage()
+                           and math.abs(endPoint.y - ent:GetOrigin().y) <= damageHeight then
+                            ents[#ents + 1] = ent
+                        end
+                    end
+                end
+
+                -- Per-arm flame pool (UNCHANGED Exo behaviour): trace THIS arm's own muzzle forward
+                -- and, if it hits a wall / ground, drop a pool there - gated to the original 0.15s
+                -- cadence so pools-per-second are unchanged. This is what lets an OBSTRUCTED arm still
+                -- lay its pool against the wall in front of it even when its damage is suppressed by
+                -- the per-arm line-of-sight check below.
+                local poolTrace = Shared.TraceRay(muzzle, muzzle + fireDir * kFlamethrowerRange,
+                                            CollisionRep.Damage, PhysicsMask.Flame, EntityFilterAll())
+                if poolTrace.fraction ~= 1
+                   and (self.timeLastFlamePool + kExoFlamethrowerBaseRate) <= now then
+                    self.timeLastFlamePool = now
+                    local hitPt = poolTrace.endPoint
                     local groundTrace = Shared.TraceRay(hitPt, hitPt + Vector(0, -2.6, 0),
                         CollisionRep.Default, PhysicsMask.CystBuild, EntityFilterAllButIsa("TechPoint"))
                     if groundTrace.fraction ~= 1 then
@@ -578,34 +631,35 @@ function Railgun:ProcessMoveOnWeapon(player, input)
                     end
                 end
 
-                -- Damage directly traced entity.
-                -- Pass surface="none" (not nil): DamageMixin:DoDamage only skips its
-                -- "trigger damage effects" block when surface is EXACTLY the string
-                -- "none" (`if surface ~= "none" then ... end`).  nil does NOT skip it —
-                -- it falls through to `surface = GetIsAlienUnit(target) and "organic"`,
-                -- which still fires the Railgun's organic-hit cinematic (the blue-green
-                -- electric-arc splat), clashing with the flamethrower's own fire visuals.
-                if trace.entity and HasMixin(trace.entity, "Live") and trace.entity:GetCanTakeDamage()
-                   and GetAreEnemies(player, trace.entity) then
-                    local hitEnt = trace.entity
-                    self:DoDamage(dmgAmount, hitEnt, trace.endPoint, fireDir, "none", false, false)
-                    if HasMixin(hitEnt, "Fire") then
-                        hitEnt:SetOnFire(player, self)
-                    end
+                -- Per-arm LINE-OF-SIGHT fairness. The candidate targets above were found from the
+                -- EYE (so a Dual-FT's two arms, both tracing from the same eye, see the SAME
+                -- targets). Before THIS arm damages a target, we require THIS arm's own muzzle to
+                -- actually see it - a plain world trace muzzle -> target, blocked = skip. So a
+                -- Dual-FT peeking a corner with only its eye + ONE arm exposed and the other arm
+                -- behind the wall deals ONE arm's damage, not two: the hidden arm's trace is blocked
+                -- and it skips every target (while still laying its pool against that wall, above).
+                -- Each arm runs this on its OWN muzzle independently, so two genuinely-exposed arms
+                -- both burn (the intended dual-wield damage). A small +0.35 slack absorbs the target
+                -- origin sitting just inside its own hitbox.
+                local function ArmCanSee(targetPoint)
+                    local tr = Shared.TraceRay(muzzle, targetPoint, CollisionRep.Damage,
+                                        PhysicsMask.Flame, EntityFilterAll())
+                    if tr.fraction == 1 then return true end
+                    return (targetPoint - muzzle):GetLength()
+                           <= (tr.endPoint - muzzle):GetLength() + 0.35
                 end
 
-                -- Damage nearby entities in the cone (matches vanilla ApplyConeDamage). Use the
-                -- HAND flamethrower's own splash radius (kFlameRadius = 1.8, = kFlamethrowerDamageRadius)
-                -- so the Exo hits exactly the same structures/clusters the AA flamethrower does -
-                -- previously the smaller radius could leave Clogs/structures just outside the splash.
-                local dmgRadius = kFlamethrowerDamageRadius or kFlameRadius or (kFlamethrowerConeWidth * 2)
-                local nearbyEnts = GetEntitiesWithMixinWithinXZRange("Live", trace.endPoint, dmgRadius)
-                for _, ent in ipairs(nearbyEnts) do
-                    if ent ~= player and ent ~= trace.entity and ent:GetCanTakeDamage()
-                       and GetAreEnemies(player, ent) then
-                        local toEnt = GetNormalizedVector(ent:GetModelOrigin() - eyePos)
-                        self:DoDamage(dmgAmount, ent, ent:GetModelOrigin(), toEnt, "none", false, false)
-                        if HasMixin(ent, "Fire") then
+                for i = 1, #ents do
+                    local ent = ents[i]
+                    local enemyOrigin = ent.GetModelOrigin and ent:GetModelOrigin()
+                    if ent ~= player and enemyOrigin and GetAreEnemies(player, ent)
+                       and ArmCanSee(enemyOrigin) then
+                        local toEnemy = GetNormalizedVector(enemyOrigin - eyePos)
+                        local health = ent:GetHealth()
+                        -- surface="none": skip the Railgun's organic-hit cinematic (flame, not rail).
+                        self:DoDamage(dmgAmount, ent, enemyOrigin, toEnemy, "none", false, false)
+                        -- Only ignite if damage actually landed (matches the hand Flamethrower).
+                        if ent:GetHealth() ~= health and HasMixin(ent, "Fire") then
                             ent:SetOnFire(player, self)
                         end
                     end
@@ -701,6 +755,31 @@ if Client then
         -- self:GetParent() returns the Exo PLAYER directly — the Railgun arm weapons
         -- are owned/parented by the player, not by the ExoWeaponHolder.
         if mode == kExoSpecialMode.Flamethrower then
+
+            -- Drive THIS arm's charge-bar display (the gray portrait circle) to show FUEL = 1 - heat:
+            -- full when cool, draining to empty as heat rises to 100% while firing. Because this is
+            -- the FT (we branch on the weapon MODE here, where we actually know it - the isolated
+            -- GUIView can't), we load our FLAMETHROWER display (GUIExoFTFuelDisplay) instead of the
+            -- railgun one: identical circle, but it pulses red when EMPTY (overheated) rather than
+            -- full. We update ONLY the GUIView (its "*exo_railgun_<slot>" texture), NOT the render
+            -- model's charge material parameter - so the bar fills WITHOUT the railgun electric-arc
+            -- glow. Local player only; cleaned up otherwise (mirrors vanilla).
+            local chargeParent = self:GetParent()
+            if chargeParent and chargeParent.GetIsLocalPlayer and chargeParent:GetIsLocalPlayer() then
+                local slotName = self:GetExoWeaponSlotName()
+                local chargeDisplayUI = self.chargeDisplayUI
+                if not chargeDisplayUI then
+                    chargeDisplayUI = Client.CreateGUIView(246, 256)
+                    chargeDisplayUI:Load("lua/CNBalance/GUI/GUIExoFTFuelDisplay.lua")
+                    chargeDisplayUI:SetTargetTexture("*exo_railgun_" .. slotName)
+                    self.chargeDisplayUI = chargeDisplayUI
+                end
+                chargeDisplayUI:SetGlobal("chargeAmount", 1 - (self.flameHeat or 0))
+            elseif self.chargeDisplayUI then
+                Client.DestroyGUIView(self.chargeDisplayUI)
+                self.chargeDisplayUI = nil
+            end
+
             local exoPlayer = self:GetParent()
             local isFirstPerson = exoPlayer
                                   and exoPlayer:GetIsLocalPlayer()
@@ -758,7 +837,12 @@ if Client then
                     visibilityChangeDuration = 0.2,
                     fadeOutCinematics        = true,
                     stretchTrail             = false,
-                    trailLength              = kFlamethrowerRange + 0.5,
+                    -- Length matched to the DAMAGE reach now that the hit-check starts at the eye
+                    -- (reaches eye + kFlamethrowerRange). The trail starts ~0.75 forward at the arm,
+                    -- so kFlamethrowerRange puts its 1P tip a touch PAST the damage (safe: the flame
+                    -- never falls short of where it burns) and its 3P tip essentially on it. The old
+                    -- +0.5 made the visible flame over-reach the eye-based damage by ~1.25m in 1P.
+                    trailLength              = kFlamethrowerRange,
                     minHardening             = minHardening,
                     maxHardening             = 2,
                     hardeningModifier        = 0.8,

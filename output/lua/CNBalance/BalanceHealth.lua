@@ -108,7 +108,7 @@ kExoDamageReduction = {
 kHealingClampMaxHPAmount = 0.12
 kMaxBiomassHealthMultiplyLevel = 8 --N-1
 
-kSkulkHealth = 75 kSkulkArmor = 10    kSkulkPointValue = 5  kSkulkHealthPerBioMass = 3 
+kSkulkHealth = 75 kSkulkArmor = 10    kSkulkPointValue = 5  kSkulkHealthPerBioMass = 2.25 
 kSkulkDamageReduction = {
     ["Grenade"] = 0.6,
     ["ImpactGrenade"] = 0.8,
@@ -118,7 +118,7 @@ kSkulkDamageReduction = {
     --["Railgun"] = 0.9,
 }
 
-kGorgeHealth = 180   kGorgeArmor = 50    kGorgePointValue = 7 kGorgeHealthPerBioMass = 5
+kGorgeHealth = 180   kGorgeArmor = 50    kGorgePointValue = 7 kGorgeHealthPerBioMass = 3.75
 kGorgeDamageReduction = {
     ["Grenade"] = 0.9,
     ["Sentry"] = 0.5,
@@ -126,7 +126,7 @@ kGorgeDamageReduction = {
     ["Mine"] = 0.5,
 }
 
-kLerkHealth = 180    kLerkArmor = 30  kLerkPointValue = 15 kLerkHealthPerBioMass = 3 -- 180 30
+kLerkHealth = 180    kLerkArmor = 30  kLerkPointValue = 15 kLerkHealthPerBioMass = 2.25 -- 180 30
 kLerkDamageReduction = {
     ["Grenade"] = 0.8,
     ["ImpactGrenade"] = 0.8,
@@ -135,7 +135,7 @@ kLerkDamageReduction = {
     --["PulseGrenade"] = 0.75,
 }
 
-kFadeHealth = 270  kFadeArmor = 80  kFadePointValue = 20 kFadeHealthPerBioMass = 5
+kFadeHealth = 270  kFadeArmor = 80  kFadePointValue = 20 kFadeHealthPerBioMass = 3.75
 kFadeDamageReduction = {
     ["Grenade"] = 0.8,
     --["Mine"] = 1.25,
@@ -151,7 +151,7 @@ kVokexDamageReduction = {
 }
 
 --700 450 50
-kOnosHealth = 700    kOnosArmor = 500    kOnosPointValue = 30 kOnosHealtPerBioMass = 65
+kOnosHealth = 700    kOnosArmor = 500    kOnosPointValue = 30 kOnosHealtPerBioMass = 48.75
 kOnosBoneShieldDefaultReduction = 0.2
 kOnosBoneShieldDamageReduction = {
     --["HeavyMachineGun"] = 0.25,
@@ -172,7 +172,7 @@ kOnosDamageReduction = {
     --["HeavyMachineGun"] = 1.08,
 }
 
-kProwlerHealth = 160 kProwlerArmor = 30 kProwlerPointValue = 15 kProwlerHealthPerBioMass = 5 -- kProwlerArmor was 30 and kProwlerHealth was 150
+kProwlerHealth = 160 kProwlerArmor = 30 kProwlerPointValue = 15 kProwlerHealthPerBioMass = 3.75 -- kProwlerArmor was 30 and kProwlerHealth was 150
 kProwlerDamageReduction = {
     ["Grenade"] = 0.75,
     ["ImpactGrenade"] = 0.75,
@@ -182,17 +182,17 @@ kProwlerDamageReduction = {
     --["Cannon"] = 0.9,
 }
 
-kVokexHealth = 240   kVokexArmor = 60   kVokexPointvalue = 25   kVokexHealthPerBioMass = 6 -- kVokexHealth was 250, kVokexArmor was 70 and kVokexHealthPerBioMass was 5
+kVokexHealth = 240   kVokexArmor = 60   kVokexPointvalue = 25   kVokexHealthPerBioMass = 4.5 -- kVokexHealth was 250, kVokexArmor was 70 and kVokexHealthPerBioMass was 5
 
 kParasitePlayerPointValue = 1
 
-kSkulkBaseCarapaceUpgradeAmount = 10    kSkulkCarapaceArmorPerBiomass = 1
-kGorgeBaseCarapaceUpgradeAmount = 25    kGorgeCarapaceArmorPerBiomass = 1.25
-kProwlerBaseCarapaceUpgradeAmount = 15  kProwlerCarapaceArmorPerBiomass = 1.75 -- kProwlerCarapaceArmorPerBiomass was 1.25 but to compensate for the 10AP loss above make kProwlerCarapaceArmorPerBiomass = 2.5 --kProwlerArmorFullyUpgradedAmount = 28
-kLerkBaseCarapaceUpgradeAmount  = 25    kLerkCarapaceArmorPerBiomass  = 1.25 -- 25 1.25
-kFadeBaseCarapaceUpgradeAmount  = 22.5    kFadeCarapaceArmorPerBiomass  = 2.5
-kOnosBaseCarapaceUpgradeAmount  = 200   kOnosCarapaceArmorPerBiomass  = 10 -- 180 10
-kVokexBaseCarapaceUpgradeAmount = 22.5    kVokexCarapaceArmorPerBiomass = 2.5
+kSkulkBaseCarapaceUpgradeAmount = 10    kSkulkCarapaceArmorPerBiomass = 0.75
+kGorgeBaseCarapaceUpgradeAmount = 25    kGorgeCarapaceArmorPerBiomass = 0.9375
+kProwlerBaseCarapaceUpgradeAmount = 15  kProwlerCarapaceArmorPerBiomass = 1.3125 -- kProwlerCarapaceArmorPerBiomass was 1.25 but to compensate for the 10AP loss above make kProwlerCarapaceArmorPerBiomass = 2.5 --kProwlerArmorFullyUpgradedAmount = 28
+kLerkBaseCarapaceUpgradeAmount  = 25    kLerkCarapaceArmorPerBiomass  = 0.9375 -- 25 1.25
+kFadeBaseCarapaceUpgradeAmount  = 22.5    kFadeCarapaceArmorPerBiomass  = 1.875
+kOnosBaseCarapaceUpgradeAmount  = 200   kOnosCarapaceArmorPerBiomass  = 7.5 -- 180 10
+kVokexBaseCarapaceUpgradeAmount = 22.5    kVokexCarapaceArmorPerBiomass = 1.875
 
 --4000 750 6000 1400
 kHiveHealth = 3600    kHiveArmor = 750 kMatureHiveHealth = 5000 kMatureHiveArmor = 1900
