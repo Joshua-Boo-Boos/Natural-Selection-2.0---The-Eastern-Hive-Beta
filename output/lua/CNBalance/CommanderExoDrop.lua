@@ -263,6 +263,38 @@ if Client then
         gExoDropMenu = GetGUIManager():CreateGUIScript(kMenuScriptName)
     end
 
+    -- ============================================================
+    -- Make the commander treat this window as UI
+    -- ============================================================
+    -- Returning true from the window's SendKeyEvent is NOT enough to stop a click inside it from
+    -- ALSO acting on the world. The commander's world interactions do not run off the key-event
+    -- path at all - they are gated on this one global instead:
+    --
+    --   GUICommanderButtons.lua      SendButtonTargetedAction  (targeted actions / placement)
+    --   Commander_MouseActions.lua   x2                        (world click, selection marquee)
+    --   Commander_Client.lua         x2                        (ghost placement)
+    --
+    -- GUICommanderManager recomputes it every frame from ContainsPoint on ITS OWN childScripts only
+    -- (UpdateMouseOverUIState), and this window is not one of them - so as far as the commander was
+    -- concerned the cursor was always over open world while the window was up. Every click therefore
+    -- issued a world action underneath: that action failed and played the invalid sound, and
+    -- completing it called SetCurrentTech(kTechId.None), which the hook below turns into a window
+    -- close. Hence "click any button -> error sound, window shuts, nothing selected".
+    --
+    -- The window is already modal by intent (its SendKeyEvent swallows every click while open), so
+    -- this reports UI for the whole time it is open rather than hit-testing the panel: a click just
+    -- outside the panel must not fall through to the world either.
+    local baseGetMouseIsOverUI = CommanderUI_GetMouseIsOverUI
+
+    function CommanderUI_GetMouseIsOverUI()
+
+        if gExoDropMenu then
+            return true
+        end
+
+        return baseGetMouseIsOverUI()
+    end
+
     -- Called by the buy window's BUY button. Sends the configuration, then arms the normal
     -- placement ghost via SetCurrentTech - exoDropConfigured tells the hook below to let that
     -- call through instead of re-opening the window.

@@ -163,6 +163,10 @@ GUIMarineBuildMenu.kBaseYResolution = 1200
 -- page-flip button was one less structure visible per page for no real benefit).
 GUIMarineBuildMenu.kPageSize = 5
 
+-- Minimum panel width, in button columns, for pages holding fewer than this many structures. See
+-- the sizing block in UpdatePage for why it cannot drop below 4 (the title would clip at 3).
+GUIMarineBuildMenu.kMinPanelColumns = 4
+
 GUIMarineBuildMenu.kButtonWidth = 170
 -- Must cover the FULL stacked content of a button: icon (96, starting 14px down) + label (+16
 -- below the icon) + the weapon-key hint number (+34 below the icon, plus its own ~32px height).
@@ -475,11 +479,16 @@ function GUIMarineBuildMenu:Reset()
 
     end
 
-    -- Sized to a FULL page (kPageSize), not merely how many buttons this particular page happens to
-    -- have - otherwise a short last page (e.g. the CE menu's page 3, which only holds two structures)
-    -- rendered a visibly narrower panel than the earlier, full pages instead of just leaving the
-    -- unused button slots as empty space on the right.
-    local columns = math.max(1, GUIMarineBuildMenu.kPageSize)
+    -- Short pages (the CE menu's 2-structure page 3, and the whole 2-structure menu when the team is
+    -- NOT running Combat Engineers) get a FLOOR on the panel width rather than their natural width:
+    -- at their natural 2 columns the panel was far narrower than the title, and at a full 5 columns
+    -- it was wider than it needed to be.
+    --
+    -- The floor is 4 and cannot go lower: the panel's inner width is columns * kButtonWidth, and the
+    -- title "BRAZIER INDUSTRIES COMBAT ENGINEER STRUCTURE PLACEMENT" (26pt bold) measures about 510
+    -- design units, so 3 columns (510) would exactly meet it and clip. 4 columns (680) clears it by
+    -- 170. Full pages are unaffected - they already exceed the floor.
+    local columns = math.max(shown, GUIMarineBuildMenu.kMinPanelColumns)
     local gridW   = columns * GUIMarineBuildMenu.kButtonWidth
     local gridH   = GUIMarineBuildMenu.kButtonHeight
 
@@ -603,14 +612,21 @@ function GUIMarineBuildMenu:CreateButton(techId, index, scale, frame, keybind, c
     button.description:SetTextAlignmentY(GUIItem.Align_Center)
     button.description:SetFontSize(20)
     button.description:SetFontName(kFontName)
-    button.description:SetPosition(Vector(0, 16, 0))
+    -- 16 -> 24, measured DOWN from the icon's bottom edge (anchored GUIItem.Bottom of graphicItem).
+    -- The key hint below is moved down by the same 8 so the gap between the two is unchanged: at
+    -- 20pt the label spans +/-10 around this centre, so it ended 8 clear of the key icon's old top
+    -- edge at +34, and moving only the label would have closed that to nothing.
+    button.description:SetPosition(Vector(0, 24, 0))
     button.description:SetFontIsBold(true)
     button.graphicItem:AddChild(button.description)
 
     if button.keyIcon then
         button.keyIcon:SetAnchor(GUIItem.Middle, GUIItem.Bottom)
         button.keyIcon:SetFontName(kFontName)
-        button.keyIcon:SetPosition(Vector(-button.keyIcon:GetSize().x/2, 0.5*button.keyIcon:GetSize().y + 34, 0))
+        -- 34 -> 42, tracking the label's own 16 -> 24 move above so their spacing is preserved. The
+        -- key icon is the lowest thing in a button, ending about 184 down against kButtonHeight 230,
+        -- so it still clears the footer band comfortably.
+        button.keyIcon:SetPosition(Vector(-button.keyIcon:GetSize().x/2, 0.5*button.keyIcon:GetSize().y + 42, 0))
         button.graphicItem:AddChild(button.keyIcon)
     end
 

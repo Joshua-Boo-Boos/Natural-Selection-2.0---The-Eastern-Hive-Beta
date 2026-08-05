@@ -17,10 +17,15 @@
 -- ============================================================
 -- Team resource income
 -- ============================================================
--- CE halves the marine team's t-res income from resource towers. p-res is untouched: it now buys
--- every structure, and the whole Arms Lab ladder (A1-W3, normally 200 t-res) is free, so the team
--- stream shrinks to match its much smaller remaining job (upgrades, ARCs, Scan, Beacon).
-kCombatEngineersTeamResScalar = 0.5
+-- CE cuts the marine team's t-res income from resource towers to a THIRD (was a half). p-res is
+-- untouched by this: it now buys every structure, and the whole Arms Lab ladder (A1-W3, normally
+-- 200 t-res) is free, so the team stream shrinks to match its much smaller remaining job (upgrades,
+-- ARCs, Scan, Beacon).
+--
+-- NOTE this scalar deliberately does NOT affect the structure prices below. Structures are bought
+-- with PERSONAL resources, and PlayingTeam:UpdateResTick pays p-res per marine independently of the
+-- team stream, so tightening t-res here and raising p-res costs below are two separate levers.
+kCombatEngineersTeamResScalar = 1 / 3
 
 -- Free to research. Long enough to notice and cancel, short enough not to stall the opening.
 kCombatEngineersResearchTime = 10
@@ -39,23 +44,39 @@ kCombatEngineersResearchTime = 10
 -- That constant-per-head property is the whole point: it is what stops a 25-man team teching up
 -- roughly six times faster than a 4-man one simply by having six times the income.
 --
--- DIVISOR 5, and the cap raised to 5.0 so the scaling stays linear across the entire 1..25 player
--- range the server actually runs. Both were wrong before:
---   * A divisor of 10 made a full base cost about 3.5 minutes of team income. Worked example, at
---     3.5 RTs (param 3.25, so 4.06 p-res/min per marine) and a ~295-base-cost build:
---     295/10 = 15 (the starting p-res every marine has) + 4.06 * t  ->  t = 3.6 min. Far too fast.
---     Solving the same equation for a ~10 minute build instead gives 295/k = 15 + 40.6 -> k ~= 5.3,
---     hence 5. Costs are therefore roughly DOUBLE what they were.
---   * The old 2.2 cap bound from 22 players up, which made the largest teams - the exact case being
---     guarded against - pay LESS per head than mid-sized ones. At 5.0 the cap only binds above 25,
---     so it never fires in practice and per-head cost stays flat all the way up.
+-- DIVISOR 3 (was 5, and 10 before that). Each change is solved from the same equation rather than
+-- guessed. Worked example at 3.5 RTs (param 3.25 -> 0.125 * 3.25 * 10 = 4.06 p-res per marine per
+-- minute), for the COMPLETE build-out - every structure below plus all six Arms Labs, 475 base -
+-- where each marine's share is base/divisor and every marine starts holding kMarineInitialIndivRes
+-- (15):
 --
--- Starting resources matter as much as income here and are easy to overlook: every marine spawns
--- with kMarineInitialIndivRes (15), so a 25-man team begins the round with 375 p-res already
--- pooled. Under the old numbers that alone nearly paid for a full base before any income arrived.
-kCombatEngineersCostDivisor = 5
+--     divisor 10 ->  47.5 = 15 + 4.06t  ->  t =  8.0 min   (far too fast)
+--     divisor  5 ->  95.0 = 15 + 4.06t  ->  t = 19.7 min
+--     divisor  3 -> 158.3 = 15 + 4.06t  ->  t = 35.3 min   <- current
+--
+-- (Earlier revisions of this comment quoted a 295 base and correspondingly shorter times; 295 was
+-- simply the wrong total - the structures below sum to 285 and the Arms Lab ladder adds a further
+-- 320, of which any one round buys at most 190 more. 475 is the real all-in figure.)
+--
+-- That full build-out is a whole-round project, not an opening: a practical early base at 10 players
+-- (Command Station 133 + Infantry Portal 50 + Extractor 33 + Armory 33 = 249 team-wide, 24.9 each)
+-- still lands about 2.5 minutes in.
+--
+-- The share PER MARINE is base/divisor at ANY team size, which is the whole point of dividing by N:
+-- it stops a 25-man team teching up six times faster than a 4-man one purely by having six times the
+-- aggregate income.
+--
+-- CAP 8.5, raised in step with the divisor. The cap must not bind anywhere inside the 1..25 player
+-- range the server actually runs, or the largest teams - the exact case this model exists to guard
+-- against - would pay LESS per head than mid-sized ones. N/3 reaches 8.33 at N=25, so 8.5 clears it
+-- with a little room and never fires in practice. (The old 2.2 cap bound from 22 players up, which
+-- had precisely that inverted effect; 5.0 was correct for divisor 5 but would bind from N=15 here.)
+--
+-- Starting resources matter as much as income and are easy to overlook: a 25-man team begins the
+-- round with 375 p-res already pooled before any income arrives at all.
+kCombatEngineersCostDivisor = 3
 kCombatEngineersCostScalarMin = 0.6
-kCombatEngineersCostScalarMax = 5.0
+kCombatEngineersCostScalarMax = 8.5
 kCombatEngineersCostFloor = 5
 
 -- Placing a CE blueprint costs NOTHING. Every personal resource a structure needs is charged while

@@ -150,7 +150,7 @@ kTranslateMessage["CANNON_TOOLTIP"]="*单兵高斯枪研发.\n*适用于压制�
 
 kTranslateMessage["COMBATBUILDER"]="工程套件"
 kTranslateMessage["COMBATBUILDER_TOOLTIP"]="给予陆战队员基础建筑建造."
-kTranslateMessage["COMBATBUILDER_BUYDESCRIPTION"]="给予基础建筑建造.\n*建造补给站以获取弹药.\n*建造机枪塔攻击范围内敌方单位."
+kTranslateMessage["COMBATBUILDER_BUYDESCRIPTION"]="给予基础建筑建造.\n*建造补给站以获取弹药.\n*建造机枪塔攻击范围内敌方单位.\n\n研究战斗工兵后:\n+在此免费获取, 并自动配发给每位陆战队员.\n+解锁完整基地: 指挥中心, 采集器, 军械库, 武器实验室, 步兵传送门等.\n*建筑消耗个人资源, 在建造过程中扣除 - 任意数量的陆战队员均可共同出资.\n*瞄准已建成的建筑并按副攻击键, 即可使用团队资源研究其升级."
 
 kTranslateMessage["WEAPON_CACHE"]="补给站"
 kTranslateMessage["WEAPON_CACHE_HINT"]="回复弹药与生命值"
@@ -464,7 +464,7 @@ kLocales["CANNON_TOOLTIP"]="*Gauss cannon.\n*Handle high mobility lifeforms."
 
 kLocales["COMBATBUILDER"]="Combat Builder"
 kLocales["COMBATBUILDER_TOOLTIP"]="Grant marines battlefield engineering."
-kLocales["COMBATBUILDER_BUYDESCRIPTION"]="Battlefield engineering.\n*Build supply depot to refill nearby marine's health and ammo.\n*Build sentries to attack enemies in range.\n*Sentry build limit: 1; 2 with AA and 3 with AA and Proto."
+kLocales["COMBATBUILDER_BUYDESCRIPTION"]="Battlefield engineering.\n*Build supply depot to refill nearby marine's health and ammo.\n*Build sentries to attack enemies in range.\n*Sentry build limit: 1; 2 with AA and 3 with AA and Proto.\n\nWith Combat Engineers researched:\n+Free here, and issued to every marine automatically.\n+Unlocks the full base: Command Station, Extractor, Armory, Arms Lab, Infantry Portal and more.\n*Structures cost personal resources, charged as they are built - any number of marines can pay into the same one.\n*Aim at a built structure and press secondary attack to research its upgrades with team resources."
 
 kLocales["WEAPON_CACHE"]="Supply depot"
 kLocales["WEAPON_CACHE_HINT"]="Refill health and ammo"

@@ -36,10 +36,10 @@ kMarineTechMap =
                                                                             -- sits directly above the Station on its own short vertical line instead of
                                                                             -- sharing Military Protocol's row - same x (7) as CommandStation so
                                                                             -- GetLinePositionForTechMap draws that connector as a plain vertical line.
-                                                                            -- Settled at 7.1, between the two extremes tried: 7.4 crowded the Station below,
-                                                                            -- 6.9 sat too high. Leaves 1.6 clear of Advanced Armory (7, 5.5) above and 1.4 of
-                                                                            -- the Station row (8.5) below.
-                                                                            { kTechId.CombatEngineers, 7, 7.1 },
+                                                                            -- Settled at 7.25, midway between the two rejected extremes: 7.4 read as crowding
+                                                                            -- the Station, 6.9/7.1 as sitting too high. Leaves 1.75 clear of Advanced Armory
+                                                                            -- (7, 5.5) above and 1.25 of the Station row (8.5) below.
+                                                                            { kTechId.CombatEngineers, 7, 7.25 },
                                                                                                                                                     { kTechId.MilitaryProtocol, 5, 8.5 },{ kTechId.CommandStation, 7, 8.5 }, {kTechId.InfantryPortal, 9, 8.5 },
     { kTechId.LightMachineGunUpgrade, 0.5, 10 }, { kTechId.StandardStation, 1.5, 10 },{kTechId.CatPack, 2.5 ,10 },             { kTechId.LifeSustain, 4, 10 },       { kTechId.ArmorStation, 5, 10 },  { kTechId.NanoShield, 6, 10 },                    { kTechId.PoweredExtractorTech,8,10}, { kTechId.ElectronicStation, 9, 10 }, { kTechId.PowerSurge, 10, 10 },        { kTechId.MinesUpgrade,11.5,10}, { kTechId.ExplosiveStation, 12.5, 10 }, { kTechId.MineDeploy, 13.5, 10 },
                                                     { kTechId.DragonBreath,1.5 , 11 },                                                                                { kTechId.ArmorRegen, 5, 11 },                                                                                          { kTechId.MACEMPBlast, 9, 11 },                                                                                   { kTechId.GrenadeLauncherUpgrade, 12.5, 11},
