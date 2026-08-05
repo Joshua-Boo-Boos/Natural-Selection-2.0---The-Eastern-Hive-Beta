@@ -113,7 +113,11 @@ local gMarineMenuButtons =
     [kTechId.WeaponsMenu] = { kTechId.DropShotgun, kTechId.DropGrenadeLauncher, kTechId.DropFlamethrower, kTechId.DropHeavyMachineGun,
                               kTechId.DropWelder ,kTechId.DropMines, kTechId.DropCombatBuilder,  kTechId.AssistMenu},
     
-    [kTechId.ProtosMenu] = { kTechId.DropJetpack, kTechId.DropDualMinigunExosuit, kTechId.DropDualRailgunExosuit, kTechId.None,
+    -- Exo drop: ONE button. It used to be two (Dual Minigun, then Dual Railgun); the second was
+    -- removed and DropDualMinigunExosuit repurposed as the generic "Exosuit" button, which opens
+    -- the commander Exosuit buy window (CNBalance/CommanderExoDrop.lua) so every combo AND its
+    -- Experimental Technologies upgrades are chosen there instead of needing a grid slot each.
+    [kTechId.ProtosMenu] = { kTechId.DropJetpack, kTechId.DropDualMinigunExosuit, kTechId.None, kTechId.None,
                                 kTechId.DropCannon, kTechId.None, kTechId.None, kTechId.AssistMenu}
 }
 

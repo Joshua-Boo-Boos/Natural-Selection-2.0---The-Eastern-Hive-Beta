@@ -101,3 +101,48 @@ function GetPrototypeCost(techId)
         or kPrototypeUpgradeCost[techId]
         or LookupTechData(techId, kTechDataCostKey, 0)
 end
+
+-- Armour Plating's armour bonus. Shared so Exo:GetArmorAmount (CNBalance/Exo.lua) and the
+-- commander Exo drop (CNBalance/CommanderExoDrop.lua), which has to size the armour of the
+-- dropped Exosuit entity itself, can never disagree about how much armour the upgrade is worth.
+kPrototypeExoArmourPlatingBonus = 100
+
+-- ============================================================
+-- Commander Exo drop
+-- ============================================================
+-- The Marine Commander can drop a fully-configured Exo for TEAM resources. The price is
+-- 2/3 of what a marine pays in PERSONAL resources at a Prototype Lab, floored.
+--
+-- The floor is applied PER ITEM rather than once over the sum. Per-item flooring keeps the
+-- window honest: every button shows its own true price and those prices add up EXACTLY to
+-- the footer total. Flooring the sum instead would leave the displayed numbers disagreeing
+-- with the total by 1-2 t-res on multi-upgrade configurations, which reads as a bug.
+--
+-- Resulting prices: dual combo 36, claw combo 23, Armour Plating 13, other upgrades 3 each.
+kCommanderExoDropCostScalar = 2 / 3
+
+function GetCommanderExoDropCost(techId)
+    return math.floor(GetPrototypeCost(techId) * kCommanderExoDropCostScalar)
+end
+
+-- Total t-res for a base combo plus a list of experimental upgrade techIds.
+function GetCommanderExoDropTotal(baseTechId, upgradeTechIds)
+    local total = baseTechId and GetCommanderExoDropCost(baseTechId) or 0
+    for _, techId in ipairs(upgradeTechIds or {}) do
+        total = total + GetCommanderExoDropCost(techId)
+    end
+    return total
+end
+
+-- Cheapest drop the commander could possibly make (bare claw combo, no upgrades). The
+-- commander's Exosuit button turns RED below this, because no configuration is affordable.
+function GetCommanderExoDropCheapest()
+    local cheapest
+    for techId in pairs(kPrototypeExoCombos) do
+        local cost = GetCommanderExoDropCost(techId)
+        if not cheapest or cost < cheapest then
+            cheapest = cost
+        end
+    end
+    return cheapest or 0
+end

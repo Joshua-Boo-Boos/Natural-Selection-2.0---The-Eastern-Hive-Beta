@@ -3683,6 +3683,17 @@ kMarineBrainActions =
             return kNilAction
         end
 
+        -- Combat Engineers: a CE structure's build percentage is funded entirely by the personal
+        -- resources of whoever is interacting with it (ConstructMixin:Construct pays for its own
+        -- progress out of the builder's p-res, and adds none if they have none). A bot with 0 p-res
+        -- that still walked over and "tried" to build one would just stand there uselessly forever -
+        -- so it ignores any such structure entirely until it actually has p-res to spend on it,
+        -- exactly like a human wouldn't bother walking up to one they can't afford to help with.
+        if buildTarget and buildTarget.ceIsCombatEngineersStructure
+           and (not marine.GetResources or marine:GetResources() <= 0) then
+            return kNilAction
+        end
+
         --limit to inside relevancy range, becuase we don't want a Marine to go clear across the map to build
         --or we're just exploring anyway but not clear across the map
         if buildTarget then

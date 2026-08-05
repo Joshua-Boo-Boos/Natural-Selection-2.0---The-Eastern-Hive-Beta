@@ -21,10 +21,18 @@ ModLoader.SetupFileHook("lua/NetworkMessages_Server.lua", "lua/CNBalance/Network
 ModLoader.SetupFileHook("lua/DamageMixin.lua", "lua/CNBalance/Mixin/DamageMixin.lua", "post" )
 
 ModLoader.SetupFileHook("lua/TechTreeConstants.lua", "lua/CNBalance/TechTreeConstants.lua", "post")
+-- Combat Engineers shared layer (mode constants, cost model, structure list). FIRST of the
+-- TechData post-hooks so its constants exist for every other file hooked on this target.
+ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/CombatEngineers_Shared.lua", "post")
+ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/CombatEngineers_Sounds.lua", "post")
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/TechData.lua", "post")
 -- Prototype Lab overhaul (buy-window subset). Load after the mod TechData hook.
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/PrototypeTechData.lua", "post")
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/Mixin/PrototypeUpgradesMixin.lua", "post")
+-- Combat Engineers: MilitaryProtocol/CombatEngineers must NOT read as already-researched during
+-- pre-game warmup (vanilla TechNode short-circuits warmup to "true" for everything). Loaded before
+-- TechTree.lua's own hook so the override is in place for anything TechTree.lua's init touches.
+ModLoader.SetupFileHook("lua/TechNode.lua", "lua/CNBalance/CombatEngineers_WarmupGuard.lua", "post")
 ModLoader.SetupFileHook("lua/TechTree.lua", "lua/CNBalance/TechTree.lua", "post")
 ModLoader.SetupFileHook("lua/TechTreeButtons.lua", "lua/CNBalance/TechTreeButtons.lua", "post")
 ModLoader.SetupFileHook("lua/BuildUtility.lua", "lua/CNBalance/BuildUtility.lua", "post")
@@ -115,6 +123,13 @@ ModLoader.SetupFileHook("lua/Commander_Buttons.lua", "lua/CNBalance/Commander_Bu
 ModLoader.SetupFileHook("lua/Commander_Server.lua", "lua/CNBalance/Commander_Server.lua", "post" )
 ModLoader.SetupFileHook("lua/AlienCommander.lua", "lua/CNBalance/AlienCommander.lua", "post" )
 ModLoader.SetupFileHook("lua/MarineCommander.lua", "lua/CNBalance/MarineCommander.lua", "replace")
+-- Commander Exo drop. MUST come after the "replace" above: it post-hooks
+-- MarineCommander:ProcessTechTreeActionForEntity (defined there), Commander:SetCurrentTech and
+-- CommanderUI_MenuButtonStatus (both already loaded by then via lua/Commander.lua).
+ModLoader.SetupFileHook("lua/MarineCommander.lua", "lua/CNBalance/CommanderExoDrop.lua", "post")
+-- Combat Engineers commander lockdown. AFTER CommanderExoDrop so it wraps that hook too: with CE
+-- researched the Exo drop button greys out along with everything else.
+ModLoader.SetupFileHook("lua/MarineCommander.lua", "lua/CNBalance/CombatEngineers_Commander.lua", "post")
 
 ModLoader.SetupFileHook("lua/CommAbilities/Marine/Scan.lua", "lua/CNBalance/CommAbilities/Scan.lua", "post")
 --Marines
@@ -133,6 +148,10 @@ ModLoader.SetupFileHook("lua/GUIActionIcon.lua", "lua/CNBalance/GUI/GUIActionIco
 ModLoader.SetupFileHook("lua/GUIPickups.lua", "lua/CNBalance/GUI/GUIPickups.lua", "post")
 ModLoader.SetupFileHook("lua/MarineBuy_Client.lua", "lua/CNBalance/MarineBuy_Client.lua", "post" )
 ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/MarineTeam.lua", "post")
+-- Combat Engineers mode flag, halved t-res income and the Arms Lab ladder. AFTER the mod's own
+-- MarineTeam hook: it wraps InitTechTree, CollectTeamResources and OnResearchComplete as defined
+-- there (Military Protocol's income rewrite in particular).
+ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/CombatEngineers_Team.lua", "post")
 ModLoader.SetupFileHook("lua/MarineTeamInfo.lua", "lua/CNBalance/MarineTeamInfo.lua", "replace")
 
 ModLoader.SetupFileHook("lua/DropPack.lua", "lua/CNBalance/DropPack.lua", "post")
@@ -149,6 +168,10 @@ ModLoader.SetupFileHook("lua/PrototypeLab.lua", "lua/CNBalance/Structures/Marine
 -- Prototype Lab buy window: open hook (client) + bundle purchase handler (server).
 ModLoader.SetupFileHook("lua/Marine_Client.lua", "lua/CNBalance/MarineBuyMenuHook.lua", "post")
 ModLoader.SetupFileHook("lua/Marine_Server.lua", "lua/CNBalance/PrototypeBuyServer.lua", "post")
+-- Combat Engineers: Combat Builder grant, personal-resource construction and the MAC guard.
+ModLoader.SetupFileHook("lua/Marine_Server.lua", "lua/CNBalance/CombatEngineers_Build.lua", "post")
+-- Combat Engineers: field structure upgrades (shared helpers + client menu + server handler).
+ModLoader.SetupFileHook("lua/ResearchMixin.lua", "lua/CNBalance/CombatEngineers_Upgrade.lua", "post")
 ModLoader.SetupFileHook("lua/CommandStation.lua", "lua/CNBalance/Structures/Marine/CommandStation.lua", "post")
 ModLoader.SetupFileHook("lua/Extractor.lua", "lua/CNBalance/Structures/Marine/Extractor.lua", "replace")
 ModLoader.SetupFileHook("lua/PowerPoint.lua", "lua/CNBalance/Structures/Marine/PowerPoint.lua", "post" )
@@ -201,6 +224,14 @@ ModLoader.SetupFileHook("lua/ExoVariantMixin.lua","lua/CNBalance/ExoVariantMixin
 ModLoader.SetupFileHook("lua/RifleVariantMixin.lua","lua/CNBalance/RifleVariantMixin.lua","post")
 
 ModLoader.SetupFileHook("lua/GUICommanderButtons.lua", "lua/CNBalance/GUI/GUICommanderButtons.lua", "post" )
+-- Combat Engineers' standalone icon texture is applied in four places, each from a post-hook on the
+-- vanilla file that owns it: the commander button grid (the GUICommanderButtons hook above), the
+-- J-menu tech map (the GUITechMap hook near the top of this file), and the research tray and
+-- selection panel below. It was previously done from a single CNBalance/GUI/CombatEngineersIcon.lua
+-- hooked ONLY on GUICommanderButtons.lua, reaching the other classes via Script.Load - that made it
+-- depend on the relative load order of unrelated hook targets, and the icon never appeared.
+ModLoader.SetupFileHook("lua/GUIProduction.lua", "lua/CNBalance/GUI/GUIProduction.lua", "post" )
+ModLoader.SetupFileHook("lua/GUISelectionPanel.lua", "lua/CNBalance/GUI/GUISelectionPanel.lua", "post" )
 ModLoader.SetupFileHook("lua/GUIInsight_PlayerHealthbars.lua", "lua/CNBalance/GUI/GUIInsight_PlayerHealthbars.lua", "post")
 --------------------
 

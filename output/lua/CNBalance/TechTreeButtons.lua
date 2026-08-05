@@ -2,6 +2,14 @@
 local kTechIdToMaterialOffset = debug.getupvaluex(GetMaterialXYOffset, "kTechIdToMaterialOffset")
 
 kTechIdToMaterialOffset[kTechId.MilitaryProtocol] = 190
+-- Combat Engineers actually draws a STANDALONE texture (ui/combat_engineers/combat_engineers_icon.dds,
+-- applied per-GUI in the CNBalance/GUI/ post-hooks for GUICommanderButtons, GUITechMap, GUIProduction
+-- and GUISelectionPanel), so this atlas offset is only a FALLBACK. It is
+-- kept deliberately rather than omitted: GetMaterialXYOffset DebugPrints a warning for any techId
+-- with no entry, and the base GUI code still resolves an atlas cell for this tech before the
+-- standalone texture is swapped in over the top of it. 207 is the Combat Builder cell, so even if
+-- the override ever fails to run the icon is still recognisably right rather than blank.
+kTechIdToMaterialOffset[kTechId.CombatEngineers] = 207
 kTechIdToMaterialOffset[kTechId.MotionTrack] = 219
 
 kTechIdToMaterialOffset[kTechId.AdvancedArmory] = 99
@@ -49,7 +57,11 @@ kTechIdToMaterialOffset[kTechId.JetpackPrototypeLab] = 89
 
 kTechIdToMaterialOffset[kTechId.ProtosMenu] = 25
 kTechIdToMaterialOffset[kTechId.DualMinigunExosuit] = 84
-kTechIdToMaterialOffset[kTechId.DropDualMinigunExosuit] = 84
+-- The commander's single Exosuit drop button. Was 84 (a dual-minigun icon), which is now
+-- misleading: this one button drops any of the six combos, so it uses the generic exosuit
+-- icon instead. DropDualRailgunExosuit no longer appears in any menu but keeps its icon
+-- mapping so nothing breaks if the tech id is referenced elsewhere.
+kTechIdToMaterialOffset[kTechId.DropDualMinigunExosuit] = 25
 kTechIdToMaterialOffset[kTechId.DropDualRailgunExosuit] = 116
 kTechIdToMaterialOffset[kTechId.DualRailgunExosuit] = 116
 kTechIdToMaterialOffset[kTechId.CannonTech] = 204

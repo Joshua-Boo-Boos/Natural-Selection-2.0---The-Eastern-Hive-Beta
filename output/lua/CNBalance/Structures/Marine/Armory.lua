@@ -126,6 +126,48 @@ if Server then
 
     end
 
+    -- CE marines get a free Combat Builder from an Armory/AdvancedArmory's resupply pulse - the
+    -- normal facing-the-armory check the health/ammo resupply already uses, just without requiring
+    -- the player to actually NEED health or ammo (a marine who dropped their builder but is otherwise
+    -- topped up must still be able to walk up and get one back). NOT granted while Mines occupy slot
+    -- 4 (same slot as the builder) - the user must use up or drop the Mines first. This is CE-only:
+    -- standard/MP Marines still buy the Combat Builder from the Armory menu at its normal cost, even
+    -- with CombatBuilderTech researched - that legacy path is untouched.
+    local function GetArmoryShouldResupplyCombatBuilder(self, player)
+
+        if not player:GetIsAlive() or not player:isa("Marine") or player:isa("MarineCommander") then
+            return false
+        end
+
+        if not GetCombatEngineersActive(player) then
+            return false
+        end
+
+        if player:GetWeapon(CombatBuilder.kMapName) then
+            return false
+        end
+
+        local slotFourWeapon = player:GetWeaponInHUDSlot(4)
+        if slotFourWeapon and not slotFourWeapon:isa("CombatBuilder") then
+            return false
+        end
+
+        local viewVec = player:GetViewAngles():GetCoords().zAxis
+        local toArmoryVec = self:GetOrigin() - player:GetOrigin()
+
+        return GetNormalizedVector(viewVec):DotProduct(GetNormalizedVector(toArmoryVec)) > .75
+    end
+
+    local baseArmoryGetShouldResupplyPlayer = Armory.GetShouldResupplyPlayer
+    function Armory:GetShouldResupplyPlayer(player)
+
+        if baseArmoryGetShouldResupplyPlayer(self, player) then
+            return true
+        end
+
+        return GetArmoryShouldResupplyCombatBuilder(self, player)
+    end
+
     function Armory:ResupplyPlayer(player)
 
         local resuppliedPlayer = false
@@ -179,6 +221,19 @@ if Server then
 
         end
 
+        -- CE marines missing a Combat Builder (dropped it, or otherwise never got one) get one free
+        -- here - see GetArmoryShouldResupplyCombatBuilder above for the full eligibility check
+        -- (CE active, no builder held, no Mines in slot 4). Clearing ceBuilderDropped lets
+        -- Marine:GiveCombatEngineerBuilder resume auto-reissuing it from here on, exactly as if it
+        -- had never been dropped.
+        if GetArmoryShouldResupplyCombatBuilder(self, player) then
+
+            player:GiveItem(CombatBuilder.kMapName)
+            player.ceBuilderDropped = false
+            resuppliedPlayer = true
+
+        end
+
         if resuppliedPlayer then
 
             -- Insert/update entry in table
@@ -190,4 +245,4 @@ if Server then
         end
 
     end
-end 
+end

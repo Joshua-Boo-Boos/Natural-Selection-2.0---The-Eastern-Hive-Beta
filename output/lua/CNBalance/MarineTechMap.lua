@@ -30,7 +30,17 @@ kMarineTechMap =
                                                             { kTechId.CannonPrototypeLab,11 ,6.5 },  { kTechId.DualRailgunExosuit, 12, 6.5 },
 
 
-                                                                                                                                                    { kTechId.MilitaryProtocol, 5, 8 },{ kTechId.CommandStation, 7, 8 }, {kTechId.InfantryPortal, 9, 8 },
+                                                                            -- Military Protocol runs horizontally off the Command Station again (same row),
+                                                                            -- with the whole CommandStation/MilitaryProtocol/InfantryPortal row nudged down
+                                                                            -- slightly (8 -> 8.5) to open a short gap above the Station. Combat Engineers now
+                                                                            -- sits directly above the Station on its own short vertical line instead of
+                                                                            -- sharing Military Protocol's row - same x (7) as CommandStation so
+                                                                            -- GetLinePositionForTechMap draws that connector as a plain vertical line.
+                                                                            -- Settled at 7.1, between the two extremes tried: 7.4 crowded the Station below,
+                                                                            -- 6.9 sat too high. Leaves 1.6 clear of Advanced Armory (7, 5.5) above and 1.4 of
+                                                                            -- the Station row (8.5) below.
+                                                                            { kTechId.CombatEngineers, 7, 7.1 },
+                                                                                                                                                    { kTechId.MilitaryProtocol, 5, 8.5 },{ kTechId.CommandStation, 7, 8.5 }, {kTechId.InfantryPortal, 9, 8.5 },
     { kTechId.LightMachineGunUpgrade, 0.5, 10 }, { kTechId.StandardStation, 1.5, 10 },{kTechId.CatPack, 2.5 ,10 },             { kTechId.LifeSustain, 4, 10 },       { kTechId.ArmorStation, 5, 10 },  { kTechId.NanoShield, 6, 10 },                    { kTechId.PoweredExtractorTech,8,10}, { kTechId.ElectronicStation, 9, 10 }, { kTechId.PowerSurge, 10, 10 },        { kTechId.MinesUpgrade,11.5,10}, { kTechId.ExplosiveStation, 12.5, 10 }, { kTechId.MineDeploy, 13.5, 10 },
                                                     { kTechId.DragonBreath,1.5 , 11 },                                                                                { kTechId.ArmorRegen, 5, 11 },                                                                                          { kTechId.MACEMPBlast, 9, 11 },                                                                                   { kTechId.GrenadeLauncherUpgrade, 12.5, 11},
 
@@ -83,7 +93,14 @@ kMarineLines =
     --Supplies
     GetLinePositionForTechMap(kMarineTechMap, kTechId.CommandStation, kTechId.InfantryPortal),
     GetLinePositionForTechMap(kMarineTechMap, kTechId.CommandStation, kTechId.MilitaryProtocol),
-    { 7, 8, 7, 9 },
+    -- Combat Engineers hangs off the Command Station alongside Military Protocol. The line lights up
+    -- on its own once researched - GUITechMap colours each line from the researched state of the two
+    -- nodes it joins, so no extra work is needed for that.
+    GetLinePositionForTechMap(kMarineTechMap, kTechId.CommandStation, kTechId.CombatEngineers),
+    -- Command Station down to the supply bus at y=9. HARDCODED start y, so it has to track the
+    -- Station's own row: that row moved 8 -> 8.5, and while this still said 8 the line began half a
+    -- row ABOVE the Station, poking a stray stub out of its top into the Combat Engineers connector.
+    { 7, 8.5, 7, 9 },
     { 1.5, 9, 12.5, 9 },
 
     -- Standard Supply

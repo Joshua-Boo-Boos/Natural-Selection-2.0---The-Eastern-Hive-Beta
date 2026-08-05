@@ -87,6 +87,9 @@ TeamInfo.kRelevantTechIdsMarine =
     kTechId.MotionTrack,
 
     kTechId.MilitaryProtocol,
+    -- Combat Engineers must be networked: every client-side CE check (build menu availability,
+    -- ghost validity, structure costs) goes through GetHasTech, which reads this list.
+    kTechId.CombatEngineers,
     kTechId.StandardStation,
     kTechId.ExplosiveStation,
     kTechId.ElectronicStation,

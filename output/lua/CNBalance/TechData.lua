@@ -4,6 +4,41 @@ kTechDataPersonalCostKey = "costpersonalkey"
 kTechDataLayoutKey     = "layoutKey"
 kTechDataTeamResOnKillKey = "tResOnKillKey"
 
+-- Global cap on Arms Labs, enforced regardless of mode (standard Marines, Military Protocol or
+-- Combat Engineers). CE already caps at this same number via kCombatEngineersMaxArmsLabs (the length
+-- of its per-lab cost ladder), so 6 is kept in sync between the two rather than picked independently.
+kMaxArmsLabsGlobal = 6
+
+-- Same shape and call signature as GetCommandStationIsBuilt (InfantryPortal.lua): counts only ALIVE
+-- Arms Labs so a destroyed one frees its slot immediately, and is consulted through
+-- kTechDataBuildRequiresMethod, which BuildUtility.lua calls for every placement attempt regardless
+-- of who or what mode is placing - so this applies to a normal commander's placement exactly like
+-- GetCommandStationIsBuilt does for Infantry Portals.
+local function GetArmsLabPlacementAllowed(techId, origin, normal, commander)
+
+    if not commander then
+        return false
+    end
+
+    local teamNumber = commander:GetTeamNumber()
+    if teamNumber == kTeamInvalid then
+        return false
+    end
+
+    local armsLabCount = 0
+    for _, armsLab in ipairs(GetEntitiesForTeam("ArmsLab", teamNumber)) do
+        if armsLab:GetIsAlive() then
+            armsLabCount = armsLabCount + 1
+        end
+    end
+
+    if armsLabCount >= kMaxArmsLabsGlobal then
+        return false, "COMMANDERERROR_ARMS_LAB_GLOBAL_LIMIT"
+    end
+
+    return true
+end
+
 local oldBuildTechData = BuildTechData
 function BuildTechData()
 
@@ -17,6 +52,46 @@ function BuildTechData()
         [kTechDataResearchName] = "MILITARY_PROTOCOL",
         [kTechDataResearchIgnoreCompleteAlert] = true,
     } )
+
+    -- Combat Engineers: the marine counterpart to the alien Origin Form, and mutually exclusive with
+    -- Military Protocol above. FREE and quick - the cost of the mode is paid by the commander losing
+    -- almost every ability, not in team resources, and the short research time doubles as the window
+    -- in which a misclick can still be cancelled.
+    table.insert(techData,{
+        [kTechDataId] = kTechId.CombatEngineers,
+        [kTechDataCostKey] = 0,
+        [kTechDataResearchTimeKey] = kCombatEngineersResearchTime,
+        [kTechDataDisplayName] = "COMBAT_ENGINEERS",
+        [kTechDataTooltipInfo] = "COMBAT_ENGINEERS_TOOLTIP",
+        [kTechDataResearchName] = "COMBAT_ENGINEERS",
+        [kTechDataResearchIgnoreCompleteAlert] = true,
+    } )
+
+    -- Full override of the vanilla Arms Lab entry (fields copied unchanged from BalanceTechData.lua)
+    -- purely to attach a global placement cap: GetArmsLabPlacementAllowed refuses a 7th Arms Lab in
+    -- ANY mode (standard, Military Protocol or Combat Engineers) with the same
+    -- "too many on the map" notification style as Infantry Portal's global cap.
+    table.insert(techData,{
+        [kTechDataId] = kTechId.ArmsLab,
+        [kTechDataHint] = "ARMSLAB_HINT",
+        [kTechDataGhostModelClass] = "MarineGhostModel",
+        [kTechDataRequiresPower] = true,
+        [kTechDataMapName] = ArmsLab.kMapName,
+        [kTechDataDisplayName] = "ARMS_LAB",
+        [kTechDataCostKey] = kArmsLabCost,
+        [kTechDataBuildTime] = kArmsLabBuildTime,
+        [kTechDataMaxHealth] = kArmsLabHealth,
+        [kTechDataMaxArmor] = kArmsLabArmor,
+        [kTechDataEngagementDistance] = kArmsLabEngagementDistance,
+        [kTechDataModel] = ArmsLab.kModelName,
+        [kTechDataPointValue] = kArmsLabPointValue,
+        [kTechDataHotkey] = Move.A,
+        [kTechDataNotOnInfestation] = kPreventMarineStructuresOnInfestation,
+        [kTechDataTooltipInfo] = "ARMS_LAB_TOOLTIP",
+        [kTechDataObstacleRadius] = 1.0,
+        [kTechDataBuildRequiresMethod] = GetArmsLabPlacementAllowed,
+        [kTechDataBuildMethodFailedMessage] = "COMMANDERERROR_ARMS_LAB_GLOBAL_LIMIT",
+    })
 
     table.insert(techData,{
         [kTechDataId] = kTechId.MilitaryProtocolBroadCast,
@@ -716,13 +791,21 @@ function BuildTechData()
     } )
 
     table.insert(techData, {
+        -- Commander Exo drop. This single button replaces the old Dual Minigun / Dual Railgun
+        -- pair: clicking it opens the commander's Exosuit buy window (CNBalance/CommanderExoDrop.lua)
+        -- where the combo AND its Experimental Technologies upgrades are chosen, then arms the
+        -- normal placement ghost.
+        --   * NO kTechDataLayoutKey - the layout is whatever the commander configured, applied
+        --     to the created Exosuit by MarineCommander:ProcessTechTreeActionForEntity.
+        --   * COST 0 - the price depends on that configuration, so the static tech-node cost
+        --     check in Commander:ProcessTechTreeAction must not charge or block. The real
+        --     t-res cost is checked and taken by the drop code itself.
         [kTechDataId] = kTechId.DropDualMinigunExosuit,
         [kTechDataMapName] = Exosuit.kMapName,
         [kTechDataModel] = Exosuit.kModelName,
-        [kTechDataDisplayName] = "DUAL_MINIGUN",
-        [kTechDataTooltipInfo] = "DUAL_MINIGUN_TOOLTIP",
-        [kTechDataLayoutKey] = "MinigunMinigun",
-        [kTechDataCostKey] = kDualExosuitDropCost,
+        [kTechDataDisplayName] = "EXOSUIT_DROP",
+        [kTechDataTooltipInfo] = "EXOSUIT_DROP_TOOLTIP",
+        [kTechDataCostKey] = 0,
         [kStructureAttachId] = {kTechId.PrototypeLab,kTechId.CannonPrototypeLab,kTechId.JetpackPrototypeLab,kTechId.ExosuitPrototypeLab},
         [kStructureAttachRange] = kArmoryWeaponAttachRange,
         [kStructureAttachRequiresPower] = true,
