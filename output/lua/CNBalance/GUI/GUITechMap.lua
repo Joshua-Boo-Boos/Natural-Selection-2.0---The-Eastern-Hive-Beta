@@ -12,17 +12,6 @@
 local kPrimalScreamIconTexture = PrecacheAsset("ui/lerk/primal_scream.dds")
 local kPrimalScreamIconSize = 464
 
--- Combat Engineers is the marine equivalent of the Primal Scream case above: a standalone dds with
--- no atlas cell of its own, pointed at the Combat Builder's slot as a fallback so it would otherwise
--- render the Combat Builder icon. Re-skinned here, in this file, for the same reason Primal Scream
--- is - this is the file that is an actual post-hook on lua/GUITechMap.lua, so GUITechMap is
--- guaranteed to exist and this override is guaranteed to be the last one applied. (It was previously
--- attempted from CNBalance/GUI/CombatEngineersIcon.lua, a post-hook on a DIFFERENT file
--- (GUICommanderButtons.lua) that pulled GUITechMap in via Script.Load and wrapped Initialize - which
--- depended on the relative load order of two unrelated hook targets and did not take effect.)
-local kCombatEngineersIconTexture = PrecacheAsset("ui/combat_engineers/combat_engineers_icon.dds")
-local kCombatEngineersIconSize = 100
-
 local baseUpdate = GUITechMap.Update
 function GUITechMap:Update(deltaTime)
 
@@ -32,21 +21,6 @@ function GUITechMap:Update(deltaTime)
 
     for i = 1, #self.techIcons do
         local techIcon = self.techIcons[i]
-
-        if techIcon and techIcon.TechId == kTechId.CombatEngineers and techIcon.Icon
-           and not techIcon._combatEngineersReskinned then
-
-            -- Texture only: the base Update keeps tinting the icon with the node's status colour
-            -- every frame, so the node still greys out / lights up on research exactly as before.
-            -- No resize, unlike Primal Scream above - this artwork is authored as an icon that
-            -- already fills its cell, so it matches the other nodes at the default size.
-            techIcon.Icon:SetTexture(kCombatEngineersIconTexture)
-            techIcon.Icon:SetTexturePixelCoordinates(0, 0, kCombatEngineersIconSize, kCombatEngineersIconSize)
-
-            techIcon._combatEngineersReskinned = true
-
-        end
-
         if techIcon and techIcon.TechId == kTechId.PrimalScream and techIcon.Icon
            and not techIcon._primalScreamReskinned then
 

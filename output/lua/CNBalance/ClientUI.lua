@@ -214,8 +214,6 @@ local kMiscPreloads = {
     'GUIList',
     'GUIMarineBuyMenu',
     'CNBalance/GUI/GUIPrototypeLabBuyMenu',
-    'CNBalance/GUI/GUICommanderExoDropMenu',
-    'CNBalance/GUI/GUICEStructureUpgradeMenu',
     'GUIMarineTeamMessage',
     'GUIMinimapButtons',
     'GUIParticleSystem',

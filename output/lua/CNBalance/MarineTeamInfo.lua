@@ -27,15 +27,6 @@ local userTrackerNetVarDef = string.format("integer (0 to %d)", kMaxPlayers - 1)
 local networkVars =
 {
     numInfantryPortals = string.format("integer (0 to %d)", kMarineTeamInfoMaxInfantryPortalCount),
-    -- Combat Engineers: total Arms Labs the team owns, built or not. The Nth Arms Lab is priced by
-    -- its LADDER POSITION, so the build menu needs the same count the server prices from - counting
-    -- entities client-side would miss labs outside relevance range and show the wrong price.
-    -- One integer on a single team entity, so the networking cost is negligible.
-    numArmsLabs = string.format("integer (0 to %d)", kCombatEngineersMaxArmsLabs or 6),
-    -- TOTAL Infantry Portals owned, built or not - distinct from numInfantryPortals above, which
-    -- counts only ACTIVE ones for the respawn-time code. The CE build menu shows "N/12" against this
-    -- and the cap is enforced on it, so an unbuilt blueprint still counts.
-    numInfantryPortalsTotal = string.format("integer (0 to %d)", kMarineTeamInfoMaxInfantryPortalCount),
 }
 
 local kTrackedMarineGadgets =
@@ -196,11 +187,9 @@ if Server then
     function MarineTeamInfo:Reset()
         
         TeamInfo.Reset(self)
-
+        
         self.numInfantryPortals = 0
-        self.numArmsLabs = 0
-        self.numInfantryPortalsTotal = 0
-
+        
     end
     
     function MarineTeamInfo:OnUpdate(deltaTime)
@@ -211,15 +200,7 @@ if Server then
         if team then
         
             self.numInfantryPortals = math.min(team:GetNumActiveInfantryPortals(), kMarineTeamInfoMaxInfantryPortalCount)
-
-            if team.GetArmsLabCount then
-                self.numArmsLabs = math.min(team:GetArmsLabCount(), kCombatEngineersMaxArmsLabs)
-            end
-
-            if team.GetInfantryPortalCount then
-                self.numInfantryPortalsTotal = math.min(team:GetInfantryPortalCount(), kMarineTeamInfoMaxInfantryPortalCount)
-            end
-
+        
         end
     
     end

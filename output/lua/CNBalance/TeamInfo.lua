@@ -45,7 +45,12 @@ local networkVars =
     -- Server-computed respawn-time extension for this team, networked so the HUD shows the
     -- SAME value to players and spectators (client-side recompute only knows the local
     -- viewer's tech tree). See GetRespawnTimeExtend / UpdateInfo.
-    respawnTimeExtension = "float (0 to 11 by 0.1)"
+    -- RANGE WIDENED for the deadlock phase-two ramp. The extension is (max respawn - min respawn),
+    -- and phase two doubles the maximum: marines reach 18*2 - 9 = 27 and aliens 19*2 - 10 = 28, both
+    -- far outside the old 0..11 ceiling. A networked value that overflows its declared range is
+    -- clamped silently, so respawn times would simply have stopped climbing partway through phase two
+    -- with nothing to indicate why. 40 leaves room for the maxima to be retuned upward.
+    respawnTimeExtension = "float (0 to 40 by 0.1)"
 }
 
 AddMixinNetworkVars(TeamMixin, networkVars)
@@ -87,9 +92,6 @@ TeamInfo.kRelevantTechIdsMarine =
     kTechId.MotionTrack,
 
     kTechId.MilitaryProtocol,
-    -- Combat Engineers must be networked: every client-side CE check (build menu availability,
-    -- ghost validity, structure costs) goes through GetHasTech, which reads this list.
-    kTechId.CombatEngineers,
     kTechId.StandardStation,
     kTechId.ExplosiveStation,
     kTechId.ElectronicStation,

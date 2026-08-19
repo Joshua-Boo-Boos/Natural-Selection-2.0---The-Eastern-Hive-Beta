@@ -1411,6 +1411,11 @@ function AlienTeam:CollectTeamResources(teamRes,playerRes)
     if self:IsOriginForm() then
         local activeHiveCount = self:GetActiveHiveCount()
         teamRes = teamRes * kOriginFormTeamResScalarHiveCount[activeHiveCount + 1]
+
+        -- Origin Form harvesters pay TRIPLE. Applied after the hive-count scalar rather than folded
+        -- into that table, so the two levers stay separate: the table shapes income against how many
+        -- hives are up, this multiplies whatever that produces.
+        teamRes = teamRes * kOriginFormResourceTowerScalar
     end
 
     PlayingTeam.CollectTeamResources(self,teamRes,playerRes)

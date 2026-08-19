@@ -704,7 +704,18 @@ if Server then
 end
 
 function Hive:GetExtraHealth(techLevel,extraPlayers,recentWins)
-    return kHiveHealthPerPlayerAdd * extraPlayers
+
+    -- Hives now START 30% below their old health and climb back to it by Biomass 8. techLevel is
+    -- already Clamp(biomass - 1, 0, 8) from BiomassHealthMixin, so the ramp completes at 7.
+    --
+    -- Mature hives use their own pair of constants: the two have different totals, so a single
+    -- restore rate would overshoot on one and undershoot on the other.
+    local isMature = self.GetIsMature and self:GetIsMature()
+    local restorePerLevel = isMature and kMatureHiveHealthBiomassRestore or kHiveHealthBiomassRestore
+
+    local restore = restorePerLevel * math.min(techLevel, kAlienStructureRestoreLevels)
+
+    return kHiveHealthPerPlayerAdd * extraPlayers + restore
 end
 
 

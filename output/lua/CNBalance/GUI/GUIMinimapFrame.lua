@@ -15,14 +15,33 @@ class 'GUIMinimapFrame' (GUIMinimap)
 local desiredSpawnPosition
 local isAlienRespawning = false
 local isRespawning = false
-local function OnSetIsRespawning(message)
-    isRespawning = message.isRespawning
+--[[
+    Track respawn state WITHOUT re-hooking the message.
+
+    Vanilla GUIMinimapFrame.lua already does Client.HookNetworkMessage("SetIsRespawning", ...) and
+    this file is a POST hook, so hooking it again produced "The message SetIsRespawning was already
+    hooked" -- and the second hook is rejected, meaning this handler never ran at all. isRespawning
+    and isAlienRespawning therefore stayed false forever, which silently disabled the alien
+    spawn-selection UI below (choosingSpawn, the ShowMap binding, the mouse and the "choose spawn"
+    text all gate on isAlienRespawning).
+
+    Vanilla keeps its own copy in a file-local we cannot reach, but it exposes it through
+    GetPlayerIsSpawning(). So read the authoritative value from there instead of maintaining a
+    duplicate, and capture the original before this file overrides that same global below.
+]]
+local baseGetPlayerIsSpawning = GetPlayerIsSpawning
+
+local function UpdateRespawningState()
+
+    isRespawning = baseGetPlayerIsSpawning and baseGetPlayerIsSpawning() or false
     isAlienRespawning = isRespawning
+
+    return isRespawning
+
 end
-Client.HookNetworkMessage("SetIsRespawning", OnSetIsRespawning)
 
 function GetPlayerIsSpawning()
-    return isRespawning
+    return UpdateRespawningState()
 end
 
 function GetDesiredSpawnPosition()
@@ -274,6 +293,11 @@ function GUIMinimapFrame:SendKeyEvent(key, down)
 end
 
 function GUIMinimapFrame:Update(deltaTime)
+
+    -- Refresh from vanilla's authoritative value once per frame, so the isAlienRespawning gates in
+    -- this file are correct regardless of whether anything called GetPlayerIsSpawning first.
+    UpdateRespawningState()
+
 
     PROFILE("GUIMinimapFrame:Update")
     

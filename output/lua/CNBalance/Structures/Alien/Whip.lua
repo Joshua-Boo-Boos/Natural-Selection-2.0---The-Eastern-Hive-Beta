@@ -10,7 +10,12 @@ function Whip:OnCreate()
 end
 
 function Whip:GetExtraHealth(techLevel,extraPlayers,recentWins)
-    return kWhipHealthPerBioMass * techLevel
+
+    -- The existing per-biomass growth is UNCHANGED; the restore term is added on top of it. Whips now
+    -- start 30% lower and are back to their old health by Biomass 8 (techLevel 7).
+    local restore = kWhipHealthBiomassRestore * math.min(techLevel, kAlienStructureRestoreLevels)
+
+    return kWhipHealthPerBioMass * techLevel + restore
 end
 
 function Whip:OnOwnerChanged(oldOwner, newOwner)

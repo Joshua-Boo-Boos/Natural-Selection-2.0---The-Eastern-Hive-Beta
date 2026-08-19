@@ -149,8 +149,12 @@ function HelpScreen_InitializeContent()
         theme = "alien",
         useLocale = true,
     })
+    -- Renamed from "Metabolize": vanilla HelpScreenContent.lua already registers an entry by that
+    -- exact name for the Fade, and HelpScreen_AddContent rejects a duplicate name with
+    -- 'Content named "Metabolize" already exists!'. This is the Vokex's own entry, a genuinely
+    -- separate item, so it needs its own unique name rather than replacing the Fade's.
     HelpScreen_AddContent({
-        name = "Metabolize",
+        name = "VokexMetabolize",
         title = "HELP_SCREEN_METABOLIZE",
         --requirementFunction = function()
         --    local result, msg = EvaluateTechAvailability(kTechId.MetabolizeEnergy, "HELP_SCREEN_METABOLIZE_REQUIREMENT")

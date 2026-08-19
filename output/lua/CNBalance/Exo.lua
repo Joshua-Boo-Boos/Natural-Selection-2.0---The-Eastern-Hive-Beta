@@ -686,9 +686,7 @@ function Exo:GetArmorAmount(armorLevels)
 
     -- Task 20: Armour Plating — +100 AP when prototype upgrade is active.
     -- Applied to both the MP branch and the normal branch (mirrors JetpackMarine +25 pattern).
-    -- Bonus lives in PrototypeTechData.lua so the commander Exo drop, which has to size the
-    -- dropped Exosuit entity's armour itself, uses the same number.
-    local armourPlatingBonus = self:GetHasPrototypeUpgrade(kTechId.PrototypeExoArmour) and kPrototypeExoArmourPlatingBonus or 0
+    local armourPlatingBonus = self:GetHasPrototypeUpgrade(kTechId.PrototypeExoArmour) and 100 or 0
 
     local hasMP = GetHasTech(self,kTechId.MilitaryProtocol)
     return hasMP and (kExosuitMPArmor + armorLevels * kExosuitMPArmorPerUpgradeLevel + armourPlatingBonus)

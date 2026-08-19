@@ -41,16 +41,8 @@ kTranslateMessage["WAITING_SPAWN_TEAM2"] = "等待孵化中..."
 
 kTranslateMessage["BOUNTY"] = "站点悬赏"
 
--- Combat Engineers. Same meaning as kLocales["COMBAT_ENGINEERS*"]: marines build the base with
--- personal resources, every marine carries a Combat Builder, Arms Labs give free upgrades,
--- structures are upgraded in the field, the commander keeps only Scan/Beacon/ARCs, and team
--- resource income is halved. Cannot be taken together with Military Protocol.
-kTranslateMessage["COMBAT_ENGINEERS"] = "战斗工兵"
-kTranslateMessage["COMBAT_ENGINEERS_TOOLTIP"] = "注意:请[谨慎签署]该协议.\n*无法与军用统筹协防同时选择.\n*陆战队自行建造基地.\n*建筑消耗个人资源.\n*所有陆战队携带战斗建造器.\n+装备实验室提供免费升级.\n+可在前线升级建筑.\n-指挥官仅保留扫描,信标,攻城坦克.\n-团队资源收入减半."
-kTranslateMessage["COMBAT_ENGINEERS_ENABLED"] = "战斗工兵已启用,指挥官无法投放或研发."
-
 kTranslateMessage["MILITARY_PROTOCOL"] = "军用统筹协防"
-kTranslateMessage["MILITARY_PROTOCOL_TOOLTIP"] = "注意:请[谨慎签署]该协议.\n*无法与战斗工兵同时选择.\n*协议无法取消,留意不可抗力.\n*指挥官将作为军需统筹者.\n+所有陆战队将统一着装.\n+陆战队获得军用级制式装备.\n+协防生物质将被转化为资源.\n+被动团队收入随研发增加.\n+个人资源主动收入增加.\n-个人资源被动收入停止."
+kTranslateMessage["MILITARY_PROTOCOL_TOOLTIP"] = "注意:请[谨慎签署]该协议.\n*协议无法取消,留意不可抗力.\n*指挥官将作为军需统筹者.\n+所有陆战队将统一着装.\n+陆战队获得军用级制式装备.\n+协防生物质将被转化为资源.\n+被动团队收入随研发增加.\n+个人资源主动收入增加.\n-个人资源被动收入停止."
 
 kTranslateMessage["BIOFORM_SUPPRESSOR"] = "生物质压制器"
 kTranslateMessage["BIOFORM_SUPPRESSOR_HINT"] = "压制大范围内的生物质"
@@ -150,7 +142,7 @@ kTranslateMessage["CANNON_TOOLTIP"]="*单兵高斯枪研发.\n*适用于压制�
 
 kTranslateMessage["COMBATBUILDER"]="工程套件"
 kTranslateMessage["COMBATBUILDER_TOOLTIP"]="给予陆战队员基础建筑建造."
-kTranslateMessage["COMBATBUILDER_BUYDESCRIPTION"]="给予基础建筑建造.\n*建造补给站以获取弹药.\n*建造机枪塔攻击范围内敌方单位.\n\n研究战斗工兵后:\n+在此免费获取, 并自动配发给每位陆战队员.\n+解锁完整基地: 指挥中心, 采集器, 军械库, 武器实验室, 步兵传送门等.\n*建筑消耗个人资源, 在建造过程中扣除 - 任意数量的陆战队员均可共同出资.\n*瞄准已建成的建筑并按副攻击键, 即可使用团队资源研究其升级."
+kTranslateMessage["COMBATBUILDER_BUYDESCRIPTION"]="给予基础建筑建造.\n*建造补给站以获取弹药.\n*建造机枪塔攻击范围内敌方单位."
 
 kTranslateMessage["WEAPON_CACHE"]="补给站"
 kTranslateMessage["WEAPON_CACHE_HINT"]="回复弹药与生命值"
@@ -161,10 +153,6 @@ kTranslateMessage["MARINE_SENTRY_HINT"]="自动索敌并攻击."
 
 kTranslateMessage["PROTOS_MENU"]="原型装备"
 kTranslateMessage["PROTOS_MENU_TOOLTIP"]="给陆战队员发放原型装备"
--- Commander Exosuit button. Same meaning as kLocales["EXOSUIT_DROP*"]: open the drop menu,
--- choose weapons and experimental upgrades, paid for with team resources.
-kTranslateMessage["EXOSUIT_DROP"]="发放机甲"
-kTranslateMessage["EXOSUIT_DROP_TOOLTIP"]="*打开机甲发放菜单.\n*选择武器与实验科技.\n*消耗团队资源."
 kTranslateMessage["DUAL_MINIGUN"]="转轮机甲"
 kTranslateMessage["DUAL_MINIGUN_TOOLTIP"]="双臂都安装了 |转轮机枪| 的原型单兵机甲.\n*预热后造成大量持续伤害. -请当心转轮过热."
 kTranslateMessage["DUAL_RAILGUN"]="电磁枪机甲"
@@ -345,33 +333,12 @@ kLocales["DEADLOCK_ACTIVATED_SHORT_TEAM2"] = "Bio-link Degenerating [%s:%s]"
 
 kLocales["BOUNTY"] = "BOUNTY"
 
--- Combat Engineers. Mutually exclusive with Military Protocol, so the tooltip leads with the cost
--- (the commander gives up almost everything) before the benefit, and each line is kept under the
--- commander tooltip's ~32 half-width-unit clip width.
-kLocales["COMBAT_ENGINEERS"] = "Combat Engineers"
-kLocales["COMBAT_ENGINEERS_TOOLTIP"] = "Caution before you assign.\nCannot be taken with Military Protocol.\n*Marines build the base themselves.\n*Structures cost personal res.\n*All Marines carry a Combat Builder.\n+Arms Labs grant free upgrades.\n+Upgrade structures in the field.\n-Comm keeps only Scan, Beacon, ARCs.\n-Halved team resource income."
-kLocales["COMBAT_ENGINEERS_ENABLED"] = "Combat Engineers Enabled, the Commander cannot drop or research."
-
 kLocales["MILITARY_PROTOCOL"] = "Military Protocol"
 kLocales["MILITARY_PROTOCOL_ENABLED"] = "Military Protocol Enabled, Unable to access offensive equipment in personal."
-kLocales["MILITARY_PROTOCOL_TOOLTIP"] = "Caution before you assign.\nCannot be taken with Combat Engineers.\nYou will be the only weapon&equipment dispatcher.\n*Marines now wears uniforms.\n+Marines gets better standard equipments.\n+Biomass harvest(kills) grants team resource.\n+Marines' positive resources gain increased.\n-Marines' passive resources stopped.\n-Marines can't buy offensives themself."
+kLocales["MILITARY_PROTOCOL_TOOLTIP"] = "Caution before you assign.\nYou will be the only weapon&equipment dispatcher.\n*Marines now wears uniforms.\n+Marines gets better standard equipments.\n+Biomass harvest(kills) grants team resource.\n+Marines' positive resources gain increased.\n-Marines' passive resources stopped.\n-Marines can't buy offensives themself."
 
 kLocales["MOTION_TRACK"] = "Motion Track"
 kLocales["MOTION_TRACK_TOOLTIP"] = "Track Active Kharra Each Time Interval."
-
--- Was entirely missing from the English table (kTranslateMessage/Chinese already had both) -
--- Locale.ResolveString falls back to printing the raw key when a string is missing, which is why
--- the buy menu was showing "BIOFORM_SUPPRESSOR_TOOLTIP" literally instead of a description.
--- Matches the mechanics exactly: built at a Resource Point (kStructureAttachClass = "ResourcePoint"),
--- and once Suppress Protocol completes it electrifies + damages every non-player Alien entity
--- (i.e. structures, not lifeforms) within range every 2 seconds (BioformSuppressor.lua:180-203,
--- kBioformSuppressRange = 58).
-kLocales["BIOFORM_SUPPRESSOR"] = "Bioform Suppressor"
-kLocales["BIOFORM_SUPPRESSOR_HINT"] = "Suppresses biomass in a large radius"
-kLocales["BIOFORM_SUPPRESSOR_TOOLTIP"] = "*Attaches to a Resource Point.\n*Provides the Bioform Suppress Protocol.\n+Suppresses biomass activity nearby."
-
-kLocales["BIOFORM_SUPPRESS_PROTOCOL"] = "Bioform Suppress Protocol"
-kLocales["BIOFORM_SUPPRESS_PROTOCOL_TOOLTIP"] = "*Electrifies nearby Alien structures.\n*Deals periodic damage while active.\n-Takes time to research and deploy."
 
 kLocales["STANDARD_SUPPLY"] = "Weapon Supply"
 kLocales["STANDARD_SUPPLY_TOOLTIP"] = "Upgrade to standard weapon base.\n>Machine Gun & Dragon Breath.\n+Commander can drop Cat Packs."
@@ -464,7 +431,7 @@ kLocales["CANNON_TOOLTIP"]="*Gauss cannon.\n*Handle high mobility lifeforms."
 
 kLocales["COMBATBUILDER"]="Combat Builder"
 kLocales["COMBATBUILDER_TOOLTIP"]="Grant marines battlefield engineering."
-kLocales["COMBATBUILDER_BUYDESCRIPTION"]="Battlefield engineering.\n*Build supply depot to refill nearby marine's health and ammo.\n*Build sentries to attack enemies in range.\n*Sentry build limit: 1; 2 with AA and 3 with AA and Proto.\n\nWith Combat Engineers researched:\n+Free here, and issued to every marine automatically.\n+Unlocks the full base: Command Station, Extractor, Armory, Arms Lab, Infantry Portal and more.\n*Structures cost personal resources, charged as they are built - any number of marines can pay into the same one.\n*Aim at a built structure and press secondary attack to research its upgrades with team resources."
+kLocales["COMBATBUILDER_BUYDESCRIPTION"]="Battlefield engineering.\n*Build supply depot to refill nearby marine's health and ammo.\n*Build sentries to attack enemies in range.\n*Sentry build limit: 1; 2 with AA and 3 with AA and Proto."
 
 kLocales["WEAPON_CACHE"]="Supply depot"
 kLocales["WEAPON_CACHE_HINT"]="Refill health and ammo"
@@ -480,11 +447,6 @@ kLocales["DUAL_MINIGUN"]="Minigun Exosuit"
 kLocales["DUAL_MINIGUN_TOOLTIP"]="Dual-weld | Minigun | Exosuit.\n*Deals continous damage after warmup."
 kLocales["DUAL_RAILGUN"]="Railgun Exosuit"
 kLocales["DUAL_RAILGUN_TOOLTIP"]="Dual-weld | Railgun | Exosuit.\n*Deals burst damage after charge up."
--- The single commander Exosuit button (kTechId.DropDualMinigunExosuit), which replaced the old
--- Dual Minigun / Dual Railgun pair. Lines kept under the commander tooltip's clip width
--- (~32 half-width units) so nothing is cut off.
-kLocales["EXOSUIT_DROP"]="Exosuit Drop"
-kLocales["EXOSUIT_DROP_TOOLTIP"]="*Open the Exosuit drop menu.\n*Choose weapons and upgrades.\n*Paid in team resources."
 
 kLocales["BUYMENU_GROUPLABEL_GRENADES"]="Throwables"
 kLocales["RESEARCH_GRENADES"]="Throwables Upgrade"
@@ -586,7 +548,6 @@ kLocales["RESOURCES_ALIEN"] = "Evolve Matter"
 kLocales["RESOURCES_MARINE"] = "Supply Point"
 
 kLocales["COMMANDERERROR_INFANTRY_PORTAL_GLOBAL_LIMIT"] = "Too many IPs on the map!"
-kLocales["COMMANDERERROR_ARMS_LAB_GLOBAL_LIMIT"] = "Too many Arms Labs on the map!"
 kLocales["COMMANDERERROR_MINE_LIMIT_REACHED"] = "Too many marine comm placed mines!"
 kLocales["COMMANDERERROR_MINE_ON_INFESTATION"] = "No marine comm mines on infestation!"
 kLocales["COMMANDERERROR_WHIP_LIMIT_REACHED"] = "Too many commander whips!"

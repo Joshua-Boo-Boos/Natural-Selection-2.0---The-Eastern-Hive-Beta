@@ -63,13 +63,8 @@ function CommandStation:GetTechButtons()
         techButtons[4] = kTechId.MinesUpgrade
     end
     
-    -- The two mutually exclusive team modes, side by side. BOTH ids stay here for the whole round
-    -- whichever is chosen: choosing one makes the other UNAVAILABLE (greyed) rather than removing
-    -- it, so this list keeps a constant length and constant tech ids for any mod that whitelists
-    -- commander buttons by position or id. See CNBalance/CombatEngineers_Commander.lua.
     techButtons[5] = kTechId.MilitaryProtocol
-    techButtons[6] = kTechId.CombatEngineers
-
+    
     return techButtons
 end
 

@@ -29,10 +29,6 @@ debug.appendtoenum(kTechId, "GrenadeLauncherUpgrade")
 --debug.appendtoenum(kTechId, "GrenadeLauncherDetectionShot")
 --debug.appendtoenum(kTechId, "GrenadeLauncherAllyBlast")
 
--- Combat Engineers: the marine counterpart to the alien Origin Form. Mutually exclusive with
--- Military Protocol. See lua/CNBalance/CombatEngineers_Shared.lua.
-debug.appendtoenum(kTechId, "CombatEngineers")
-
 debug.appendtoenum(kTechId, "ProtosMenu")
 debug.appendtoenum(kTechId, "DropDualMinigunExosuit")
 debug.appendtoenum(kTechId, "DropDualRailgunExosuit")

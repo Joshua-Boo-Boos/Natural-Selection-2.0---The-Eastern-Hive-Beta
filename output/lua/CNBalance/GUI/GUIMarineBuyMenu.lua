@@ -705,6 +705,30 @@ function GUIMarineBuyMenu:_CreateButton(parent, buttonPosition, buttonTechId)
     teamText:SetOptionFlag(GUIItem.CorrectScaling)
     GUIMakeFontScale(teamText, "kAgencyFB", kButtonNumberFontSize)
 
+    -- ARMORY WEAPON STORAGE: live "Stored: N" readout for weapons this host can bank. Anchored to
+    -- the button's bottom-right, which is the one corner none of the cost/team furniture occupies.
+    -- Created for every button unconditionally and simply hidden for techs that are never stored --
+    -- cheaper than rebuilding buttons when the host structure changes, and it keeps the button table
+    -- shape uniform so _UpdateRealTimeElements never has to nil-check the item itself.
+    local storedText = self:CreateAnimatedTextItem()
+    storedText:SetIsScaling(false)
+    storedText:AddAsChildTo(buyButton)
+    -- Anchored to the button's bottom edge; y grows downward, so a more negative offset lifts it.
+    -- Raised from -4 to -12 to sit clear of the button's lower border.
+    storedText:SetAnchor(GUIItem.Middle, GUIItem.Bottom)
+    storedText:SetPosition(Vector(0, -iconPaddingY - 10, 0))
+    storedText:SetTextAlignmentX(GUIItem.Align_Center)
+    storedText:SetTextAlignmentY(GUIItem.Align_Max)
+    -- AgencyFB IS the marine team font (Stamp is the alien one), and "kAgencyFBBold" is its bold
+    -- family. GUIMakeFontScale picks the actual face from that family for the requested size and
+    -- overrides SetFontName, so the family key is what really decides the font -- the SetFontName
+    -- below is just a sane starting value. 30 matches the cost numerals: clearly larger than before
+    -- without competing with the button's own labels.
+    storedText:SetFontName(Fonts.kAgencyFB_Small)
+    storedText:SetOptionFlag(GUIItem.CorrectScaling)
+    storedText:SetIsVisible(false)
+    GUIMakeFontScale(storedText, "kAgencyFBBold", 30)
+
     -- y = 7, x: 0
     local errorFrame = self:CreateAnimatedGraphicItem()
     errorFrame:SetIsScaling(false)
@@ -735,6 +759,7 @@ function GUIMarineBuyMenu:_CreateButton(parent, buttonPosition, buttonTechId)
         WeaponGroup = parent,
         TeamText = teamText,
         CostText = costText,
+        StoredText = storedText,
         Initialized = false,
         PlayersRestriction = techRestriction,
         LastShowState = kButtonShowState.Uninitialized,
@@ -1383,6 +1408,12 @@ function GUIMarineBuyMenu:_UpdateRealTimeElements(buttonTable, techId, techAvail
     local costText = buttonTable.CostText
     local teamText = buttonTable.TeamText
     local buttonItem = buttonTable.Button
+
+    -- The on-button price is otherwise set once at creation and never refreshed. techCost here is
+    -- already the EFFECTIVE cost (0 when stored/owned), so this keeps the printed number honest once
+    -- a purchase becomes free instead of just unblocking the click while still showing the old price.
+    costText:SetText(string.format("%d", techCost))
+
     if techAvailable then
 
         buttonItem:SetColor(Color(1,1,1))
@@ -1419,6 +1450,67 @@ function GUIMarineBuyMenu:_UpdateRealTimeElements(buttonTable, techId, techAvail
         teamText:SetText(tooManyPlayers and string.format(Locale.ResolveString("BUYMENU_RESTRICTION"),numUsers)
                 or string.format("%d", numUsers))
     end
+
+    self:_UpdateStoredCount(buttonTable, techId)
+
+end
+
+-- ARMORY WEAPON STORAGE: refresh one button's "Stored: N" readout.
+--
+-- Driven from _UpdateRealTimeElements so it tracks the server's pushes with no polling of its own --
+-- the client cache is updated by the ArmoryStock message, and this just reads whatever is current.
+function GUIMarineBuyMenu:_UpdateStoredCount(buttonTable, techId)
+
+    -- The Machine Gun is a one-time purchase, not a stored item: it never gets a "Stored: N" label.
+    -- (The on-button price itself is kept current by _UpdateRealTimeElements via GetArmoryEffectiveCost.)
+    if techId == kTechId.LightMachineGunAcquire or techId == kTechId.LightMachineGun then
+
+        if buttonTable.StoredText then
+            buttonTable.StoredText:SetIsVisible(false)
+        end
+
+        return
+
+    end
+
+    local storedText = buttonTable.StoredText
+    if not storedText then
+        return
+    end
+
+    -- Only armories store anything, and only some techs are storable. The advanced-only check matters
+    -- for the basic Armory: it can DISPLAY an HMG button in some configurations but can never hold
+    -- one, so showing "Stored: 0" there would imply a stock that structure is incapable of keeping.
+    local host = self.hostStructure
+    local isStorable =
+        host ~= nil and
+        host.isa ~= nil and host:isa("Armory") and
+        GetIsArmoryStorableTechId ~= nil and GetIsArmoryStorableTechId(techId) and
+        GetArmoryCanStoreTechId ~= nil and GetArmoryCanStoreTechId(host, techId)
+
+    if not isStorable then
+        storedText:SetIsVisible(false)
+        return
+    end
+
+    local count = GetArmoryStoredCount and GetArmoryStoredCount(host:GetId(), techId) or 0
+
+    storedText:SetIsVisible(true)
+
+    -- An unpowered armory will not dispense its stock (see GetArmoryWithStockFor), so the label has to
+    -- say so. Showing a plain count here would be a lie the player only discovers by being charged
+    -- full price for a weapon they already own.
+    local powered = not host.GetIsPowered or host:GetIsPowered()
+
+    if not powered then
+        storedText:SetText(string.format("Stored: %d (No Power)", count))
+        storedText:SetColor(Color(1, 0.2, 0.2, 1))
+        return
+    end
+
+    storedText:SetText(string.format("Stored: %d", count))
+    storedText:SetColor(GetArmoryStoredCountColor and GetArmoryStoredCountColor(count) or Color(1,1,1,1))
+
 end
 
 function GUIMarineBuyMenu:_UpdateBuyButtonAvailability(buttonTable, hoverStateChanged, useHoverTexture, buttonState,text)
@@ -1502,6 +1594,13 @@ function GUIMarineBuyMenu:Update(deltaTime)
 
         -- Update details section.
         local techCost = LookupTechData(techId, kTechDataCostKey, -1)
+
+        -- ARMORY WEAPON STORAGE: the price actually being gated on. A stored/owned weapon is free, but
+        -- nothing below this point knew that until now -- the button would show "INSUFFICIENT FUNDS"
+        -- and block the click even with stock sitting right there, because it only ever compared
+        -- currentMoney against the full techCost.
+        local effectiveCost = (GetArmoryEffectiveCost and GetArmoryEffectiveCost(self.hostStructure, techId, techCost)) or techCost
+
         if (hovering and changed) or initEvent then
             self:_SetDetailsSectionTechId(techId, techCost)
         end
@@ -1523,17 +1622,17 @@ function GUIMarineBuyMenu:Update(deltaTime)
             buttonState = kButtonShowState.Equipped
         elseif not techResearched then
             buttonState = kButtonShowState.Unresearched
-        elseif techCost > currentMoney then
+        elseif effectiveCost > currentMoney then
             buttonState = kButtonShowState.InsufficientFunds
         end
 
         self:_UpdateBuyButtonAvailability(buttonTable, changed, useHoverTexture, buttonState,text)
-        self:_UpdateRealTimeElements(buttonTable, techId, techAvailable, currentMoney, techCost)
+        self:_UpdateRealTimeElements(buttonTable, techId, techAvailable, currentMoney, effectiveCost)
 
         if hovering then
             self.hoveredBuyButton = buttonTable
             hoveredTechAvailable = techAvailable
-            hoveredCanAfford = currentMoney >= techCost
+            hoveredCanAfford = currentMoney >= effectiveCost
         end
 
     end
@@ -1609,6 +1708,14 @@ local function HandleItemClicked(self)
 
         local researched = self:_GetResearchInfo(item.TechID)
         local itemCost = MarineBuy_GetCosts(item.TechID)
+
+        -- ARMORY WEAPON STORAGE: a second, independent affordability gate from the one driving the
+        -- button's visual state (_UpdateBuyButtonAvailability). That one was already fixed to use the
+        -- effective (stock-aware) cost; this one was not, so the button could show "CLICK TO PURCHASE"
+        -- while the actual click was still silently rejected against the full price. Same fix, same
+        -- helper, applied at the point that actually gates the send.
+        itemCost = (GetArmoryEffectiveCost and GetArmoryEffectiveCost(self.hostStructure, item.TechID, itemCost)) or itemCost
+
         local canAfford = PlayerUI_GetPlayerResources() >= itemCost
         local hasItem = PlayerUI_GetHasItem(item.TechID)
 

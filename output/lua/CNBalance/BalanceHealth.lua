@@ -108,7 +108,7 @@ kExoDamageReduction = {
 kHealingClampMaxHPAmount = 0.12
 kMaxBiomassHealthMultiplyLevel = 8 --N-1
 
-kSkulkHealth = 75 kSkulkArmor = 10    kSkulkPointValue = 5  kSkulkHealthPerBioMass = 2.25 
+kSkulkHealth = 60 kSkulkArmor = 10    kSkulkPointValue = 5  kSkulkHealthPerBioMass = 2.25 
 kSkulkDamageReduction = {
     ["Grenade"] = 0.6,
     ["ImpactGrenade"] = 0.8,
@@ -118,7 +118,7 @@ kSkulkDamageReduction = {
     --["Railgun"] = 0.9,
 }
 
-kGorgeHealth = 180   kGorgeArmor = 50    kGorgePointValue = 7 kGorgeHealthPerBioMass = 3.75
+kGorgeHealth = 170   kGorgeArmor = 50    kGorgePointValue = 7 kGorgeHealthPerBioMass = 3.75
 kGorgeDamageReduction = {
     ["Grenade"] = 0.9,
     ["Sentry"] = 0.5,
@@ -135,7 +135,7 @@ kLerkDamageReduction = {
     --["PulseGrenade"] = 0.75,
 }
 
-kFadeHealth = 270  kFadeArmor = 80  kFadePointValue = 20 kFadeHealthPerBioMass = 3.75
+kFadeHealth = 235  kFadeArmor = 80  kFadePointValue = 20 kFadeHealthPerBioMass = 3.75
 kFadeDamageReduction = {
     ["Grenade"] = 0.8,
     --["Mine"] = 1.25,
@@ -151,7 +151,7 @@ kVokexDamageReduction = {
 }
 
 --700 450 50
-kOnosHealth = 700    kOnosArmor = 500    kOnosPointValue = 30 kOnosHealtPerBioMass = 48.75
+kOnosHealth = 620    kOnosArmor = 500    kOnosPointValue = 30 kOnosHealtPerBioMass = 48.75
 kOnosBoneShieldDefaultReduction = 0.2
 kOnosBoneShieldDamageReduction = {
     --["HeavyMachineGun"] = 0.25,
@@ -195,7 +195,26 @@ kOnosBaseCarapaceUpgradeAmount  = 200   kOnosCarapaceArmorPerBiomass  = 7.5 -- 1
 kVokexBaseCarapaceUpgradeAmount = 22.5    kVokexCarapaceArmorPerBiomass = 1.875
 
 --4000 750 6000 1400
-kHiveHealth = 3600    kHiveArmor = 750 kMatureHiveHealth = 5000 kMatureHiveArmor = 1900
+-- Hive and Whip start 30% lower and climb BACK to their original values by Biomass 8, via the
+-- restore terms in their GetExtraHealth (Structures/Alien/Hive.lua, Whip.lua).
+--
+-- The originals are kept as constants rather than as comments because the per-biomass restore is
+-- derived from them: restorePerLevel = (original - reduced) / kCombatHiveWhipRestoreLevels. Hard
+-- coding the increment instead would silently stop landing on the original the moment any of these
+-- numbers is retuned.
+kAlienStructureStartHealthScalar = 0.70
+
+-- BiomassHealthMixin passes techLevel = Clamp(biomass - 1, 0, 8), so Biomass 8 arrives as 7. The
+-- ramp therefore has to complete over 7 steps, not 8, or full health would land a biomass late.
+kAlienStructureRestoreLevels = 7
+
+kHiveHealthOriginal       = 3600
+kMatureHiveHealthOriginal = 5000
+
+kHiveHealth = math.floor(kHiveHealthOriginal * kAlienStructureStartHealthScalar)    kHiveArmor = 750 kMatureHiveHealth = math.floor(kMatureHiveHealthOriginal * kAlienStructureStartHealthScalar) kMatureHiveArmor = 1900
+
+kHiveHealthBiomassRestore       = (kHiveHealthOriginal - kHiveHealth) / kAlienStructureRestoreLevels
+kMatureHiveHealthBiomassRestore = (kMatureHiveHealthOriginal - kMatureHiveHealth) / kAlienStructureRestoreLevels
 kHiveHealthPerPlayerAdd = 200
 
 --2000 200 2300 320
@@ -230,7 +249,10 @@ kBabblerDefaultLifeTime = 5 kBabblerEggHatchLifetime = 30 kBabblerPheromoneHatch
 kBoneWallHealth = 500 kBoneWallArmor = 200    kBoneWallHealthPerBioMass = 75 kBoneWallExtraHealthPerPlayer = 25
 kContaminationHealth = 1450 kContaminationArmor = 0    kContaminationPointValue = 2
 
-kWhipHealth = 650    kWhipArmor = 175    kWhipPointValue = 6
+kWhipHealthOriginal = 650
+kWhipHealth = math.floor(kWhipHealthOriginal * kAlienStructureStartHealthScalar)    kWhipArmor = 175    kWhipPointValue = 6
+-- ADDED to the Whip's existing kWhipHealthPerBioMass ramp, not replacing it.
+kWhipHealthBiomassRestore = (kWhipHealthOriginal - kWhipHealth) / kAlienStructureRestoreLevels
 kMatureWhipHealth = 720    kMatureWhipArmor = 240  kWhipHealthPerBioMass = 120  kMatureWhipPointValue = 6
 
 kCragHealth = 480    kCragArmor = 160    kCragPointValue = 8

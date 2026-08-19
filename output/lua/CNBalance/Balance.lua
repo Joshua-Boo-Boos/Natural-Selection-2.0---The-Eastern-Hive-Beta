@@ -749,6 +749,52 @@ kOriginFormInitialGorgePRes = 60
 kOriginFormExtraGorgePRes = 20
 kOriginFormTeamResourceFetchThreshold = 10
 kOriginFormTeamResScalarHiveCount = { 0.5 , 0.25 , 0.125 , 0.125 , 0.125 , 0.125, 0.125}
+-- Origin Form multiplies alien resource-tower team income by this on top of the hive-count scalar
+-- above, so each harvester pays three times what it otherwise would per income cycle.
+kOriginFormResourceTowerScalar = 3
+
+-- ============================================================
+-- Deadlock second phase
+-- ============================================================
+-- Phase one begins at the deadlock start time and grinds structures down to 50% max EHP over its
+-- first 20 minutes. Phase two begins LATER STILL and takes them the rest of the way to 15%, while
+-- respawn times climb to double.
+--
+-- The offset is a DIFFERENCE, never an absolute clock time. At the current 25-minute deadlock start
+-- that puts phase two at 40 minutes and its peak at 60; move the deadlock start to 35 and phase two
+-- follows it to 50, with no other edit. Writing 2400 here instead would silently decouple the two the
+-- first time the deadlock start was retuned.
+kDeadlockPhase2Offset   = 15 * 60   -- after the deadlock start
+kDeadlockPhase2Duration = 20 * 60   -- reaches full effect this long after phase two begins
+
+-- Structures (and ARCs) bottom out here, down from phase one's 50% floor.
+kDeadlockPhase2MinScale = 0.15
+
+-- Maximum respawn time is multiplied by this at full effect, ramped linearly from 1.0.
+kDeadlockPhase2RespawnMultiplier = 2.0
+
+-- The per-team MAXIMUM respawn times phase two scales. Deliberately named globals rather than the
+-- numbers being buried inside GetRespawnTimeExtend, so the doubling always tracks whatever these are
+-- retuned to rather than a copy that drifts out of step.
+kDesiredMarinesMaximumRespawnTime = 18
+kDesiredAliensMaximumRespawnTime  = 19
+
+-- How far into phase two we are, 0 at its start through 1 at full effect. One definition, shared by
+-- the EHP floor and the respawn ramp so the two can never disagree about the schedule.
+function GetDeadlockPhase2Fraction(gameLengthSeconds)
+
+    local deadlockStart = (NS2Gamerules and NS2Gamerules.kBalanceConfig
+                           and NS2Gamerules.kBalanceConfig.deadlockInitialTime) or 1500
+
+    local phase2Start = deadlockStart + kDeadlockPhase2Offset
+    local elapsed     = (gameLengthSeconds or 0) - phase2Start
+
+    if elapsed <= 0 then
+        return 0
+    end
+
+    return math.min(1, elapsed / kDeadlockPhase2Duration)
+end
 
 kBiomassPerTower = {0,1,3,6}
 function GetOriginFormBiomassLevel(count)

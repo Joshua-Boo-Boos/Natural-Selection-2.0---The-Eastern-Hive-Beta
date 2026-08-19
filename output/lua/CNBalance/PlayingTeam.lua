@@ -253,7 +253,27 @@ local function ComputeDeadlockScale(elapsedSeconds)
         if bandTicks <= 0 then break end
         reduction = reduction + bandTicks * kDeadlockPeriodRates[band]
     end
-    return math.max(kDeadlockMinScale, 1 - reduction)
+    local scale = math.max(kDeadlockMinScale, 1 - reduction)
+
+    -- PHASE TWO. Phase one bottoms out at kDeadlockMinScale (50%); phase two carries structures the
+    -- rest of the way to kDeadlockPhase2MinScale (15%), linearly across its own duration.
+    --
+    -- Computed from the SAME elapsed-since-deadlock-start value phase one uses, so it inherits the
+    -- catch-up property: a structure placed midway through phase two is scaled to exactly what it
+    -- would be had it stood there the whole time.
+    local phase2Offset = kDeadlockPhase2Offset or (15 * 60)
+    local phase2Elapsed = math.max(0, elapsedSeconds) - phase2Offset
+
+    if phase2Elapsed > 0 then
+
+        local phase2Fraction = math.min(1, phase2Elapsed / (kDeadlockPhase2Duration or (20 * 60)))
+        local phase2Floor    = kDeadlockPhase2MinScale or 0.15
+
+        scale = math.min(scale, kDeadlockMinScale + (phase2Floor - kDeadlockMinScale) * phase2Fraction)
+
+    end
+
+    return scale
 end
 
 -- Force a single structure's max health/armor to (base * scale). The pre-deadlock

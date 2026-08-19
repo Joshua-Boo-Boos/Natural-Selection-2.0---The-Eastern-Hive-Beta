@@ -125,6 +125,17 @@ float4 SFXDarkVisionPS(PS_INPUT input) : COLOR0
         float luminance = max(inputPixel.r,max(inputPixel.g,inputPixel.b));
         edge = edge * (1 - luminance);
         edge = edge * amount * 0.01;
-        return lerp(inputPixel, edgeColor2 , min(edge * 5,5) );
+        // saturate on BOTH the blend factor and the result.
+        //
+        // This was the only branch in the whole function without a saturate -- every one above it
+        // has one. Worse, the factor was clamped to 5, not 1: lerp with t > 1 EXTRAPOLATES past
+        // edgeColor2 instead of blending toward it, so at t = 5 the result is
+        // inputPixel + 5 * (edgeColor2 - inputPixel). That drives RGB far out of range and can push
+        // alpha negative, which corrupts the rest of the post-process chain rather than just looking
+        // wrong here -- the likely source of the reported black screens.
+        //
+        // saturate(edge * 5) keeps the intended "ramp up fast, then hold" shape; the 5 was almost
+        // certainly meant as that clamp-to-full rather than a factor of five past it.
+        return saturate( lerp(inputPixel, edgeColor2, saturate(edge * 5)) );
     }
 }

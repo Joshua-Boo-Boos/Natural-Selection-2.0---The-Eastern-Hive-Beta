@@ -97,8 +97,17 @@ function GetRespawnTimeExtend(player, teamIndex, _gameLength)
 
     local kEndGameBegin = 1500
 
-    local kDesiredMarinesMaximumRespawnTime = 18
-    local kDesiredAliensMaximumRespawnTime = 19
+    -- Now globals (Balance.lua) so the deadlock phase-two ramp below scales the same values these
+    -- are, rather than a private copy that would drift if either is retuned.
+    --
+    -- Phase two lifts the MAXIMUM linearly to kDeadlockPhase2RespawnMultiplier over its duration; the
+    -- minimum (kMarineRespawnTime / kAlienSpawnTime) is untouched, so a team spawning at its floor is
+    -- unaffected and only the worst case stretches.
+    local phase2 = GetDeadlockPhase2Fraction and GetDeadlockPhase2Fraction(_gameLength) or 0
+    local respawnScale = 1 + phase2 * ((kDeadlockPhase2RespawnMultiplier or 2) - 1)
+
+    local kDesiredMarinesMaximumRespawnTime = kDesiredMarinesMaximumRespawnTime * respawnScale
+    local kDesiredAliensMaximumRespawnTime = kDesiredAliensMaximumRespawnTime * respawnScale
 
     local kDifferenceBetweenMarinesMaximumAndMinimumRespawnTime = kDesiredMarinesMaximumRespawnTime - kMarineRespawnTime
     local kDifferenceBetweenAliensMaximumAndMinimumRespawnTime = kDesiredAliensMaximumRespawnTime - kAlienSpawnTime

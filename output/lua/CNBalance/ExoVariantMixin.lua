@@ -33,17 +33,33 @@ if Client then
             return "Railgun"   -- safe fallback, never nil
         end
 
-        local cls = baseGetWeaponLoadoutClass(self)
+        -- pcall: vanilla does wep:GetLeftSlotWeapon():GetClassName() with no nil check, so a
+        -- half-built or mid-transition exo (arms not attached yet) throws rather than returning.
+        local ok, cls = pcall(baseGetWeaponLoadoutClass, self)
+        if not ok then
+            cls = nil
+        end
+
         if cls == "Claw" then
             local wep = self:GetActiveWeapon()
             if wep then
-                local right = wep:GetRightSlotWeapon()
+                local right = wep.GetRightSlotWeapon and wep:GetRightSlotWeapon()
                 if right and right:GetClassName() == "Minigun" then
                     return "Minigun"
                 end
             end
             return "Railgun"
         end
+
+        -- NEVER return nil/false. Vanilla's live-exo branch ends in `return false` when the exo has
+        -- no active weapon yet, and OnUpdateRender treats that as a failure WITHOUT clearing
+        -- dirtySkinState... so it re-dirties and logs "Exo with invalid weapon class" every single
+        -- render frame. That is the flood in the server log. The Exosuit branch above already used a
+        -- safe default for exactly this reason; the live-exo path needs the same.
+        if not cls then
+            return "Railgun"
+        end
+
         return cls
     end
 
