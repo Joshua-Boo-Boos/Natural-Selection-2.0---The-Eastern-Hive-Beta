@@ -27,6 +27,18 @@ local userTrackerNetVarDef = string.format("integer (0 to %d)", kMaxPlayers - 1)
 local networkVars =
 {
     numInfantryPortals = string.format("integer (0 to %d)", kMarineTeamInfoMaxInfantryPortalCount),
+    -- Combat Engineers: Arms Labs the team owns, built or not, counted SEPARATELY PER TRACK. The Nth
+    -- lab on a track is priced by its position on that track and capped at three, so the build menu
+    -- needs the same per-track counts the server prices and caps from - counting entities client-side
+    -- would miss labs outside relevance range and show the wrong price. Two integers on a single team
+    -- entity (replacing the one combined counter, since the combined total is just their sum), so the
+    -- networking cost stays negligible.
+    numArmsLabsArmor  = string.format("integer (0 to %d)", kCombatEngineersMaxArmsLabsPerTrack or 3),
+    numArmsLabsWeapon = string.format("integer (0 to %d)", kCombatEngineersMaxArmsLabsPerTrack or 3),
+    -- TOTAL Infantry Portals owned, built or not - distinct from numInfantryPortals above, which
+    -- counts only ACTIVE ones for the respawn-time code. The CE build menu shows "N/12" against this
+    -- and the cap is enforced on it, so an unbuilt blueprint still counts.
+    numInfantryPortalsTotal = string.format("integer (0 to %d)", kMarineTeamInfoMaxInfantryPortalCount),
 }
 
 local kTrackedMarineGadgets =
@@ -187,9 +199,12 @@ if Server then
     function MarineTeamInfo:Reset()
         
         TeamInfo.Reset(self)
-        
+
         self.numInfantryPortals = 0
-        
+        self.numArmsLabsArmor  = 0
+        self.numArmsLabsWeapon = 0
+        self.numInfantryPortalsTotal = 0
+
     end
     
     function MarineTeamInfo:OnUpdate(deltaTime)
@@ -200,7 +215,16 @@ if Server then
         if team then
         
             self.numInfantryPortals = math.min(team:GetNumActiveInfantryPortals(), kMarineTeamInfoMaxInfantryPortalCount)
-        
+
+            if team.GetArmsLabCountForTrack then
+                self.numArmsLabsArmor  = math.min(team:GetArmsLabCountForTrack("armor"),  kCombatEngineersMaxArmsLabsPerTrack)
+                self.numArmsLabsWeapon = math.min(team:GetArmsLabCountForTrack("weapon"), kCombatEngineersMaxArmsLabsPerTrack)
+            end
+
+            if team.GetInfantryPortalCount then
+                self.numInfantryPortalsTotal = math.min(team:GetInfantryPortalCount(), kMarineTeamInfoMaxInfantryPortalCount)
+            end
+
         end
     
     end
