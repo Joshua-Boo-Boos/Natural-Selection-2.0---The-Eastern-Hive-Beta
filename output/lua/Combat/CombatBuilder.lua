@@ -1,5 +1,6 @@
 Script.Load("lua/Combat/SentryAbility.lua")
 Script.Load("lua/Combat/ArmoryAbility.lua")
+Script.Load("lua/Combat/CEStructureAbilities.lua")
 Script.Load("lua/PickupableWeaponMixin.lua")
 Script.Load("lua/LiveMixin.lua")
 Script.Load("lua/BuilderVariantMixin.lua")
@@ -17,9 +18,59 @@ CombatBuilder.kModelName = PrecacheAsset("models/marine/welder/builder_sandstorm
 
 local kCreateFailSound = PrecacheAsset("sound/NS2.fev/alien/gorge/create_fail")
 
-CombatBuilder.kSupportedStructures = { SentryAbility, ArmoryAbility}--, PhaseGateAbility, ObservatoryAbility }
+-- Index in this list IS the structureIndex sent over the network, so entries must never be
+-- reordered or conditionally omitted: the list is the SAME in every round, and Combat Engineers
+-- structures are hidden in non-CE rounds by their IsAllowed check (and by the build menu's
+-- visibility filter), not by shortening the list.
+--
+-- The ten CE structures come FIRST and the two vanilla Combat structures (Sentry, Supply Depot)
+-- LAST, so in the build menu's 5-per-page layout Sentry Battery and Command Station (the first two
+-- entries in kCEStructureAbilityOrder) land on page 1 where Sentry/Supply Depot used to be, and
+-- Sentry/Supply Depot land on page 3 where Sentry Battery/Command Station used to be.
+CombatBuilder.kSupportedStructures = {}
+
+for _, ability in ipairs(kCEStructureAbilityOrder) do
+    table.insert(CombatBuilder.kSupportedStructures, ability)
+end
+
+table.insert(CombatBuilder.kSupportedStructures, SentryAbility)
+table.insert(CombatBuilder.kSupportedStructures, ArmoryAbility)
+
+-- "Take Credits" last, so it is the third and final entry on page 3 next to Sentry/Supply Depot.
+-- Not a structure - see kCECreditsAbility in CEStructureAbilities.lua.
+table.insert(CombatBuilder.kSupportedStructures, kCECreditsAbility)
 
 local kPhaseGateBlockRadius = 2.4
+
+-- ============================================================
+-- Structure cost (personal resources)
+-- ============================================================
+-- Sentry and Supply Depot keep their long-standing fixed kTechDataPersonalCostKey prices. Every
+-- Combat Engineers structure is priced by the team-size model in CombatEngineers_Shared.lua, and
+-- Arms Labs additionally by LADDER POSITION - the Nth lab carries the research it unlocks for free,
+-- so it costs more than the last.
+--
+-- Both sides compute this identically: the lab count comes from the networked MarineTeamInfo counter
+-- rather than from counting entities, which client-side would miss labs outside relevance range.
+function CombatBuilder.GetArmsLabIndexForTeam(teamNumber, track)
+
+    -- Position on THIS TRACK's ladder. The two tracks price independently, so a team with three
+    -- weapons labs still pays the level-1 price for its first armour lab.
+    local count = GetCombatEngineersStructureCount(kTechId.ArmsLab, teamNumber, track) or 0
+
+    return math.min(count + 1, kCombatEngineersMaxArmsLabsPerTrack)
+end
+
+function CombatBuilder.GetStructureCost(techId, teamNumber, scalarOverride, track)
+
+    if not kCombatEngineersStructureBaseCost or not GetCombatEngineersStructureCost then
+        return LookupTechData(techId, kTechDataPersonalCostKey, 0)
+    end
+
+    local armsLabIndex = (techId == kTechId.ArmsLab) and CombatBuilder.GetArmsLabIndexForTeam(teamNumber, track) or nil
+
+    return GetCombatEngineersStructureCost(techId, teamNumber, armsLabIndex, scalarOverride)
+end
 
 local networkVars =
 {
@@ -53,7 +104,6 @@ function CombatBuilder:OnCreate()
     Weapon.OnCreate(self)
     
     self.dropping = false
-    self.mouseDown = false
     self.activeStructure = nil
 
     InitMixin(self, BuilderVariantMixin)
@@ -70,7 +120,8 @@ function CombatBuilder:OnCreate()
 	-- self.numPhaseGatesLeft = 0
     -- self.numObservatoriesLeft = 0
     self.lastClickedPosition = nil
-    
+    self.lastClickedNormal = nil
+
 end
 
 function CombatBuilder:OnInitialized()
@@ -93,7 +144,80 @@ end
 function CombatBuilder:SetActiveStructure(structureNum)
 
     self.activeStructure = structureNum
-    
+
+    -- A fresh choice from the menu always starts at the POSITION step, never inherits a rotation
+    -- lock left over from a previous, different structure (or a cancelled placement of this one).
+    self.lastClickedPosition = nil
+    self.lastClickedNormal = nil
+
+    -- Belt and braces alongside the explicit reset in MarineBuild_SendSelect: OnUpdateRender
+    -- recreates self.buildMenu the moment it is nil (CreateBuildMenu has no other guard), so ANY
+    -- path that picks a structure while the chooser is open must also clear menuActive, or the
+    -- freshly recreated instance inherits the stale "true" and reopens itself immediately.
+    self.menuActive = false
+
+end
+
+-- Drops the armed selection and every bit of rotation state that goes with it. Used by right-click
+-- to cancel a purchase, so the marine is left holding the builder with nothing pending.
+function CombatBuilder:ClearActiveStructure()
+
+    self.activeStructure = nil
+    self.lastClickedPosition = nil
+    self.lastClickedNormal = nil
+
+    self.ceRotateYaw = nil
+    self.ceRotateLockYaw = nil
+    self.ceRotateLockPitch = nil
+
+end
+
+-- The direction the STRUCTURE faces, which is not always the direction the player is looking.
+--
+-- Normally they are the same - the ghost follows the crosshair. But once the position has been
+-- locked and the marine is rotating the blueprint, the camera is deliberately frozen (see
+-- OverrideInput) and the mouse drives self.ceRotateYaw instead, so the facing has to be rebuilt from
+-- that accumulated yaw rather than read off a view that is no longer moving.
+--
+-- Everything that needs a placement direction goes through here - the ghost preview AND the drop
+-- message - so the structure the server builds is the one the marine saw. The server itself needs no
+-- changes at all: it still derives facing from the direction in the message, it is just no longer
+-- the view direction while rotating.
+function CombatBuilder:GetPlacementDirection(player)
+
+    if self.lastClickedPosition and self.ceRotateYaw then
+        return Angles(0, self.ceRotateYaw, 0):GetCoords().zAxis
+    end
+
+    return player:GetViewCoords().zAxis
+end
+
+-- Consume whatever the mouse has added to InputHandler's accumulator since it was last pinned, fold
+-- it into the blueprint's rotation, and pin the accumulator back to the locked angles.
+--
+-- Called from BOTH the move path (OverrideInput) and the render path (OnUpdateRender). It has to be
+-- one shared function that always ACCUMULATES before pinning: if the render path merely pinned, every
+-- bit of mouse movement between one move and the next would be silently thrown away and the rotation
+-- would feel like it was dropping input. Accumulating in both places means no movement is lost no
+-- matter which path observes it first, and pinning in both places is what keeps the view still.
+function CombatBuilder:ConsumeRotationDelta()
+
+    if not Client or not self.lastClickedPosition or not self.ceRotateLockYaw then
+        return
+    end
+
+    local delta = Client.GetYaw() - self.ceRotateLockYaw
+
+    -- Through the short way round: the accumulator wraps at 2*pi, and a raw difference at the wrap
+    -- point would spin the blueprint a full turn in a single frame.
+    while delta > math.pi do delta = delta - math.pi * 2 end
+    while delta < -math.pi do delta = delta + math.pi * 2 end
+
+    self.ceRotateYaw = (self.ceRotateYaw or 0) + delta
+
+    Client.SetYaw(self.ceRotateLockYaw)
+    Client.SetPitch(self.ceRotateLockPitch)
+
 end
 
 function CombatBuilder:GetHasDropCooldown()
@@ -141,22 +265,68 @@ end
 
 function CombatBuilder:OnPrimaryAttack(player)
 
-    if Client then
+    if not Client then return end
 
-        if self.activeStructure ~= nil
-        and not self.dropping
-        and not self.mouseDown then
-        
-            self.mouseDown = true
-        
-			if self:PerformPrimaryAttack(player) then
-				self.dropping = true
-            else
-                player:TriggerInvalidSound()
-            end
+    -- OnPrimaryAttack fires every tick the button is held (continuous, not once per press), AND it
+    -- fires on every client-side PREDICTION/RECONCILIATION pass of that same tick, not just the one
+    -- pass that actually counts. A plain Lua flag on this weapon (self.mouseDown) has no protection
+    -- against that second part: prediction replay could run this function's body twice for what was
+    -- a single real click, toggling self.menuActive twice and undoing itself - the exact "menu
+    -- flickers open and closed, have to time the click just right" bug reported.
+    --
+    -- Prediction passes are skipped outright, and the press edge is detected with a CLIENT-LOCAL
+    -- flag cleared in OverrideInput (which sees the raw input bits every frame). The player's
+    -- networked primaryAttackLastFrame is deliberately NOT used: it is a "compensated boolean" the
+    -- engine saves and restores around prediction replay, so it can read back false during a held
+    -- button and let this fire every frame.
+    if Shared.GetIsRunningPrediction() then
+        return
+    end
 
+    if self.cePrimaryHeld then
+        return
+    end
+    self.cePrimaryHeld = true
+
+    -- The two Combat Builder windows are mutually exclusive. While the upgrade window is up, a left
+    -- click belongs to ITS research buttons (handled by its own SendKeyEvent) and must not also
+    -- open the structure chooser behind it.
+    if CEStructureUpgrade_GetIsOpen and CEStructureUpgrade_GetIsOpen() then
+        return
+    end
+
+    if self.activeStructure ~= nil then
+
+        if self:PerformPrimaryAttack(player) then
+            self.dropping = true
+        else
+            player:TriggerInvalidSound()
         end
-    
+
+    else
+
+        -- Nothing chosen yet: a click TOGGLES the structure chooser - one click opens it, a second
+        -- click (with nothing since selected) closes it again, openable with a further click.
+        self:CreateBuildMenu()
+        self.menuActive = not self.menuActive
+
+        if self.menuActive then
+            if MarineBuild_OnSelect then MarineBuild_OnSelect() end
+
+            -- CE-specific menu-open sound, local to this player only. Deliberately NOT folded into
+            -- MarineBuild_OnSelect above - that same function also fires for a plain structure pick
+            -- inside the already-open chooser, and this sound is only for the initial open, and only
+            -- for a CE Marine (standard/MP Marines share this same chooser for Sentry/Supply Depot).
+            if GetCombatEngineersActive(player) then
+                -- Once per life, and silent with the option off - both handled by the claim.
+                if CombatEngineers_PlayLocalSoundOnce then
+                    CombatEngineers_PlayLocalSoundOnce(kCombatEngineersBuyStructuresSound)
+                end
+            end
+        else
+            if MarineBuild_OnClose then MarineBuild_OnClose() end
+        end
+
     end
 
 end
@@ -164,16 +334,15 @@ end
 function CombatBuilder:OnPrimaryAttackEnd(player)
 
     if not Shared.GetIsRunningPrediction() then
-    
+
         if Client and self.dropping then
             self:OnSetActive()
         end
 
         self.dropping = false
-        self.mouseDown = false
-        
+
     end
-    
+
 end
 
 function CombatBuilder:GetIsDropping()
@@ -194,8 +363,30 @@ function CombatBuilder:Dropped(prevOwner)
     Weapon.Dropped(self, prevOwner)
     -- prevOwner:GetTeam():ClearMarineStructure(prevOwner)
 
+    -- Marks a DELIBERATE drop (the vanilla weapon-drop key), as opposed to simply never having had a
+    -- Combat Builder yet this life. CombatEngineers_Team.lua's periodic grant pass checks this flag and
+    -- refuses to auto-reissue one while it is set - a CE marine who drops their builder must visit an
+    -- Armory/AdvancedArmory (which clears the flag on resupply) to get another, rather than having it
+    -- silently reappear within a couple of seconds. A fresh respawn, commander step-down or Exo eject
+    -- all create a brand new Marine entity, so this flag naturally starts unset for them - only an
+    -- actual drop on a still-living marine sets it.
+    if Server and prevOwner and prevOwner.isa and prevOwner:isa("Marine") then
+        prevOwner.ceBuilderDropped = true
+
+        -- A CE marine's Combat Builder is standard issue, not loot - leaving it lying in the world
+        -- (dropped deliberately, or on death) would let ANY marine pick it up via the normal
+        -- WeaponOwnerMixin auto-pickup, including a bot: this mod never auto-grants bots a builder
+        -- (Marine:GiveCombatEngineerBuilder checks isVirtual) and bots never buy one (it is not in
+        -- MarineBrain_Data.lua's hardcoded purchasable-weapon list), so picking a dropped one up off
+        -- the ground was the only way a bot could ever end up holding one. Destroying it immediately
+        -- closes that off entirely - the dropper must visit an Armory/AdvancedArmory for a new one.
+        if GetCombatEngineersActive(prevOwner) then
+            DestroyEntity(self)
+            return
+        end
+    end
+
     self.dropping = false
-    self.mouseDown = false
     self.activeStructure = nil
     if Server then
         self.lastCreatedId = Entity.invalidId
@@ -206,6 +397,7 @@ function CombatBuilder:Dropped(prevOwner)
 	-- self.numPhaseGatesLeft = 0
     -- self.numObservatoriesLeft = 0
     self.lastClickedPosition = nil
+    self.lastClickedNormal = nil
 end
 
 
@@ -215,93 +407,247 @@ end
 
 function CombatBuilder:OnSecondaryAttack(player)
 
-    if player then
-        local weapon = player:GetWeaponInHUDSlot(1)
-        if weapon then
-            player:SetActiveWeapon(weapon:GetMapName())
-        end
+    if not player then
+        return
     end
+
+    if not (Client and player:GetIsLocalPlayer()) then
+        return
+    end
+
+    -- Prediction passes REPLAY this same tick's input, so this must be skipped on them or a single
+    -- physical click runs the toggle below more than once and undoes itself.
+    if Shared.GetIsRunningPrediction() then
+        return
+    end
+
+    -- Press-edge detection uses a CLIENT-LOCAL field, deliberately NOT the player's networked
+    -- secondaryAttackLastFrame. That field is a "compensated boolean" - the engine saves and
+    -- RESTORES it around prediction replay, so during a held button it can keep reading back as
+    -- false on the client and this function fires every single frame. That is what actually caused
+    -- "have to hold right-click to keep the window open": the window was being destroyed and
+    -- rebuilt continuously, which also swallowed every click aimed at its research buttons. A plain
+    -- local flag, cleared only in OnSecondaryAttackEnd, is not subject to that restore.
+    if self.ceSecondaryHeld then
+        return
+    end
+    self.ceSecondaryHeld = true
+
+    -- A second click while the window is already open CLOSES it (matches left-click's toggle).
+    if CEStructureUpgrade_GetIsOpen and CEStructureUpgrade_GetIsOpen() then
+        CEStructureUpgrade_Close()
+        return
+    end
+
+    -- Mutually exclusive with the structure chooser: opening the upgrade window closes that one.
+    if self.menuActive then
+        self.menuActive = false
+        if MarineBuild_OnClose then MarineBuild_OnClose() end
+    end
+
+    -- CANCEL A PENDING PURCHASE. With a structure selected (ghost armed, whether still being
+    -- positioned or already locked and being rotated), right-click throws it away - nothing is
+    -- placed and nothing is spent. Deliberately NOT an early return: if the marine also happens to
+    -- be looking at a nearby upgradeable structure, that structure's tech window still opens from
+    -- the same click, so one right-click both clears the ghost and gets them where they were going.
+    if self.activeStructure ~= nil then
+        self:ClearActiveStructure()
+    end
+
+    -- Aiming at a friendly, built, POWERED, upgradeable structure in range opens its upgrade window.
+    -- Aiming at anything else does NOTHING - right-click is the upgrade-window button while the
+    -- Combat Builder is out, and nothing more. (It used to fall through to "switch to primary
+    -- weapon" here, which meant every right-click that missed a structure silently put the builder
+    -- away.)
+    local structure = CEStructureUpgrade_GetTargetStructure and CEStructureUpgrade_GetTargetStructure(player)
+
+    if structure then
+        CEStructureUpgrade_Open(structure)
+    end
+end
+
+function CombatBuilder:OnSecondaryAttackEnd(player)
+    -- The ceSecondaryHeld guard is cleared in OverrideInput, off the raw input bits - not here.
+    Weapon.OnSecondaryAttackEnd(self, player)
 end
 
 function CombatBuilder:PerformPrimaryAttack(player)
 
     if self.activeStructure == nil then
         return false
-    end 
+    end
 
     local success = false
 
     -- Ensure the current location is valid for placement.
-    local coords, valid = self:GetPositionForStructure(player:GetEyePos(), player:GetViewCoords().zAxis, self:GetActiveStructure(), self.lastClickedPosition)
-    local secondClick = true
-    
+    local coords, valid = self:GetPositionForStructure(player:GetEyePos(), self:GetPlacementDirection(player), self:GetActiveStructure(), self.lastClickedPosition, self.lastClickedNormal)
+
     local structureID = self:GetActiveStructure().GetDropStructureId()
-    
-    if LookupTechData(structureID, kTechDataSpecifyOrientation, false) then
+    local ability      = self:GetActiveStructure()
+
+    -- Two-click flow: FIRST click locks position+normal and returns (nothing placed yet, the ghost
+    -- starts rotating instead); SECOND click (self.lastClickedPosition already set) confirms the
+    -- currently-showing orientation. Structures that don't require it (attach abilities, and
+    -- anything still using the legacy kTechDataSpecifyOrientation flag) place on a single click.
+    local requiresOrientationClick = (ability.GetRequiresOrientationClick and ability:GetRequiresOrientationClick())
+                                     or LookupTechData(structureID, kTechDataSpecifyOrientation, false)
+
+    local secondClick = true
+    if requiresOrientationClick then
         secondClick = self.lastClickedPosition ~= nil
     end
-    
+
     if secondClick then
-    
+
         if valid then
 
-            -- Ensure they have enough resources.
-             local cost = LookupTechData(structureID, kTechDataPersonalCostKey, 0)
+            -- Ensure they have enough resources. Combat Engineers structures cost NOTHING to place -
+            -- every personal resource they need is charged while they are physically being built -
+            -- so the check is skipped entirely for them.
+             local cost = CombatBuilder.GetStructureCost(structureID, player:GetTeamNumber())
+             if GetCombatEngineersStructureHasDynamicCost(structureID) then
+                 cost = 0
+             end
              if player:GetResources() >= cost then --and not self:GetHasDropCooldown() then
-                local message = BuildMarineDropStructureMessage(player:GetEyePos(), player:GetViewCoords().zAxis, self.activeStructure, self.lastClickedPosition)
+                local message = BuildMarineDropStructureMessage(player:GetEyePos(), self:GetPlacementDirection(player), self.activeStructure, self.lastClickedPosition, self.lastClickedNormal)
                 Client.SendNetworkMessage("MarineBuildStructure", message, true)
                 self.timeLastDrop = Shared.GetTime()
                 success = true
 
              end
-        
+
         end
 
+        -- Placed (or the confirm attempt failed outright) - either way the rotation lock is spent.
+        -- On a FAILED confirm the player is left free to click a fresh position rather than being
+        -- stuck re-confirming an invalid one.
         self.lastClickedPosition = nil
+        self.lastClickedNormal = nil
 
     else
+        -- First click: lock position AND the normal that was used to build these coords (coords'
+        -- own yAxis, since Coords.GetLookIn sets yAxis from the surface normal passed to it) so
+        -- later frames rotate around a FIXED point instead of the origin continuing to follow the
+        -- player's aim.
         self.lastClickedPosition = Vector(coords.origin)
+        self.lastClickedNormal = Vector(coords.yAxis)
+
+        -- Seed the rotation from where the marine is ALREADY looking, so the blueprint does not jump
+        -- to a different facing the instant the position locks - the first frame of rotating looks
+        -- exactly like the last frame of positioning.
+        --
+        -- The two yaws come from DIFFERENT sources on purpose, because they live in different spaces:
+        --   ceRotateYaw     - the structure's WORLD facing, so it comes from the player's view angles.
+        --   ceRotateLockYaw - the value OverrideInput pins InputHandler's mouse accumulator to and
+        --                     measures the mouse delta against, so it must come from that same
+        --                     accumulator (Client.GetYaw), not from the view angles.
+        -- On a standing marine these normally coincide, but they are not the same quantity and
+        -- conflating them would make the rotation drift wherever base view angles are non-zero.
+        local viewAngles = player:GetViewAngles()
+        self.ceRotateYaw = viewAngles.yaw
+
+        if Client then
+            self.ceRotateLockYaw = Client.GetYaw()
+            self.ceRotateLockPitch = Client.GetPitch()
+        end
     end
-    
+
     if not valid then
         player:TriggerInvalidSound()
     end
-        
+
     return success
     
 end
 
-local function DropStructure(self, player, origin, direction, structureAbility, lastClickedPosition)
+local function DropStructure(self, player, origin, direction, structureAbility, lastClickedPosition, lastClickedNormal)
 
     -- If we have enough resources
     if Server then
-    
-        local coords, valid, onEntity = self:GetPositionForStructure(origin, direction, structureAbility, lastClickedPosition)
+
+        local coords, valid, onEntity = self:GetPositionForStructure(origin, direction, structureAbility, lastClickedPosition, lastClickedNormal)
         local techId = structureAbility:GetDropStructureId()
         local maxStructures = structureAbility:GetMaxStructures(self:GetParent())
         
-        local cost = LookupTechData(structureAbility:GetDropStructureId(), kTechDataPersonalCostKey, 0)
+        local isCEStructure = GetCombatEngineersStructureHasDynamicCost(techId)
+
+        -- CE structures are FREE to place - the whole cost is charged while they are physically
+        -- being built (ChargeForConstruction in CombatEngineers_Build.lua), recomputed LIVE every
+        -- tick from the team's current player count. Nothing is stamped: if the team shrinks
+        -- mid-build the structure's price shrinks with it, and p-res already spent can push a
+        -- structure that is no longer "full price" straight to completion.
+        local cost = isCEStructure and 0 or CombatBuilder.GetStructureCost(techId, player:GetTeamNumber())
         local enoughRes = player:GetResources() >= cost
-        
-        if valid and structureAbility:IsAllowed(player) and not self:GetHasDropCooldown() then
-        
+
+
+        if valid and enoughRes and structureAbility:IsAllowed(player) and not self:GetHasDropCooldown() then
+
             -- Create structure
             local structure = self:CreateStructure(coords, player, structureAbility)
             if structure then
-            
+
                 structure:SetOwner(player)
-                structure:Construct(0.01,player)
-				player:GetTeam():AddMarineStructure(player, structure,maxStructures)
-                
+
+                -- Marks this as a CE-priced structure and starts its spent-resource ledger. Stamped
+                -- BEFORE the kick-off Construct call below, or that first tick would be built free
+                -- (the construction charge hook keys off ceIsCombatEngineersStructure being set).
+                -- techId is kept too, since ArmsLab needs its LADDER POSITION (fixed at the moment
+                -- it was placed - the price of an already-placed lab does not change if more labs
+                -- go up after it) to price itself.
+                if isCEStructure then
+                    structure.ceIsCombatEngineersStructure = true
+                    structure.ceResSpent = 0
+                    if techId == kTechId.ArmsLab then
+                        -- WHICH TRACK this lab serves, fixed for its lifetime. The two Arms Lab menu
+                        -- entries share a tech id and differ only by this, so it has to come from the
+                        -- ability the player actually selected rather than from the tech id. Stamped
+                        -- BEFORE the ladder index below, which is counted per track and so needs it.
+                        local track = structureAbility and structureAbility.ceTrack
+                        structure.ceTrackIndex = GetCombatEngineersTrackIndex(track)
+
+                        -- Position on that track's price ladder. This lab is already in the team's
+                        -- entity list by now, so the count includes it - hence no +1.
+                        local team = player:GetTeam()
+                        structure.ceArmsLabIndex =
+                            (team and team.GetArmsLabCountForTrack and team:GetArmsLabCountForTrack(track)) or 1
+                    end
+                end
+
+                -- CE structures are placed as an UNTOUCHED BLUEPRINT at exactly 0% and are never
+                -- charged anything at placement: the entire price is paid across the 0% -> 100%
+                -- construction, by whoever actually builds it.
+                --
+                -- The kick-off Construct(0.01) below is therefore skipped for them. It looked
+                -- harmless but broke both halves of that rule: ConstructMixin:Construct runs the CE
+                -- charge hook, so the placer was billed a sliver of personal resources the instant
+                -- they placed (a "why did I lose p-res just for placing?" that scaled with the
+                -- structure's price), and it left the blueprint sitting fractionally above 0% rather
+                -- than at a clean zero. Non-CE structures (Sentry, Supply Depot) keep the original
+                -- behaviour - they are flat-priced and paid for up front, so nothing changes there.
+                if not isCEStructure then
+                    structure:Construct(0.01,player)
+                end
+
+                -- Per-player ownership tracking is only for structures with a PER-PLAYER cap
+                -- (Sentry, Supply Depot). CE structures are team property: registering them here
+                -- would let AddMarineStructure destroy the oldest one when a player placed another,
+                -- and would tear the team's base down when that player left.
+                if maxStructures and maxStructures > 0 then
+                    player:GetTeam():AddMarineStructure(player, structure,maxStructures)
+                end
+
                 -- Check for space
                 if structure:SpaceClearForEntity(coords.origin) then
-                
-                    local angles = Angles()                    
+
+                    local angles = Angles()
                     angles:BuildFromCoords(coords)
                     structure:SetAngles(angles)
-                    
-                     player:AddResources(-cost)
-                    
+
+                    -- CE structures are paid for during construction, so nothing is taken here.
+                    if not isCEStructure then
+                        player:AddResources(-cost)
+                    end
+
                     if structureAbility:GetStoreBuildId() then
                         self.lastCreatedId = structure:GetId()
                     end
@@ -313,7 +659,43 @@ local function DropStructure(self, player, origin, direction, structureAbility, 
                     end
                     
                     self.timeLastDrop = Shared.GetTime()
-                    
+
+                    -- Only NOW is this a genuinely, successfully placed structure - space was clear
+                    -- and its rotation (angles) is set, not merely "reached the rotation-confirm
+                    -- click". Private to the placing player only. Gated on the PLAYER being a CE
+                    -- Marine using the CB, not on isCEStructure - Marine Sentry and Supply Depot are
+                    -- always flat-cost (isCEStructure is false for them), but they are still placed
+                    -- via this same CB and still count for a CE Marine.
+                    if GetCombatEngineersActive(player) then
+                        if CombatEngineers_PlaySoundFor then
+                            CombatEngineers_PlaySoundFor(player, kCombatEngineersStructurePlacedSound)
+                        end
+
+                        -- Announce the confirmed purchase to the whole team. Reached only from this
+                        -- point, which is AFTER space-clear and angles are set - so it fires once per
+                        -- structure that genuinely exists, never for a cancelled or refused placement.
+                        if CombatEngineers_SendTeamMessage then
+
+                            -- The price quoted is what the structure will actually cost to BUILD -
+                            -- CE structures are free to place and charged across construction - so it
+                            -- is read from the same live pricing function that will do the charging,
+                            -- never from a static tech cost.
+                            local buildCost = CombatBuilder.GetStructureCost(techId, player:GetTeamNumber()) or 0
+
+                            local structureName = CombatEngineers_GetDisplayName(techId)
+
+                            CombatEngineers_SendTeamMessage(player:GetTeam(),
+                                CombatEngineers_FormatTeamMessage(
+                                    string.format("%s placed %s %s in %s - The cost to build is %d p-res",
+                                                  player:GetName(),
+                                                  CombatEngineers_GetArticleFor(structureName),
+                                                  structureName,
+                                                  CombatEngineers_GetLocationName(structure:GetOrigin()),
+                                                  buildCost)))
+
+                        end
+                    end
+
                     return true
                     
                 else
@@ -343,19 +725,28 @@ local function DropStructure(self, player, origin, direction, structureAbility, 
     
 end
 
-function CombatBuilder:OnDropStructure(origin, direction, structureIndex, lastClickedPosition)
+function CombatBuilder:OnDropStructure(origin, direction, structureIndex, lastClickedPosition, lastClickedNormal)
 
     local player = self:GetParent()
-        
+
     if player then
-    
-        local structureAbility = CombatBuilder.kSupportedStructures[structureIndex]        
-        if structureAbility then        
-             DropStructure(self, player, origin, direction, structureAbility, lastClickedPosition)
+
+        local structureAbility = CombatBuilder.kSupportedStructures[structureIndex]
+
+        -- "Take Credits" is in this list but is an action, not a structure - it has no map name and
+        -- nothing to spawn. Selecting it never sets activeStructure, so this should be unreachable;
+        -- it is refused explicitly anyway because structureIndex arrives over the network and a
+        -- crafted one must not be able to drive CreateEntity with a nil map name.
+        if structureAbility and structureAbility.ceIsCreditsExchange then
+            return
         end
-        
+
+        if structureAbility then
+             DropStructure(self, player, origin, direction, structureAbility, lastClickedPosition, lastClickedNormal)
+        end
+
     end
-    
+
 end
 
 function CombatBuilder:CreateStructure(coords, player, structureAbility, lastClickedPosition)
@@ -374,90 +765,120 @@ end
 -- Given a gorge player's position and view angles, return a position and orientation
 -- for structure. Used to preview placement via a ghost structure and then to create it.
 -- Also returns bool if it's a valid position or not.
-function CombatBuilder:GetPositionForStructure(startPosition, direction, structureAbility, lastClickedPosition)
+function CombatBuilder:GetPositionForStructure(startPosition, direction, structureAbility, lastClickedPosition, lastClickedNormal)
 
     PROFILE("CombatBuilder:GetPositionForStructure")
 
-    local validPosition = false
-    local range = structureAbility.GetDropRange()
-    local origin = startPosition + direction * range
-    local player = self:GetParent()
+    -- Two-click "place then rotate" structures (every free-placement CE structure) LOCK their
+    -- position and surface normal at the first click; from then on only the FACING varies as the
+    -- player looks around, re-validated every frame (backfacing in particular can flip from valid
+    -- to invalid as the player orbits a locked point), until the second click confirms whatever
+    -- orientation is currently showing. Attach structures never reach this - GetRequiresOrientationClick
+    -- is false for them, so lastClickedPosition is never set for them by PerformPrimaryAttack.
+    local rotating = lastClickedPosition ~= nil and lastClickedNormal ~= nil
+                     and structureAbility.GetRequiresOrientationClick
+                     and structureAbility:GetRequiresOrientationClick()
 
-    -- Trace short distance in front
-    local trace = Shared.TraceRay(player:GetEyePos(), origin, CollisionRep.Default, PhysicsMask.AllButPCsAndRagdolls, FilterBabblersAndTwo(player, self))
-    
-    local displayOrigin = trace.endPoint
-    
-    -- If we hit nothing, trace down to place on ground
-    if trace.fraction == 1 then
-    
-        origin = startPosition + direction * range
-        trace = Shared.TraceRay(origin, origin - Vector(0, range, 0), CollisionRep.Default, PhysicsMask.AllButPCsAndRagdolls, EntityFilterTwo(player, self))
-        
-    end
-    
-    -- If it hits something, position on this surface (must be the world or another structure)
-    if trace.fraction < 1 then
-    
-        if trace.entity == nil then
-            validPosition = true
-		end
-        
+    local validPosition = false
+    local player = self:GetParent()
+    local displayOrigin, normal, hitEntity
+
+    if rotating then
+
+        displayOrigin = Vector(lastClickedPosition)
+        normal = Vector(lastClickedNormal)
+        hitEntity = nil
+        validPosition = true
+
+    else
+
+        local range = structureAbility.GetDropRange()
+        local origin = startPosition + direction * range
+
+        -- Trace short distance in front
+        local trace = Shared.TraceRay(player:GetEyePos(), origin, CollisionRep.Default, PhysicsMask.AllButPCsAndRagdolls, FilterBabblersAndTwo(player, self))
+
         displayOrigin = trace.endPoint
-        
-    end
-    
-    -- Can only be built on infestation
-    -- local requiresInfestation = LookupTechData(structureAbility.GetDropStructureId(), kTechDataRequiresInfestation)
-    -- if requiresInfestation and not GetIsPointOnInfestation(displayOrigin) then
-    
-    --     if self:GetActiveStructure().OverrideInfestationCheck then
-    --         validPosition = self:GetActiveStructure():OverrideInfestationCheck(trace)
-    --     else
-    --         validPosition = false
-    --     end
-        
-    -- end
-    
-    if not structureAbility.AllowBackfacing() and trace.normal:DotProduct(GetNormalizedVector(startPosition - trace.endPoint)) < 0 then
-        validPosition = false
-    end    
-    
-    -- Don't allow dropped structures to go too close to techpoints and resource nozzles
-    if GetPointBlocksAttachEntities(displayOrigin) then
-        validPosition = false
+
+        -- If we hit nothing, trace down to place on ground
+        if trace.fraction == 1 then
+
+            origin = startPosition + direction * range
+            trace = Shared.TraceRay(origin, origin - Vector(0, range, 0), CollisionRep.Default, PhysicsMask.AllButPCsAndRagdolls, EntityFilterTwo(player, self))
+
+        end
+
+        -- Attach abilities (Extractor -> Resource Point, Command Station -> Tech Point) are the one
+        -- case where hitting an ENTITY (the attach point's own collision) is expected and correct,
+        -- not a foul - GetIsPositionValid below is their sole authority instead of the
+        -- bare-world-only rule.
+        local allowsAttachEntityHit = structureAbility.GetAllowsAttachEntityHit
+                                      and structureAbility:GetAllowsAttachEntityHit()
+
+        -- If it hits something, position on this surface (must be the world or another structure)
+        if trace.fraction < 1 then
+
+            if trace.entity == nil or allowsAttachEntityHit then
+                validPosition = true
+            end
+
+            displayOrigin = trace.endPoint
+
+        end
+
+        if not structureAbility.AllowBackfacing() and trace.normal:DotProduct(GetNormalizedVector(startPosition - trace.endPoint)) < 0 then
+            validPosition = false
+        end
+
+        -- Don't allow dropped structures to go too close to techpoints and resource nozzles -
+        -- EXCEPT for the ability whose entire job is to attach to exactly one (Extractor, Command
+        -- Station).
+        if not allowsAttachEntityHit and GetPointBlocksAttachEntities(displayOrigin) then
+            validPosition = false
+        end
+
+        normal    = trace.normal
+        hitEntity = trace.entity
+
     end
 
     -- Do not allow building too close to any PhaseGate (preview and actual build)
     if validPosition and #GetEntitiesWithinRange("PhaseGate", displayOrigin, kPhaseGateBlockRadius) > 0 then
         validPosition = false
     end
-    
-    if not structureAbility:GetIsPositionValid(displayOrigin, player, trace.normal, lastClickedPosition, trace.entity) then
+
+    -- While rotating, re-check backfacing against the CURRENT viewpoint even though the position and
+    -- normal are locked - orbiting round to the far side of a locked point can turn a valid facing
+    -- invalid, which is exactly the "some rotations are not valid" behaviour a rotation step implies.
+    if rotating and not structureAbility.AllowBackfacing()
+       and normal:DotProduct(GetNormalizedVector(startPosition - displayOrigin)) < 0 then
         validPosition = false
-    end    
-    
+    end
+
+    if not structureAbility:GetIsPositionValid(displayOrigin, player, normal, lastClickedPosition, hitEntity) then
+        validPosition = false
+    end
+
     -- Don't allow placing above or below us and don't draw either
     local structureFacing = Vector(direction)
-    
-    if math.abs(Math.DotProduct(trace.normal, structureFacing)) > 0.9 then
-        structureFacing = trace.normal:GetPerpendicular()
+
+    if math.abs(Math.DotProduct(normal, structureFacing)) > 0.9 then
+        structureFacing = normal:GetPerpendicular()
     end
-    
+
     -- Coords.GetLookIn will prioritize the direction when constructing the coords,
     -- so make sure the facing direction is perpendicular to the normal so we get
     -- the correct y-axis.
-    local perp = Math.CrossProduct( trace.normal, structureFacing )
-    structureFacing = Math.CrossProduct( perp, trace.normal )
-    
-    local coords = Coords.GetLookIn( displayOrigin, structureFacing, trace.normal )
-    
+    local perp = Math.CrossProduct( normal, structureFacing )
+    structureFacing = Math.CrossProduct( perp, normal )
+
+    local coords = Coords.GetLookIn( displayOrigin, structureFacing, normal )
+
     if structureAbility.ModifyCoords then
         structureAbility:ModifyCoords(coords, lastClickedPosition)
     end
-    
-    -- Shared.Message(tostring(validPosition))
-    return coords, validPosition, trace.entity
+
+    return coords, validPosition, hitEntity
 
 end
 
@@ -572,14 +993,20 @@ if Client then
     function CombatBuilder:OnProcessIntermediate(input)
 
         local player = self:GetParent()
-        local viewDirection = player:GetViewCoords().zAxis
+        local viewDirection = self:GetPlacementDirection(player)
 
         if player and self.activeStructure then
 
-            self.ghostCoords, self.placementValid = self:GetPositionForStructure(player:GetEyePos(), viewDirection, self:GetActiveStructure(), self.lastClickedPosition)
+            self.ghostCoords, self.placementValid = self:GetPositionForStructure(player:GetEyePos(), viewDirection, self:GetActiveStructure(), self.lastClickedPosition, self.lastClickedNormal)
             
-             if player:GetResources() < LookupTechData(self:GetActiveStructure():GetDropStructureId(), kTechDataPersonalCostKey) then
-                 self.placementValid = false
+             local techId = self:GetActiveStructure():GetDropStructureId()
+
+             -- Mirror the server's placement rule exactly: CE structures are FREE to place.
+             if not GetCombatEngineersStructureHasDynamicCost(techId) then
+                 local cost = CombatBuilder.GetStructureCost(techId, player:GetTeamNumber())
+                 if player:GetResources() < cost then
+                     self.placementValid = false
+                 end
              end
         
         end
@@ -617,17 +1044,14 @@ if Client then
     end
     
     function CombatBuilder:OnDrawClient()
-    
+
         Weapon.OnDrawClient(self)
-        
-        -- We need this here in case we switch to it via Prev/NextWeapon keys
-        
-        -- Do not show menu for other players or local spectators.
-        local player = self:GetParent()
-        if player and player:GetIsLocalPlayer() and self:GetActiveStructure() == nil and Client.GetIsControllingPlayer() then
-            self.menuActive = true
-        end
-        
+
+        -- Equipping the builder no longer auto-opens the chooser - only a genuine left CLICK does
+        -- (see OnPrimaryAttack). Switching TO this weapon should not carry over a stale "menu open"
+        -- state from before it was last holstered, though, so explicitly close it here.
+        self.menuActive = false
+
     end
     
     local function UpdateGUI(self, player)
@@ -654,35 +1078,110 @@ if Client then
     end
     
     function CombatBuilder:OverrideInput(input)
-    
-        if self.buildMenu then
 
-            -- Build menu is up, let it handle input
-            if self.buildMenu:GetIsVisible() then
-            
-                local selected = false
-                input, selected = self.buildMenu:OverrideInput(input)
-                self.menuActive = not selected
-                
-            else
+        -- Re-pressing this weapon's own slot key used to force the chooser back open even when a
+        -- structure was already selected (and its ghost showing) - which threw the current
+        -- selection away without the player asking for that. Opening is now LEFT-CLICK's job only
+        -- (OnPrimaryAttack); re-pressing the slot key while already on this weapon does nothing,
+        -- like switching to any other already-active weapon.
+        --
+        -- self.menuActive is DELIBERATELY not touched here. OnPrimaryAttack's own edge-guarded
+        -- toggle is the single source of truth for opening/closing this menu; a selection closes
+        -- it via MarineBuild_Close() (which destroys the GUI object outright) inside
+        -- GUIMarineBuildMenu:OverrideInput below. Forcing self.menuActive = not selected here used
+        -- to fight that: whenever nothing was hit this tick (selected == false, including the tick
+        -- right after a click had just TOGGLED the menu closed), it unconditionally forced
+        -- menuActive back to true, undoing the close.
+        -- Authoritative press-edge tracking for BOTH mouse buttons, driven straight off the raw
+        -- input bits. OverrideInput runs every client frame with the real, un-replayed commands, so
+        -- clearing the guards here is reliable in a way that depending on OnPrimaryAttackEnd /
+        -- OnSecondaryAttackEnd is not: those only fire when the engine's own compensated
+        -- primaryAttackLastFrame / secondaryAttackLastFrame flags happen to survive prediction
+        -- replay intact, and if one is missed the corresponding guard would latch on forever and
+        -- that mouse button would stop working entirely for the rest of the round.
+        if not HasMoveCommand( input.commands, Move.PrimaryAttack ) then
+            self.cePrimaryHeld = false
+        end
 
-                -- If player wants to switch to this, open build menu immediately
-                local weaponSwitchCommands = { Move.Weapon1, Move.Weapon2, Move.Weapon3, Move.Weapon4, Move.Weapon5 }
-                local thisCommand = weaponSwitchCommands[ self:GetHUDSlot() ]
+        if not HasMoveCommand( input.commands, Move.SecondaryAttack ) then
+            self.ceSecondaryHeld = false
+        end
 
-                if bit.band( input.commands, thisCommand ) ~= 0 then
-                    self.menuActive = true
-                end
+        if self.buildMenu and self.buildMenu:GetIsVisible() then
+            input = self.buildMenu:OverrideInput(input)
+        end
 
+        -- ROTATION LOCKS THE CAMERA.
+        --
+        -- Once the position is locked and the marine is rotating the blueprint, the mouse must turn
+        -- the STRUCTURE and nothing else - not the view, and emphatically not the movement keys.
+        --
+        -- Writing input.yaw/input.pitch alone is NOT enough, and was why the first attempt failed.
+        -- InputHandler.lua keeps its own file-local mouse accumulator (_cameraYaw) and GenerateMove()
+        -- does `move.yaw = _cameraYaw` BEFORE OverrideInput is called, so editing the move only
+        -- changed the copy being sent: the camera carried on turning from the untouched accumulator,
+        -- while movement - computed relative to the move's yaw - resolved against the frozen value.
+        -- Hence "the view still rotates AND my movement keys go the wrong way", two faces of one bug.
+        --
+        -- ConsumeRotationDelta pins the accumulator itself (via Client.SetYaw, the accessor
+        -- InputHandler exposes for exactly this); the move is then pinned to match so movement and
+        -- view agree.
+        if self.lastClickedPosition and self.ceRotateLockYaw then
+
+            self:ConsumeRotationDelta()
+
+            input.yaw = self.ceRotateLockYaw
+            input.pitch = self.ceRotateLockPitch
+
+        end
+
+        -- While the structure UPGRADE window is open, take over the inputs it needs.
+        --
+        -- (Restored - this block was lost in an edit to the rotation handling above, which very
+        -- probably contributed to the upgrade window feeling unreliable: without it a click aimed at
+        -- a research button ALSO reached OnPrimaryAttack and popped the structure chooser open over
+        -- the top.)
+        --
+        -- A mouse button produces BOTH a key event and a move-command bit. The window's own
+        -- SendKeyEvent consumes the key event, which is what actually clicks its buttons, but that
+        -- does nothing about the move bit - so PrimaryAttack has to be stripped here.
+        if CEStructureUpgrade_GetIsOpen and CEStructureUpgrade_GetIsOpen() then
+
+            -- Wheel pages the window (Arms Lab: armour <-> weapons). Consumed so it does not also
+            -- switch the marine's weapon out from under the open window.
+            if HasMoveCommand( input.commands, Move.SelectNextWeapon ) then
+                if CEStructureUpgrade_ChangePage then CEStructureUpgrade_ChangePage(1) end
+                input.commands = RemoveMoveCommand( input.commands, Move.SelectNextWeapon )
+            elseif HasMoveCommand( input.commands, Move.SelectPrevWeapon ) then
+                if CEStructureUpgrade_ChangePage then CEStructureUpgrade_ChangePage(-1) end
+                input.commands = RemoveMoveCommand( input.commands, Move.SelectPrevWeapon )
             end
-            
-        end    
-        
+
+            input.commands = RemoveMoveCommand( input.commands, Move.PrimaryAttack )
+
+            -- SecondaryAttack is deliberately LEFT ALONE: OnSecondaryAttack is what toggles this
+            -- window shut again, so stripping it would make the window impossible to close.
+        end
+
         return input
-        
+
     end
     
     function CombatBuilder:OnUpdateRender()
+
+        -- Re-pin the view every RENDER frame while rotating, not just in OverrideInput.
+        --
+        -- OverrideInput runs once per move, but the mouse accumulator (_cameraYaw in InputHandler)
+        -- keeps taking input in between, and the camera is built from it - so pinning it only at move
+        -- time leaves a frame where the view has already drifted and is then snapped back. That snap
+        -- is the visible shake: a small turn that always gets pulled home.
+        --
+        -- Pinning here as well closes most of that window, because this runs on the render tick that
+        -- the camera is actually built from. The delta is still accumulated in OverrideInput, which
+        -- is the authoritative per-move path, so nothing is double-counted: this only re-asserts the
+        -- lock, it never advances the rotation.
+        self:ConsumeRotationDelta()
+
         UpdateGUI(self, self:GetParent())    
     end
     
@@ -691,7 +1190,8 @@ end
 if Server then
 
     function CombatBuilder:GetIsValidRecipient(recipient)
-        return not recipient.isVirtual      --Don't give this to bot
+        -- GetIsVirtual(), not the raw field - the field is nil until SetControllerClient runs.
+        return recipient.GetIsVirtual ~= nil and not recipient:GetIsVirtual()
     end
     
     function CombatBuilder:GetDestroyOnKill()

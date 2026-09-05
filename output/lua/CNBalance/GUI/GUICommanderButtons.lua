@@ -1,8 +1,27 @@
 
 local kCommanderIcons = PrecacheAsset("ui/alien_hivestatus_commicons.dds")
+local kCombatEngineersIconTexture = PrecacheAsset("ui/combat_engineers/combat_engineers_icon.dds")
 
+-- Custom commander-button icons. Despite the name this is no longer only lifeform eggs: any techId
+-- whose button art is not simply its own cell in ui/buildmenu.dds belongs here, because this is the
+-- one place the button icon is built (UpdateLifeformEggButtonIcon below), and anything that tries to
+-- re-texture the button from outside is undone by the `if not iconInfo` branch there, which resets
+-- every other button back to the atlas on every status refresh.
 local kLifeformEggButtonIcons =
 {
+    -- Combat Engineers has a standalone 100x100 dds rather than an atlas cell (its
+    -- kTechIdToMaterialOffset entry points at the Combat Builder cell purely as a fallback, so
+    -- without this the button shows the Combat Builder icon). KeepButtonColor keeps the marine
+    -- status tint - the egg colouring below is alien-orange and would be wrong here.
+    [kTechId.CombatEngineers] =
+    {
+        Texture         = kCombatEngineersIconTexture,
+        SourceWidth     = 100,
+        SourceHeight    = 100,
+        Scale           = 1.0,
+        KeepButtonColor = true,
+    },
+
     [kTechId.ProwlerEgg] =
     {
         UseBuildMenuIcon = true,
@@ -44,6 +63,20 @@ local function GetLifeformEggButtonColor(buttonItem)
     end
 
     return Color(kLifeformEggIconEnabledColor.r, kLifeformEggIconEnabledColor.g, kLifeformEggIconEnabledColor.b, color.a)
+
+end
+
+-- Entries flagged KeepButtonColor take the button's OWN colour, which vanilla UpdateButtonStatus has
+-- already set to the correct status tint (team colour when enabled, grey when unavailable, red when
+-- unaffordable). GetLifeformEggButtonColor above deliberately forces alien-egg orange instead, which
+-- is right for the eggs and wrong for a marine research button.
+local function GetCustomButtonIconColor(buttonItem, iconInfo)
+
+    if iconInfo and iconInfo.KeepButtonColor then
+        return buttonItem:GetColor()
+    end
+
+    return GetLifeformEggButtonColor(buttonItem)
 
 end
 
@@ -94,7 +127,7 @@ local function UpdateLifeformEggButtonIcon(self, buttonIndex)
     end
 
     local iconSize = buttonItem:GetSize() * (iconInfo.Scale or kLifeformEggIconScale)
-    local iconColor = GetLifeformEggButtonColor(buttonItem)
+    local iconColor = GetCustomButtonIconColor(buttonItem, iconInfo)
 
     buttonItem:SetTexture("ui/transparent.dds")
     buttonItem:SetTexturePixelCoordinates(0, 0, 1, 1)
@@ -133,7 +166,7 @@ local function SyncLifeformEggButtonIconColors(self)
         local techId = GetCommanderButtonTechId(i)
         local iconInfo = kLifeformEggButtonIcons[techId]
         if iconInfo then
-            local iconColor = GetLifeformEggButtonColor(buttonItem)
+            local iconColor = GetCustomButtonIconColor(buttonItem, iconInfo)
             buttonItem:SetColor(iconColor)
 
             if buttonItem.lifeformEggIcon then

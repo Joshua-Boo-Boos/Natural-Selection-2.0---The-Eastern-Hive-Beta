@@ -29,6 +29,14 @@ debug.appendtoenum(kTechId, "GrenadeLauncherUpgrade")
 --debug.appendtoenum(kTechId, "GrenadeLauncherDetectionShot")
 --debug.appendtoenum(kTechId, "GrenadeLauncherAllyBlast")
 
+-- Combat Engineers: the marine counterpart to the alien Origin Form. Mutually exclusive with
+-- Military Protocol. See lua/CNBalance/CombatEngineers_Shared.lua.
+debug.appendtoenum(kTechId, "CombatEngineers")
+-- Not a structure: the Combat Builder build menu's "Take Credits" entry, which converts team
+-- resources into personal resources for the marine who clicks it. It needs a tech id purely so it
+-- can sit in the same menu list as the structures and reuse their display name / icon lookups.
+debug.appendtoenum(kTechId, "CombatEngineersCredits")
+
 debug.appendtoenum(kTechId, "ProtosMenu")
 debug.appendtoenum(kTechId, "DropDualMinigunExosuit")
 debug.appendtoenum(kTechId, "DropDualRailgunExosuit")

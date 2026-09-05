@@ -875,6 +875,16 @@ local kMarineBrainObjectiveActionTypesOrderScale = 100
 
 --Note: all of these action can be overridden by kMarineBrainActionTypes, but when no kMarineBrainActionTypes is set
 --then these take precendence. Thus, granting a "planning/decision" step, and then a "reaction" step for Marine bots.
+-- Combat Engineers bot tuning.
+--   MIN RESOURCES - how much personal resource a bot wants in hand before it is worth walking to a
+--                   CE structure at all. Anything less buys a sliver of build progress and leaves
+--                   the bot stranded next to a blueprint it cannot finish.
+--   IGNORE        - how long a bot then pretends that particular structure does not exist. Long
+--                   enough to go and do something else and bank some income, short enough that a
+--                   genuinely needed structure is not abandoned for the rest of the round.
+local kCombatEngineersBotMinBuildResources = 5
+local kCombatEngineersBotIgnoreDuration    = 25
+
 local kMarineBrainObjectiveTypes = enum({
     "FollowOrders",
     "RespondToThreat",
@@ -3681,6 +3691,47 @@ kMarineBrainActions =
         -- Don't build structures if we've been given an order or we're "on a mission"
         if HasHighPriorityTask(bot, brain) then
             return kNilAction
+        end
+
+        -- Combat Engineers: a CE structure's build progress is funded entirely from the personal
+        -- resources of whoever is building it (ConstructMixin:Construct charges the builder and adds
+        -- no progress at all if they have none). A bot with nothing to spend that walks over anyway
+        -- just stands there.
+        --
+        -- A bare "has more than zero" test was not enough, and produced exactly the loitering that
+        -- was reported. Personal resources trickle in continuously, so a bot with 0.4 p-res passed
+        -- the test, walked to the structure, spent it in a fraction of a second, stopped, waited for
+        -- the next trickle, and went again - pinned to a structure it could never meaningfully
+        -- advance.
+        --
+        -- Two things fix it. A bot must hold a WORTHWHILE amount before it commits to the trip, and
+        -- once it finds it cannot afford one, that specific structure is put on a per-bot ignore list
+        -- for a while and treated as though it does not exist - so the bot goes and does something
+        -- useful instead of orbiting a blueprint. When the timer lapses it is free to reconsider,
+        -- and by then it has usually banked enough to actually help.
+        if buildTarget and buildTarget.ceIsCombatEngineersStructure then
+
+            brain.ceIgnoredBuildables = brain.ceIgnoredBuildables or {}
+
+            local structureId = buildTarget:GetId()
+            local now = Shared.GetTime()
+            local ignoredUntil = brain.ceIgnoredBuildables[structureId]
+
+            if ignoredUntil and now < ignoredUntil then
+                return kNilAction
+            end
+
+            local resources = marine.GetResources and marine:GetResources() or 0
+
+            if resources < kCombatEngineersBotMinBuildResources then
+                brain.ceIgnoredBuildables[structureId] = now + kCombatEngineersBotIgnoreDuration
+                return kNilAction
+            end
+
+            -- Affordable again: clear any stale entry so the list cannot grow without bound as
+            -- structures come and go over a long round.
+            brain.ceIgnoredBuildables[structureId] = nil
+
         end
 
         --limit to inside relevancy range, becuase we don't want a Marine to go clear across the map to build
