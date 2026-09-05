@@ -815,7 +815,26 @@ function GUIMinimap:UpdateStaticIcon(entityId)
     local icon = entityId and self.iconMap:Get(entityId)
     if icon then
         local entity = Shared.GetEntity(entityId)
-        if not entity then
+
+        --[[
+            Two ways this lookup fails to give us a blip-capable entity:
+
+              1. The entity is gone            -> Shared.GetEntity returns nil.
+              2. The entity id was RECYCLED    -> Shared.GetEntity returns a DIFFERENT entity that
+                                                  happens to hold that id now.
+
+            Only (1) was handled. The icon map is keyed by entity id, and NS2 reuses ids: a blip
+            entity gets destroyed, its id is handed to something else, and this then calls
+            UpdateMinimapItem on whatever now owns it. That method exists only on MapBlip and
+            MinimapMappableMixin, so hitting e.g. a ParticleEffect threw
+            "attempt to call method 'UpdateMinimapItem' (a nil value)" -- once per frame, per stale
+            icon, since nothing cleared it.
+
+            A recycled id means the blip we were tracking is just as gone as in case (1), so treat it
+            identically: hide the icon and leave its version stale, which lets the existing cleanup
+            in UpdateStaticBlips reclaim it on the next pass.
+        ]]
+        if not entity or not entity.UpdateMinimapItem then
             icon:SetIsVisible(false)
         else
             entity:UpdateMinimapItem(self, icon)

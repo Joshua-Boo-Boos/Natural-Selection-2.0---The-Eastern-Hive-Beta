@@ -7,6 +7,36 @@ local kBeaconInstantPhaseDuration = 15
 local kBeaconInstantPhaseCooldown = 0.5
 
 local baseOnCreate = PhaseGate.OnCreate
+-- How long a marine stays parasited after phasing through a parasited gate. Deliberately SHORT: the
+-- gate marks people passing through it, it does not hand out a full-length parasite.
+local kPhaseGateParasiteDuration = 4
+
+--[[
+    Parasite a marine for using a parasited phase gate.
+
+    SetParasited's own durationOverride path is used rather than TransferParasite, because it already
+    refuses to SHORTEN an existing parasite:
+
+        if self.parasited and now + durationOverride > self.parasiteDuration + self.timeParasited then
+
+    So a marine who is already parasited for 40s keeps their 40s; only someone with less than 4s
+    remaining (or none at all) is moved up to 4. TransferParasite would instead have copied the
+    gate's own remaining time verbatim, which is how marines were ending up with a full-length
+    parasite from a freshly-parasited gate.
+
+    fromPlayer is nil: it is only used to award a parasite score, and a phase gate is not the player
+    who earned it.
+]]
+local function ApplyPhaseGateParasite(user, gate)
+
+    if not user or not gate then return end
+    if not user.SetParasited then return end
+    if not gate.GetIsParasited or not gate:GetIsParasited() then return end
+
+    user:SetParasited(nil, kPhaseGateParasiteDuration)
+
+end
+
 function PhaseGate:OnCreate()
     baseOnCreate(self)
     InitMixin(self, BiomassHealthMixin)
@@ -120,8 +150,27 @@ function PhaseGate:Phase(user)
                     end
                 end
 
-                self:TransferParasite(user)
-                user:TransferParasite(destinationPhaseGate)
+                --[[
+                    PARASITE FLOWS ONE WAY: GATE -> MARINE, NEVER MARINE -> GATE.
+
+                    A marine using a phase gate never parasites it, and never loses their own
+                    parasite by using one. A parasited gate marks everyone passing through it for a
+                    fixed 4 seconds (see ApplyPhaseGateParasite).
+
+                    The original code did this instead:
+                        self:TransferParasite(user)
+                        user:TransferParasite(destinationPhaseGate)
+                    Both directions, and TransferParasite copies wholesale INCLUDING "not parasited"
+                    (self:SetIsParasited(from.parasited)). Two bugs fell out of that: any
+                    un-parasited marine phasing through wiped a parasited gate outright -- which is
+                    why a Phase Gate appeared to lose its parasite seconds later for no visible
+                    reason -- and a marine inherited the gate's whole remaining time, so a freshly
+                    parasited gate handed out a full-length parasite.
+
+                    Both gates are checked, so it does not matter which end was parasited.
+                ]]
+                ApplyPhaseGateParasite(user, self)
+                ApplyPhaseGateParasite(user, destinationPhaseGate)
             end
             
             local instantPhase = user.timeLastBeacon and Shared.GetTime() - user.timeLastBeacon <= kBeaconInstantPhaseDuration

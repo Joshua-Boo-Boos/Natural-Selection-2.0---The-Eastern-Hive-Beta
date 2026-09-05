@@ -18,13 +18,20 @@ end
 -- Parasite damage-over-time.
 -- On top of the direct parasite hit, marine-team targets take an additional
 -- 2 damage spread over 3 seconds, of the SAME damage type as the parasite
--- (kParasiteDamageType). The effect does not stack: re-parasiting a target that
--- already has the DoT just refreshes its timer back to the full 3 seconds.
+-- (kParasiteDamageType).
+--
+-- The effect NEITHER STACKS NOR REFRESHES. While a DoT is already running on a
+-- target, re-parasiting it is ignored outright: the timer is not extended, the
+-- damage is not re-applied, and no second ticker is started. A new DoT can only
+-- begin once the previous one has finished.
 -- ---------------------------------------------------------------------------
 local kParasiteDotDuration    = 3    -- seconds
 local kParasiteDotTotalDamage = 2    -- total (raw) damage over the duration
-local kParasiteDotInterval    = 0.5  -- tick period
-local kParasiteDotDamagePerTick = kParasiteDotTotalDamage * (kParasiteDotInterval / kParasiteDotDuration)
+local kParasiteDotTicks       = 3    -- equal intervals across the duration
+
+-- One tick per second, each dealing 2/3, so the full 2 damage lands in equal instalments.
+local kParasiteDotInterval      = kParasiteDotDuration / kParasiteDotTicks
+local kParasiteDotDamagePerTick = kParasiteDotTotalDamage / kParasiteDotTicks
 
 -- Runs on the target entity (self == target). Returns the next interval to keep
 -- ticking, or false to stop.
@@ -46,13 +53,22 @@ local function ParasiteDotTick(self)
         return false
     end
 
-    local now = Shared.GetTime()
+    --[[
+        COUNT TICKS, do not compare against an end time.
 
-    -- Stop once the (possibly refreshed) timer has elapsed.
-    if now >= (self._parasiteDotEndTime or 0) then
+        The previous version stopped on `now >= endTime`, which silently DROPPED THE FINAL TICK: at
+        0.5s intervals over 3s it dealt 5 ticks of 1/3 = 1.667 damage, not the intended 2. Counting
+        instalments makes the total exact and independent of scheduler drift -- 3 ticks of 2/3 is
+        always precisely 2.
+    ]]
+    local ticksLeft = self._parasiteDotTicksLeft or 0
+
+    if ticksLeft <= 0 then
         self._parasiteDotActive = false
         return false
     end
+
+    self._parasiteDotTicksLeft = ticksLeft - 1
 
     -- Resolve the alien that applied the parasite; needed for the damage pipeline
     -- (damage attribution + friendly-fire rules). If it is gone or itself converted
@@ -69,6 +85,12 @@ local function ParasiteDotTick(self)
 
     if damage > 0 then
         self:TakeDamage(damage, attacker, attacker, point, nil, armorUsed, healthUsed, kParasiteDamageType, true)
+    end
+
+    -- That was the last instalment; the full 2 damage has now been dealt.
+    if self._parasiteDotTicksLeft <= 0 then
+        self._parasiteDotActive = false
+        return false
     end
 
     return kParasiteDotInterval
@@ -88,12 +110,18 @@ function Parasite:PostDoDamage(target, damage)
     local parent = self.GetParent and self:GetParent()
     if not parent or not GetAreEnemies(parent, target) then return end
 
-    -- Refresh (never stack) the timer, and start the ticking loop if not running.
-    target._parasiteDotEndTime    = Shared.GetTime() + kParasiteDotDuration
+    -- ALREADY RUNNING -> IGNORE COMPLETELY.
+    --
+    -- Previously the end time was rewritten on every hit, so re-parasiting extended the DoT to a
+    -- fresh 3 seconds each time. A target under sustained parasite fire could be held in the effect
+    -- indefinitely, which is the "resets/reapplies on reproc" behaviour that is not wanted. Bailing
+    -- out here means the current effect always runs exactly its 3 seconds and no longer, and a new
+    -- one can only start after it has ended.
+    if target._parasiteDotActive then return end
+
+    target._parasiteDotActive     = true
+    target._parasiteDotTicksLeft  = kParasiteDotTicks
     target._parasiteDotAttackerId = parent:GetId()
 
-    if not target._parasiteDotActive then
-        target._parasiteDotActive = true
-        target:AddTimedCallback(ParasiteDotTick, kParasiteDotInterval)
-    end
+    target:AddTimedCallback(ParasiteDotTick, kParasiteDotInterval)
 end
