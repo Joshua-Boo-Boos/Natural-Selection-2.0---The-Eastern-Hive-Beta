@@ -279,6 +279,12 @@ local function PerformAttackStructure( eyePos, target, lastSeenPos, bot, brain, 
         sighted = target:GetIsSighted()     --??? How does this make sense for BOTS, they're ServerWorld ONLY
     end
 
+    -- Unsighted target with no remembered position (e.g. a cloaked/unseen lifeform the bot never saw):
+    -- there is nothing valid to aim at, and lastSeenPos + Vector would throw. Skip this attack tick.
+    if not sighted and not lastSeenPos then
+        return
+    end
+
     local aimPos = sighted and GetBestAimPoint( target ) or (lastSeenPos + Vector(0,0.1,0))
     local dist = (eyePos - target:GetOrigin()):GetLength() --GetDistanceToTouch(eyePos, target)
     local doFire = false
@@ -390,6 +396,12 @@ local function PerformAttackEntity( eyePos, target, lastSeenPos, bot, brain, mov
         sighted = target:GetIsSighted()
     end
     
+    -- Unsighted target with no remembered position (e.g. a cloaked/unseen lifeform the bot never saw):
+    -- there is nothing valid to aim at, and lastSeenPos + Vector would throw. Skip this attack tick.
+    if not sighted and not lastSeenPos then
+        return
+    end
+
     local aimPos = sighted and GetBestAimPoint( target ) or (lastSeenPos + Vector(0,0.1,0))
     local dist = GetDistanceToTouch( eyePos, target )
     local doFire = false

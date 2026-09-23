@@ -483,8 +483,18 @@ end
 -- along with a closure to perform the action
 -- The order they are listed matters - actions near the beginning of the list get priority.
 ------------------------------------------
+Script.Load("lua/bots/TEH_AlienOrderAction.lua")
+
 kFadeBrainActions =
 {
+
+    ------------------------------------------
+    -- Alien Commander order
+    ------------------------------------------
+    CreateTEHAlienOrderAction(GetFadeActionBaselineWeight(kFadeBrainActionTypes.Order), PerformMove,
+        function(fade, target, lastSeenPos, bot, brain, move)
+            PerformAttackEntity( fade:GetEyePos(), target, bot, brain, move )
+        end),
 
     ------------------------------------------
     -- Debug Idle

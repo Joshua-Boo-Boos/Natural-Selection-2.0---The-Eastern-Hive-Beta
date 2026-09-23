@@ -32,6 +32,26 @@ function RecycleMixin:OnResearchComplete(researchId)
         -- the case.
         local finalRecycleAmount = math.round(amount * scalar)
 
+        -- COMBAT ENGINEERS structures were paid for entirely out of marines' PERSONAL resources,
+        -- tracked exactly on the structure as ceResSpent, and never cost the team a single team
+        -- resource. The vanilla figure above is therefore meaningless for them: it is derived from a
+        -- team-resource tech cost nobody paid. Refund a flat fraction of what was genuinely spent
+        -- instead, so 100 p-res of construction returns 20 t-res to the commander.
+        --
+        -- `amount` is re-pointed at the p-res total as well, because it is only used from here on to
+        -- report the SHORTFALL (amount - finalRecycleAmount) in the Recycle network message; leaving
+        -- it as the old team cost would make that message describe a completely unrelated number.
+        --
+        -- No health scalar is applied: this pays back a share of resources actually contributed, and
+        -- a half-built structure has already banked proportionally less in ceResSpent. Applying the
+        -- health scalar on top would penalise the same incompleteness twice.
+        if self.ceIsCombatEngineersStructure then
+
+            amount = self.ceResSpent or 0
+            finalRecycleAmount = math.round(amount * (kCombatEngineersRecycleRefundFraction or 0.20))
+
+        end
+
         self:GetTeam():AddTeamResources(finalRecycleAmount)
 
         self:GetTeam():PrintWorldTextForTeamInRange(kWorldTextMessageType.Resources, finalRecycleAmount, self:GetOrigin() + kWorldMessageResourceOffset, kResourceMessageRange)

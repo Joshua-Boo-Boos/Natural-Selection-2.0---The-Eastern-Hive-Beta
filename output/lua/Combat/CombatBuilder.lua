@@ -632,12 +632,16 @@ local function DropStructure(self, player, origin, direction, structureAbility, 
                 -- (Sentry, Supply Depot). CE structures are team property: registering them here
                 -- would let AddMarineStructure destroy the oldest one when a player placed another,
                 -- and would tear the team's base down when that player left.
-                if maxStructures and maxStructures > 0 then
-                    player:GetTeam():AddMarineStructure(player, structure,maxStructures)
-                end
-
                 -- Check for space
                 if structure:SpaceClearForEntity(coords.origin) then
+
+                    -- Registered only AFTER the space check. It used to happen before it, so a
+                    -- structure refused for lack of space was destroyed below while still sitting in
+                    -- the team's per-player structure list - a dangling entity reference that the
+                    -- team would later try to count or destroy again.
+                    if maxStructures and maxStructures > 0 then
+                        player:GetTeam():AddMarineStructure(player, structure,maxStructures)
+                    end
 
                     local angles = Angles()
                     angles:BuildFromCoords(coords)
@@ -765,6 +769,72 @@ end
 -- Given a gorge player's position and view angles, return a position and orientation
 -- for structure. Used to preview placement via a ghost structure and then to create it.
 -- Also returns bool if it's a valid position or not.
+--[[
+    ROLL-OUT CLEARANCE for structures that emit units.
+
+    A Robotics Factory puts the unit it builds 3.2m straight out in front of itself
+    (RoboticsFactory:GetPositionForEntity -> origin + zAxis * 3.2), so a factory placed facing a wall
+    spawns its ARC or MAC inside the wall. Vanilla already refuses such a placement - CheckValidExit
+    in BuildUtility.lua tests a Robotics Factory exit out to 5m - but that test lives inside
+    GetIsBuildLegal, and the Combat Builder validates placement through its own
+    CombatBuilder:GetPositionForStructure and never calls GetIsBuildLegal. So the check simply did
+    not exist on the Combat Engineers path, which is why a CE-placed factory could box its own ARC in.
+
+    The numbers here are vanilla's, copied deliberately so a CE-placed factory and a commander-placed
+    one agree about what counts as a legal spot: radius 0.5, height 0.5, lifted 0.1m off the floor,
+    traced against the AI movement mask. Radius 0.5 is the widest thing the factory produces - the ARC
+    and the MAC share a capsule radius of exactly 0.5 (ARC.kCapsuleRadius, MAC.kCapsuleRadius), so one
+    test covers both - and the 5m range is comfortably past the 3.2m spawn point, leaving the unit
+    somewhere to actually drive once it exists rather than only somewhere to appear.
+
+    Reimplemented rather than reused because GetIsStructureExitValid is a FILE-LOCAL in
+    BuildUtility.lua (`local function GetIsStructureExitValid`) and is unreachable from a hook.
+]]
+--[[
+    ONLY THE ROBOTICS FACTORY. Vanilla's CheckValidExit also tests a Phase Gate exit at 1.5m, and
+    matching it here would be one more line - deliberately not done, because the two structures fail
+    differently and only one of them actually needs protecting at placement time.
+
+    The Robotics Factory has NO runtime fallback. GetPositionForEntity returns origin + zAxis * 3.2
+    unconditionally: no room test, no alternative spot. If that point is inside a wall, the ARC is
+    inside the wall. Placement is the only chance to catch it.
+
+    A Phase Gate recovers on its own. GetDestinationOrigin (PhaseGate.lua) tests the intended spot and,
+    if it is occupied, searches seven positions along the gate's axis in BOTH directions within 1.5m
+    until it finds room. A cramped gate therefore degrades to "the marine arrives slightly offset"
+    rather than "the marine is stuck in geometry" - and a wall in front still leaves the offsets
+    behind it available.
+
+    Requiring 1.5m of clear space in front would forbid placements that work perfectly well today,
+    including the common flush-against-a-wall-facing-out gate that CE players rely on in tight
+    corridors. That is a real cost to players in exchange for preventing a failure the engine already
+    handles, so the check is scoped to the structure that genuinely cannot recover.
+]]
+local kCEStructureExitRange =
+{
+    [kTechId.RoboticsFactory] = 5,
+}
+
+local function GetCEStructureExitValid(techId, origin, facing)
+
+    local range = techId and kCEStructureExitRange[techId]
+    if not range or not origin or not facing then
+        return true
+    end
+
+    local capsuleRadius = 0.5
+    local capsuleHeight = 0.5
+    local groundOffset  = Vector(0, 0.1 + capsuleHeight / 2 + capsuleRadius, 0)
+
+    local startPoint = origin + groundOffset
+    local endPoint   = startPoint + facing * range
+
+    local trace = Shared.TraceCapsule(startPoint, endPoint, capsuleRadius, capsuleHeight,
+                                      CollisionRep.Move, PhysicsMask.AIMovement, nil)
+
+    return trace.fraction == 1
+end
+
 function CombatBuilder:GetPositionForStructure(startPosition, direction, structureAbility, lastClickedPosition, lastClickedNormal)
 
     PROFILE("CombatBuilder:GetPositionForStructure")
@@ -876,6 +946,21 @@ function CombatBuilder:GetPositionForStructure(startPosition, direction, structu
 
     if structureAbility.ModifyCoords then
         structureAbility:ModifyCoords(coords, lastClickedPosition)
+    end
+
+    -- Checked HERE, at the very end, rather than in GetIsPositionValid: the exit direction is the
+    -- structure's final facing, and that is only settled once `coords` has been built above. Running
+    -- it any earlier would test a direction the structure is not going to end up with. Both the
+    -- client's placement preview and the server's authoritative re-check come through this function,
+    -- so the ghost turns red for the player and the server refuses the drop, with one rule.
+    if validPosition then
+
+        local exitTechId = structureAbility.GetDropStructureId and structureAbility:GetDropStructureId()
+
+        if not GetCEStructureExitValid(exitTechId, coords.origin, coords.zAxis) then
+            validPosition = false
+        end
+
     end
 
     return coords, validPosition, hitEntity

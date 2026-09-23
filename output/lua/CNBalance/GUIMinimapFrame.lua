@@ -1,30 +1,66 @@
 -- ======= NS2.0-TEH-Beta: CNBalance/GUIMinimapFrame.lua =======
 --
--- CLIENT post-hook on lua/GUIMinimapFrame.lua. Renders the commander's team drawing on the
--- fullscreen map, drives the commander's draw/erase/clear input, and shows the header + current
--- mode. The drawing DATA lives in gGCLocalDrawing (kept in sync by CommMapTools_Client.lua); this
--- file only turns it into on-screen red marks and lets the commander add to / edit it.
+-- CLIENT post-hook on lua/GUIMinimapFrame.lua. Commander ORDER ICONS on the fullscreen map
+-- (replaces the old freehand commander drawing). The icon DATA lives in gGCLocalIcons (kept in sync
+-- by CommMapTools_Client.lua); this file draws the icons, the order wheel and the commander input.
 --
--- Input model (commander, while the fullscreen map is open):
---   * MIDDLE mouse cycles the MODE: Map Movement -> Drawing -> Erase -> Clear -> (repeat).
---   * LEFT mouse then does whatever the current mode is:
---       Map Movement -> the game's normal "pan the overhead view" (we don't touch it).
---       Drawing      -> freehand red drawing.
---       Erase        -> rubs out nearby marks.
---       Clear        -> a click wipes the whole drawing.
--- Left mouse is intercepted (so it doesn't also pan) ONLY in the drawing/erase/clear modes.
+-- Input (commander, while the fullscreen map is open):
+--   * HOLD MIDDLE mouse over the map: the order wheel opens at the cursor, and that cursor spot is
+--     remembered as where the order will be placed. While holding, move the cursor over an order and
+--     either RELEASE middle mouse or click LEFT mouse: that order's icon is placed at the remembered
+--     spot and the wheel closes. Releasing over nothing just closes the wheel.
+--   * With the wheel closed, left mouse and the scroll wheel behave as normal (pan / zoom).
+--   * RIGHT mouse: clear every order icon for the commander's team.
 --
--- Draw marks are added as CHILDREN of the minimap item and positioned with the engine's own
--- world->minimap transform (self:PlotToMap), exactly like blips, so they line up at any zoom.
--- Cursor->world uses the engine's own MinimapToWorld (the same call the spawn-select map uses),
--- so the drawing lands exactly under the cursor.
+-- Everyone on the commander's team sees the icons on their fullscreen map. Each icon has the order
+-- name underneath and a number (1, 2, 3... in placement order, across all orders) at its top-right, in the team colour
+-- (Marines blue / Kharaa orange).
+--
+-- Map icons are CHILDREN of the minimap item and positioned with the engine's own world->minimap
+-- transform (self:PlotToMap), exactly like blips, so they line up at any zoom.
 
 if not Client then return end
 
-local kHeaderLine1 = "Green - Commander's Order(s)"
+local kIconTexture   = "ui/buildmenu.dds"
+local kMapIconSize   = 50     -- on-map icon size (before GUIScale); was 40, +25%
+local kMapLayer      = 25
+local kWheelLayer    = kGUILayerBigMap + 3
+local kWheelInner    = 75     -- order wheel inner circle radius (before GUIScale)
+local kWheelOuter    = 175    -- order wheel outer circle radius
+local kWheelIconSize = 56
 
--- Mode order that MMB cycles through.
-local kModes = { "Map Movement", "Drawing", "Erase", "Clear" }
+-- The ring is drawn with TEXTURES (real circles, no rotated pieces): one texture per order slice
+-- (tinted individually for hover) plus one texture with the inner/outer circles and the dividers.
+-- The textures are 512x512 with the outer circle at radius 250 and the inner circle at
+-- 250 * kWheelInner / kWheelOuter, so kWheelInner/kWheelOuter must keep that 75:175 ratio.
+local kWheelSliceTextures = {
+    "ui/teh_orderwheel_slice1.dds", "ui/teh_orderwheel_slice2.dds", "ui/teh_orderwheel_slice3.dds",
+    "ui/teh_orderwheel_slice4.dds", "ui/teh_orderwheel_slice5.dds",
+}
+for i = 1, #kWheelSliceTextures do PrecacheAsset(kWheelSliceTextures[i]) end
+local kWheelLinesTexture = PrecacheAsset("ui/teh_orderwheel_lines.dds")
+local kTextureOuterRadiusFraction = 250 / 256   -- outer circle radius / half the texture size
+
+-- Team colours. text = order names / counts / legend; slice = wheel background; hover = the slice
+-- under the cursor; line = circles + dividers.
+local kTeamColours = {
+    [1] = {   -- Marines blue
+        text  = Color(0.40, 0.90, 1.00, 1),      -- brighter, slightly turquoise blue
+        slice = Color(0.03, 0.15, 0.24, 0.82),
+        hover = Color(0.14, 0.60, 0.82, 0.92),
+        line  = Color(0.50, 0.93, 1.00, 0.9),
+    },
+    [2] = {   -- Kharaa orange
+        text  = Color(1.00, 0.52, 0.06, 1),      -- slightly more orange
+        slice = Color(0.27, 0.10, 0.01, 0.82),
+        hover = Color(0.88, 0.38, 0.02, 0.92),
+        line  = Color(1.00, 0.58, 0.12, 0.9),
+    },
+}
+
+local function GetTeamColours()
+    return kTeamColours[Client.GetLocalClientTeamNumber()] or kTeamColours[2]
+end
 
 local function IsLocalCommander()
     local p = Client.GetLocalPlayer()
@@ -37,16 +73,27 @@ local function IsBigMapOpen(self)
         and self:GetBackground():GetIsVisible()
 end
 
-local function CurrentMode(self)
-    return kModes[self._gcModeIndex or 1]
+local function IsOnPlayingTeam()
+    local n = Client.GetLocalClientTeamNumber()
+    return n == kTeam1Index or n == kTeam2Index
 end
 
--- Screen cursor -> world (x,z) by INVERTING GUIMinimap:PlotToMap - the SAME transform used to
--- render the marks. (The engine's MinimapToWorld uses a different, heightmap-based mapping, so
--- pairing it with PlotToMap put the drawing far from the cursor.) The marks are children of the
--- minimap item, so PlotToMap outputs item-local coordinates; the cursor's item-local position is
--- just (cursor - item's top-left screen position), because the zoom is baked into the plot factors
--- (the item's own GUIItem scale is 1). Inverting PlotToMap on that lands the point under the cursor.
+local function GetOrders()
+    return kGCommMap.Orders[Client.GetLocalClientTeamNumber()] or kGCommMap.Orders[kTeam2Index]
+end
+
+-- Button-atlas pixel coords for an order entry (same atlas and maths as the commander buttons).
+local function SetOrderIcon(item, entry)
+    item:SetTexture(kIconTexture)
+    local techId = entry and kTechId and kTechId[entry.tech]
+    local coords = techId and GetTextureCoordinatesForIcon(techId)
+    if coords then
+        item:SetTexturePixelCoordinates(GUIUnpackCoords(coords))
+    end
+end
+
+-- Screen cursor -> world (x,z) by INVERTING GUIMinimap:PlotToMap - the SAME transform used to render
+-- the icons (MinimapToWorld uses a different, heightmap-based mapping that lands off the cursor).
 local function CursorToWorld(self)
     local item = self.minimap
     if not item then return nil end
@@ -57,14 +104,12 @@ local function CursorToWorld(self)
     local localY = my - sp.y
 
     if Client.legacyMinimap then
-        -- PlotToMap (legacy): localX = (posZ+constY)*linY ; localY = -(posX+constX)*linX
         if not (self.plotToMapLinX and self.plotToMapLinY)
            or self.plotToMapLinX == 0 or self.plotToMapLinY == 0 then return nil end
         local posZ =  localX / self.plotToMapLinY - self.plotToMapConstY
         local posX = -localY / self.plotToMapLinX - self.plotToMapConstX
         return Vector(posX, 0, posZ)
     else
-        -- PlotToMap: localX = (posZ+plotZOffset)*plotZFactor ; localY = (posX+plotXOffset)*plotXFactor
         if not (self.plotXFactor and self.plotZFactor)
            or self.plotXFactor == 0 or self.plotZFactor == 0 then return nil end
         local posZ = localX / self.plotZFactor - self.plotZOffset
@@ -73,278 +118,320 @@ local function CursorToWorld(self)
     end
 end
 
-local function BreakStroke(self)
-    if self._gcDrewLast then
-        Client.SendNetworkMessage("GC_Draw",
-            { position = Vector(0, 0, 0), erase = false, penUp = true }, true)
-        self._gcDrewLast = false
+-- ---- Order wheel ---------------------------------------------------------------------------------
+local function NewScreenGraphic(layer, texture)
+    local it = GetGUIManager():CreateGraphicItem()
+    it:SetAnchor(GUIItem.Left, GUIItem.Top)
+    it:SetLayer(layer)
+    if texture then it:SetTexture(texture) end
+    it:SetIsVisible(false)
+    return it
+end
+
+local function EnsureWheel(self, count)
+    if self._gcWheel then return end
+    local wheel = { slices = {}, icons = {}, labels = {} }
+    for i = 1, count do
+        wheel.slices[i] = NewScreenGraphic(kWheelLayer, kWheelSliceTextures[i])
+        wheel.icons[i]  = NewScreenGraphic(kWheelLayer + 2)
+
+        local label = GetGUIManager():CreateTextItem()
+        label:SetAnchor(GUIItem.Left, GUIItem.Top)
+        label:SetFontName(Fonts.kAgencyFB_Small)
+        label:SetTextAlignmentX(GUIItem.Align_Center)
+        label:SetTextAlignmentY(GUIItem.Align_Min)
+        label:SetLayer(kWheelLayer + 2)
+        label:SetIsVisible(false)
+        wheel.labels[i] = label
     end
-    self._gcLastSample = nil
+    wheel.lines = NewScreenGraphic(kWheelLayer + 1, kWheelLinesTexture)
+    self._gcWheel = wheel
 end
 
-function GUIMinimapFrame:GCCycleMode()
-    self._gcModeIndex = ((self._gcModeIndex or 1) % #kModes) + 1
-    self._gcLmb = false
-    BreakStroke(self)   -- end any in-progress stroke when the mode changes
+-- Segment index (1..count) for a screen angle measured from the wheel centre. Segment 1 is centred
+-- at the top and they go clockwise - the same layout the slice textures were generated with.
+local function SegmentForAngle(angle, count)
+    local step = 2 * math.pi / count
+    local a = (angle + math.pi * 0.5 + step * 0.5) % (2 * math.pi)
+    return math.floor(a / step) + 1
 end
 
--- Intercept the mode/draw buttons on the OPEN map. LEFT mouse is only consumed in the modes that
--- act on it (so "Map Movement" keeps the game's normal LMB pan). MIDDLE mouse cycles the mode
--- (it is the commander ping when the map is closed, which we leave alone).
+-- Which segment the cursor points at, or nil if the cursor is inside the inner circle. Anything
+-- beyond the outer circle still counts: only the ANGLE decides the order once past the inner circle.
+local function WheelSegmentAtCursor(self)
+    local count = math.min(#GetOrders(), #kWheelSliceTextures)
+    local cx, cy = self._gcWheelX, self._gcWheelY
+    if not cx or count == 0 then return nil end
+    local mx, my = Client.GetCursorPosScreen()
+    local dx, dy = mx - cx, my - cy
+    local r = math.sqrt(dx * dx + dy * dy)
+    if r < GUIScale(kWheelInner) then return nil end
+    return SegmentForAngle(math.atan2(dy, dx), count)
+end
+
+local function HideWheel(self)
+    local wheel = self._gcWheel
+    if not wheel then return end
+    for i = 1, #wheel.slices do
+        wheel.slices[i]:SetIsVisible(false)
+        wheel.icons[i]:SetIsVisible(false)
+        wheel.labels[i]:SetIsVisible(false)
+    end
+    wheel.lines:SetIsVisible(false)
+end
+
+local function CloseWheel(self)
+    self._gcWheelOpen = false
+    self._gcPlaceAt = nil
+    HideWheel(self)
+end
+
+-- Opens the wheel at the cursor and remembers the world spot under the cursor as the placement point.
+local function OpenWheel(self)
+    local mx, my = Client.GetCursorPosScreen()
+    if not GUIItemContainsPoint(self.minimap, mx, my) then return end
+    local world = CursorToWorld(self)
+    if not world then return end
+    self._gcWheelX, self._gcWheelY = mx, my
+    self._gcPlaceAt = world
+    self._gcWheelOpen = true
+end
+
+-- If the cursor is on an order, place that order at the remembered spot. Always closes the wheel.
+local function ChooseAndClose(self)
+    local idx = WheelSegmentAtCursor(self)
+    if idx and self._gcPlaceAt then
+        Client.SendNetworkMessage("GC_Icon",
+            { position = self._gcPlaceAt, order = idx, size = kGCommMap.DefaultIconSize }, true)
+    end
+    CloseWheel(self)
+end
+
+local function UpdateWheel(self)
+    local orders = GetOrders()
+    local count = math.min(#orders, #kWheelSliceTextures)
+    if not self._gcWheelOpen or count == 0 then
+        HideWheel(self)
+        return
+    end
+    EnsureWheel(self, count)
+    local wheel = self._gcWheel
+    local colours = GetTeamColours()
+
+    local cx, cy = self._gcWheelX, self._gcWheelY
+    local inner, outer = GUIScale(kWheelInner), GUIScale(kWheelOuter)
+    local midR = (inner + outer) * 0.5
+    local hovered = WheelSegmentAtCursor(self)
+
+    -- Every wheel texture is the same square, centred on the wheel centre.
+    local texSize = (outer / kTextureOuterRadiusFraction) * 2
+    local texPos = Vector(cx - texSize * 0.5, cy - texSize * 0.5, 0)
+    local texVec = Vector(texSize, texSize, 0)
+
+    wheel.lines:SetSize(texVec)
+    wheel.lines:SetPosition(texPos)
+    wheel.lines:SetColor(colours.line)
+    wheel.lines:SetIsVisible(true)
+
+    local step = 2 * math.pi / count
+    local iconSize = GUIScale(kWheelIconSize)
+    for i = 1, count do
+        local slice = wheel.slices[i]
+        slice:SetSize(texVec)
+        slice:SetPosition(texPos)
+        slice:SetColor((i == hovered) and colours.hover or colours.slice)
+        slice:SetIsVisible(true)
+
+        -- Icon + name in the band between the two circles, nudged up a little so the pair sits centred.
+        local a = -math.pi * 0.5 + (i - 1) * step
+        local px, py = cx + math.cos(a) * midR, cy + math.sin(a) * midR
+
+        local icon = wheel.icons[i]
+        SetOrderIcon(icon, orders[i])
+        icon:SetColor(Color(1, 1, 1, 1))
+        icon:SetSize(Vector(iconSize, iconSize, 0))
+        icon:SetPosition(Vector(px - iconSize * 0.5, py - iconSize * 0.80, 0))
+        icon:SetIsVisible(true)
+
+        local label = wheel.labels[i]
+        label:SetText(orders[i].name)
+        label:SetColor(colours.text)
+        label:SetScale(GUIScale(Vector(1.0, 1.0, 1)))
+        label:SetPosition(Vector(px, py + iconSize * 0.12, 0))
+        label:SetIsVisible(true)
+    end
+end
+
+-- ---- Input ---------------------------------------------------------------------------------------
 local baseSendKeyEvent = GUIMinimapFrame.SendKeyEvent
 function GUIMinimapFrame:SendKeyEvent(key, down)
 
     if InputKey and IsLocalCommander() and IsBigMapOpen(self) then
 
-        if key == InputKey.MouseButton2 then          -- MIDDLE: cycle mode
-            if down then self:GCCycleMode() end
-            self:UpdatePlayerMinimapVisible()
+        if key == InputKey.MouseButton2 then                  -- MIDDLE: hold = wheel, release = choose
+            if down then
+                if not self._gcWheelOpen then
+                    OpenWheel(self)
+                end
+            elseif self._gcWheelOpen then
+                ChooseAndClose(self)
+            end
             return true
 
-        elseif key == InputKey.MouseButton0 then       -- LEFT: act per current mode
-            local mode = CurrentMode(self)
-            if mode == "Drawing" or mode == "Erase" then
-                self._gcLmb = down
-                if not down then BreakStroke(self) end
-                self:UpdatePlayerMinimapVisible()
-                return true
-            elseif mode == "Clear" then
-                if down then Client.SendNetworkMessage("GC_DrawClear", {}, true) end
-                self:UpdatePlayerMinimapVisible()
-                return true
+        elseif key == InputKey.MouseButton0 and self._gcWheelOpen then   -- LEFT while the wheel is open
+            if down then
+                ChooseAndClose(self)
             end
-            -- "Map Movement": fall through so the base pans the overhead view as normal.
+            return true                                        -- never pan/select through the wheel
+
+        elseif key == InputKey.MouseButton1 then              -- RIGHT: clear all team icons
+            if down then
+                Client.SendNetworkMessage("GC_DrawClear", {}, true)
+            end
+            return true
         end
     end
 
     return baseSendKeyEvent(self, key, down)
 end
 
--- ---- Header + mode text (created lazily, toggled with the big map). ----------------------------
--- Non-commanders get a single top-centre legend. The COMMANDER gets a stacked, multi-colour block
--- anchored bottom-right and sat ABOVE the button grid / armour+weapons icons, so nothing clips.
+-- ---- Header + hint text (created lazily, toggled with the big map) -------------------------------
 local function EnsureHeader(self)
-    if self._gcTop then return end
+    if self._gcMmb then return end
     local gui = GetGUIManager()
 
-    -- Top-centre legend for non-commander players.
-    local top = gui:CreateTextItem()
-    top:SetAnchor(GUIItem.Middle, GUIItem.Top)
-    top:SetFontName(Fonts.kAgencyFB_Medium)
-    top:SetTextAlignmentX(GUIItem.Align_Center)
-    top:SetTextAlignmentY(GUIItem.Align_Min)
-    top:SetScale(GUIScale(Vector(1, 1, 1)))
-    top:SetPosition(Vector(0, GUIScale(90), 0))   -- midway between the old 60 (clipped) and 120 (too low)
-    top:SetLayer(kGUILayerBigMap + 1)
-    top:SetColor(kGCommMap.DrawColour)
-    top:SetText(kHeaderLine1)
-    top:SetIsVisible(false)
-    self._gcTop = top
-
-    -- Bottom-right stacked guidance for the commander. Distinct colour per line so the separate
-    -- sentences read clearly. Row 0 is highest; the block sits ~280-360px above the bottom edge.
+    -- Bottom-right stacked guidance for the commander (no "Commander's Order(s)" heading).
     local kBlue  = Color(0.45, 0.85, 1.0, 1)
-    local kAmber = Color(1.0, 0.82, 0.30, 1)
-    local kWhite = Color(1, 1, 1, 1)   -- LMB hint (green is now the drawing colour, so use white)
+    local kWhite = Color(1, 1, 1, 1)
 
-    local function makeRight(row, font, colour)
+    local function makeRight(row, font, colour, text)
         local t = gui:CreateTextItem()
         t:SetAnchor(GUIItem.Right, GUIItem.Bottom)
         t:SetFontName(font)
-        t:SetTextAlignmentX(GUIItem.Align_Max)     -- right-aligned to the screen edge
+        t:SetTextAlignmentX(GUIItem.Align_Max)
         t:SetTextAlignmentY(GUIItem.Align_Min)
         t:SetScale(GUIScale(Vector(1, 1, 1)))
         t:SetPosition(Vector(-GUIScale(24), -GUIScale(360) + GUIScale(26) * row, 0))
         t:SetLayer(kGUILayerBigMap + 1)
-        t:SetColor(colour)
+        if colour then t:SetColor(colour) end
+        if text then t:SetText(text) end
         t:SetIsVisible(false)
         return t
     end
 
-    self._gcLegend  = makeRight(0, Fonts.kAgencyFB_Medium, kGCommMap.DrawColour)
-    self._gcLegend:SetText(kHeaderLine1)
-    self._gcModeText = makeRight(1, Fonts.kAgencyFB_Medium, kAmber)   -- "Mode: X" (dynamic)
-    self._gcMmb     = makeRight(2, Fonts.kAgencyFB_Small, kBlue)
-    self._gcMmb:SetText("MMB: Change Mode")
-    self._gcLmbHint = makeRight(3, Fonts.kAgencyFB_Small, kWhite)
-    self._gcLmbHint:SetText("LMB: Use Selected Mode")
+    self._gcMmb     = makeRight(1, Fonts.kAgencyFB_Small, kBlue,  "Hold MMB: Order Wheel")
+    self._gcLmbHint = makeRight(2, Fonts.kAgencyFB_Small, kWhite, "Release MMB / LMB on an order: Place it")
+    self._gcRmbHint = makeRight(3, Fonts.kAgencyFB_Small, kWhite, "RMB: Clear All Orders")
 end
 
--- Only players ON a playing team see that team's drawing (Marine sees Marine, Alien sees Alien);
--- ready-room and spectators see neither the marks nor the legend.
-local function IsOnPlayingTeam()
-    local n = Client.GetLocalClientTeamNumber()
-    return n == kTeam1Index or n == kTeam2Index
+-- ---- On-map icon pool (children of the minimap item) ---------------------------------------------
+local function EnsureMapIcon(self, n)
+    self._gcIcons = self._gcIcons or {}
+    local e = self._gcIcons[n]
+    if e then return e end
+    local gui = GetGUIManager()
+    local parent = self:GetMinimapItem()
+
+    local icon = gui:CreateGraphicItem()
+    icon:SetLayer(kMapLayer)
+    parent:AddChild(icon)
+
+    local count = gui:CreateTextItem()
+    count:SetFontName(Fonts.kAgencyFB_Small)
+    count:SetTextAlignmentX(GUIItem.Align_Min)
+    count:SetTextAlignmentY(GUIItem.Align_Max)
+    count:SetLayer(kMapLayer + 1)
+    parent:AddChild(count)
+
+    local name = gui:CreateTextItem()
+    name:SetFontName(Fonts.kAgencyFB_Small)
+    name:SetTextAlignmentX(GUIItem.Align_Center)
+    name:SetTextAlignmentY(GUIItem.Align_Min)
+    name:SetLayer(kMapLayer + 1)
+    parent:AddChild(name)
+
+    e = { icon = icon, count = count, name = name }
+    self._gcIcons[n] = e
+    return e
 end
 
--- ---- Draw-mark pool (children of the minimap item) ----------------------------------------------
--- A stroke is rendered as ONE line SEGMENT between each pair of consecutive points (plus one dot at
--- each stroke start, so single-point strokes still show). This is ~1 GUIItem per DRAWN point,
--- versus ~10 for the old interpolated-dot line - crucial because NS2 hard-caps the WHOLE GUI at
--- 5000 items. Curves stay smooth because the points are sampled finely (each segment is short).
--- Rendering is INCREMENTAL: normal drawing only appends items for the new points; a full rebuild
--- happens only on a structural change (clear / erase) or when the map (re)opens. Positions use the
--- engine's own PlotToMap and the segment orientation copies NS2's minimap connection-line maths.
-local kDrawLayer = 25
-local kMaxMarks  = 3000   -- well under the engine's 5000 total-GUIItem cap (leaves room for the HUD)
-
--- Default (top-left) self-anchor, so positions are relative to the minimap's top-left - matching
--- how CursorToWorld inverts the cursor. (A Middle/Center anchor is parent-CENTRE relative and put
--- the drawing ~half a map off from the cursor.) We centre each item on its point manually.
-local function GCEnsure(self, n)
-    local it = self._gcMarks[n]
-    if not it then
-        it = GetGUIManager():CreateGraphicItem()
-        it:SetColor(kGCommMap.DrawColour)
-        it:SetLayer(kDrawLayer)
-        self:GetMinimapItem():AddChild(it)
-        self._gcMarks[n] = it
+local function HideMapIcons(self, fromIdx)
+    if not self._gcIcons then return end
+    for i = fromIdx or 1, #self._gcIcons do
+        local e = self._gcIcons[i]
+        e.icon:SetIsVisible(false)
+        e.count:SetIsVisible(false)
+        e.name:SetIsVisible(false)
     end
-    return it
 end
 
--- A dot centred at (x,y) (stroke starts / single points).
-local function GCDot(self, x, y)
-    if (self._gcMarkN or 0) >= kMaxMarks then return end
-    self._gcMarkN = self._gcMarkN + 1
-    local t = self._gcThickness
-    local it = GCEnsure(self, self._gcMarkN)
-    it:SetRotationOffset(Vector(0, 0, 0))
-    it:SetRotation(Vector(0, 0, 0))
-    it:SetSize(Vector(t, t, 0))
-    it:SetPosition(Vector(x - t * 0.5, y - t * 0.5, 0))
-    it:SetIsVisible(true)
-end
+-- Positions are recomputed every frame the map is open, so icons follow zoom / pan changes.
+local function RenderMapIcons(self)
+    local orders = GetOrders()
+    local colours = GetTeamColours()
+    local size = GUIScale(kMapIconSize)
+    local n = 0
+    for i = 1, #gGCLocalIcons do
+        local data = gGCLocalIcons[i]
+        local entry = orders[data.order]
+        if entry and data.pos then
+            n = n + 1
+            local e = EnsureMapIcon(self, n)
+            local mx, my = self:PlotToMap(data.pos.x, data.pos.z)
 
--- A line segment from A(ax,ay) to B(bx,by): a rectangle centred on the segment midpoint and rotated
--- to the segment angle, pivoting about its own centre (all in the minimap's top-left space).
-local function GCSeg(self, ax, ay, bx, by)
-    if (self._gcMarkN or 0) >= kMaxMarks then return end
-    local dx, dy = bx - ax, by - ay
-    local length = math.sqrt(dx * dx + dy * dy)
-    if length < 0.001 then return end
-    self._gcMarkN = self._gcMarkN + 1
-    local it = GCEnsure(self, self._gcMarkN)
+            SetOrderIcon(e.icon, entry)
+            e.icon:SetColor(colours.text)   -- tinted Marines blue / Kharaa orange for the viewer's team
+            e.icon:SetSize(Vector(size, size, 0))
+            e.icon:SetPosition(Vector(mx - size * 0.5, my - size * 0.5, 0))
+            e.icon:SetIsVisible(true)
 
-    local t = self._gcThickness
-    local mx, my = (ax + bx) * 0.5, (ay + by) * 0.5
-    it:SetSize(Vector(length, t, 0))
-    it:SetPosition(Vector(mx - length * 0.5, my - t * 0.5, 0))   -- top-left so the rect is centred on M
-    it:SetRotationOffset(Vector(length * 0.5, t * 0.5, 0))        -- pivot = the rectangle's centre
-    it:SetRotation(Vector(0, 0, math.atan2(dy, dx)))
-    it:SetIsVisible(true)
-end
+            e.count:SetText(tostring(n))   -- chronological: 1, 2, 3... across ALL orders until cleared
+            e.count:SetColor(colours.text)
+            e.count:SetScale(GUIScale(Vector(1.0625, 1.0625, 1)))   -- 1.25 - 15%
+            e.count:SetPosition(Vector(mx + size * 0.40, my - size * 0.22, 0))
+            e.count:SetIsVisible(true)
 
-local function GCComputeSizes(self)
-    local pf = (math.abs(self.plotXFactor or 1) + math.abs(self.plotZFactor or 1)) * 0.5
-    self._gcThickness = math.max(3, kGCommMap.MinDrawStep * 1.6 * pf)
-end
-
--- Render entries [fromIdx .. end], appending marks and continuing the current stroke.
-local function GCRenderRange(self, fromIdx)
-    for i = fromIdx, #gGCLocalDrawing do
-        local e = gGCLocalDrawing[i]
-        if e.penUp or not e.pos then
-            self._gcPrevX, self._gcPrevY = nil, nil
-        else
-            local mx, my = self:PlotToMap(e.pos.x, e.pos.z)
-            if not self._gcPrevX then
-                GCDot(self, mx, my)                       -- stroke start / single point
-            else
-                GCSeg(self, self._gcPrevX, self._gcPrevY, mx, my)
-            end
-            self._gcPrevX, self._gcPrevY = mx, my
+            e.name:SetText(string.upper(entry.name))
+            e.name:SetColor(colours.text)
+            e.name:SetScale(GUIScale(Vector(0.935, 0.935, 1)))       -- 1.1 - 15%
+            e.name:SetPosition(Vector(mx, my + size * 0.40, 0))   -- a little closer to the icon
+            e.name:SetIsVisible(true)
         end
     end
-    self._gcSrcRendered = #gGCLocalDrawing
+    HideMapIcons(self, n + 1)
 end
 
-local function GCFullRebuild(self)
-    self._gcMarks = self._gcMarks or {}
-    GCComputeSizes(self)
-    self._gcMarkN = 0
-    self._gcPrevX, self._gcPrevY = nil, nil
-    GCRenderRange(self, 1)
-    for i = (self._gcMarkN or 0) + 1, #self._gcMarks do   -- hide leftovers from a larger drawing
-        self._gcMarks[i]:SetIsVisible(false)
-    end
-end
-
-local function GCSyncMarks(self)
-    self._gcMarks = self._gcMarks or {}
-    if self._gcRenderStruct ~= gGCDrawStructVersion or self._gcRenderVer == nil then
-        GCFullRebuild(self)
-        self._gcRenderStruct = gGCDrawStructVersion
-    elseif self._gcRenderVer ~= gGCDrawVersion then
-        GCComputeSizes(self)
-        GCRenderRange(self, (self._gcSrcRendered or 0) + 1)
-    end
-    self._gcRenderVer = gGCDrawVersion
-end
-
-local function GCHideMarks(self)
-    if not self._gcMarks then return end
-    for i = 1, #self._gcMarks do
-        self._gcMarks[i]:SetIsVisible(false)
-    end
-end
-
--- ---- Main per-frame driver. --------------------------------------------------------------------
+-- ---- Main per-frame driver -----------------------------------------------------------------------
 local function UpdateOverlay(self)
 
-    -- "Showing" requires the big map open AND the local player on a playing team. Ready-room and
-    -- spectators see no drawing and no legend.
-    local onTeam = IsOnPlayingTeam()
-    local show   = IsBigMapOpen(self) and onTeam
+    -- Only players ON a playing team see that team's icons; ready room / spectators see nothing.
+    local show = IsBigMapOpen(self) and IsOnPlayingTeam()
 
-    -- On the open edge, ask the server to (re)send this team's persisted drawing and force a full
-    -- rebuild once it arrives.
+    -- On the open edge, ask the server to (re)send this team's stored icons.
     if show and not self._gcWasShowing then
         Client.SendNetworkMessage("GC_DrawRequest", {}, true)
-        self._gcRenderVer = nil
     end
     self._gcWasShowing = show
 
     EnsureHeader(self)
-    local isComm = IsLocalCommander()   -- a commander is always on a playing team
-    self._gcTop:SetIsVisible(show and not isComm)
+
+    local isComm = IsLocalCommander()
     local showComm = show and isComm
-    self._gcLegend:SetIsVisible(showComm)
-    self._gcModeText:SetIsVisible(showComm)
-    self._gcMmb:SetIsVisible(showComm)
-    self._gcLmbHint:SetIsVisible(showComm)
-    if showComm then
-        self._gcModeText:SetText("Mode: " .. CurrentMode(self))
+    self._gcMmb:SetColor(GetTeamColours().text)   -- MMB hint in the team colour
+    for _, t in ipairs({ self._gcMmb, self._gcLmbHint, self._gcRmbHint }) do
+        t:SetIsVisible(showComm)
     end
 
+    if not show or not isComm then
+        CloseWheel(self)
+    end
     if not show then
-        GCHideMarks(self)
-        self._gcLmb = false
-        BreakStroke(self)
+        HideMapIcons(self)
         return
     end
 
-    GCSyncMarks(self)
-
-    -- Commander drawing / erasing while LMB is held in the matching mode (throttled by MinDrawStep).
-    if isComm and self._gcLmb then
-        local mode = CurrentMode(self)
-        if mode == "Drawing" or mode == "Erase" then
-            local world = CursorToWorld(self)
-            if world then
-                local stepSq = kGCommMap.MinDrawStep * kGCommMap.MinDrawStep
-                local last = self._gcLastSample
-                if not last or ((world.x - last.x) ^ 2 + (world.z - last.z) ^ 2) >= stepSq then
-                    self._gcLastSample = world
-                    -- Reliable so every point reaches the server (stored + replayed identically),
-                    -- avoiding dropped points that would vanish on the next map re-open.
-                    Client.SendNetworkMessage("GC_Draw",
-                        { position = world, erase = (mode == "Erase"), penUp = false }, true)
-                end
-            end
-            self._gcDrewLast = true
-        end
-    end
+    RenderMapIcons(self)
+    UpdateWheel(self)
 end
 
 local baseUpdate = GUIMinimapFrame.Update

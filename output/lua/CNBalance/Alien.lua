@@ -45,6 +45,33 @@ function Alien:OnInitialized()
     if not HasMixin(self, "PrimalScream") then
         InitMixin(self, PrimalScreamMixin)
     end
+
+    -- Alien Commander orders. Vanilla only gives OrdersMixin to hallucinations; like theirs, the
+    -- mixin's network field is NOT added, so no class is re-linked (orders are server-side).
+    if not HasMixin(self, "Orders") then
+        InitMixin(self, OrdersMixin, { kMoveOrderCompleteDistance = kPlayerMoveOrderCompleteDistance })
+    end
+end
+
+-- Right-click orders from the Alien Commander, mirroring Marine:OnOverrideOrder: defend a friendly
+-- target, attack a sighted enemy, otherwise move. Gorges also get Construct / Heal (Lifeforms/Gorge.lua).
+function Alien:OnOverrideOrder(order)
+
+    if order:GetType() ~= kTechId.Default then
+        return
+    end
+
+    local orderTarget = Shared.GetEntity(order:GetParam())
+
+    if GetOrderTargetIsDefendTarget(order, self:GetTeamNumber()) then
+        order:SetType(kTechId.Defend)
+    elseif orderTarget and GetAreEnemies(orderTarget, self) and HasMixin(orderTarget, "Live") and orderTarget:GetIsAlive()
+            and (not HasMixin(orderTarget, "LOS") or orderTarget:GetIsSighted()) then
+        order:SetType(kTechId.Attack)
+    else
+        order:SetType(kTechId.Move)
+    end
+
 end
 
 -- Real enzyme always wins over PrimalScream. Hook the server-side

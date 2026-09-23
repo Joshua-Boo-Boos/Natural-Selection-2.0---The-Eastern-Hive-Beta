@@ -34,7 +34,7 @@ kExoSpecialMode = enum({ 'Railgun', 'Flamethrower' })
 -- TraceBox loop (the same technique Combat/Cannon.lua's own FireOnePellet
 -- pierce branch already used, built from this exact vanilla function).
 local kRailgunVanillaChargeTime = 2
-Railgun.kChargeTime             = kRailgunVanillaChargeTime * (2 / 3)   -- ~1.3333s: 2/3 of vanilla's charge time
+Railgun.kChargeTime             = kRailgunVanillaChargeTime              -- 2s, same as vanilla (was 2/3 of it, ~1.3333s)
 local kRailgunChargeForceShoot  = Railgun.kChargeTime * 1.1             -- same 1.1x proportion as vanilla's 2.2/2
 Railgun.kBurstShots             = 3
 Railgun.kBurstShotInterval      = 0.1     -- matches Cannon's own burst cadence
@@ -279,12 +279,31 @@ function Flame:GetDeathIconIndex()
 end
 
 -- ── Step 3: Wrap Railgun:OnPrimaryAttack ─────────────────────────────────────
+-- A single Railgun Exo (Railgun + Claw) waits 15% longer between shots than vanilla's 1.4s post-shot
+-- lockout (Railgun.lua's file-local kRailgunChargeTime, unreachable from here). Dual-Railgun Exos and
+-- the Exo flamethrower mode keep their timings.
+local kRailgunVanillaShotLockout = 1.4
+local kSingleRailgunShotLockout  = kRailgunVanillaShotLockout * 1.15
+
+local function GetIsSingleRailgunExo(self, player)
+    local holder = player and player.GetActiveWeapon and player:GetActiveWeapon()
+    if not holder or not holder.GetLeftSlotWeapon then
+        return false
+    end
+    local otherSlotWeapon = self:GetIsLeftSlot() and holder:GetRightSlotWeapon() or holder:GetLeftSlotWeapon()
+    return otherSlotWeapon ~= nil and otherSlotWeapon:isa("Claw")
+end
+
 local baseOnPrimaryAttack = Railgun.OnPrimaryAttack
 function Railgun:OnPrimaryAttack(player)
 
     local mode = self:GetWeaponMode()
 
     if mode == kExoSpecialMode.Railgun then
+        if not self.railgunAttacking and GetIsSingleRailgunExo(self, player)
+                and self.timeOfLastShot + kSingleRailgunShotLockout > Shared.GetTime() then
+            return
+        end
         baseOnPrimaryAttack(self, player)
 
     elseif mode == kExoSpecialMode.Flamethrower then

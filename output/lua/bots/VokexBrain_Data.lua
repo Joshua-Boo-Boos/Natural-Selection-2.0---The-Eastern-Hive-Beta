@@ -311,8 +311,18 @@ local kExecAttackAction = function(move, bot, brain, vokex, action)
     PerformAttack( vokex:GetEyePos(), action.bestMem, bot, brain, move )
 end
 
+Script.Load("lua/bots/TEH_AlienOrderAction.lua")
+
 kVokexBrainActions =
 {
+    ------------------------------------------
+    -- Alien Commander order
+    ------------------------------------------
+    CreateTEHAlienOrderAction(GetVokexActionBaselineWeight(kVokexBrainActionTypes.Order), PerformMove,
+        function(vokex, target, lastSeenPos, bot, brain, move)
+            PerformAttackEntity( vokex:GetEyePos(), target, bot, brain, move )
+        end),
+
     ------------------------------------------
     -- Attack
     ------------------------------------------

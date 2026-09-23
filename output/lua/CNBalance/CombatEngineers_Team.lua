@@ -459,6 +459,7 @@ end
 local function GetCETrackLabs(self)
 
     local armor, weapon = {}, {}
+    local untracked = {}
 
     for _, armsLab in ipairs(GetEntitiesForTeam("ArmsLab", self:GetTeamNumber())) do
 
@@ -471,8 +472,42 @@ local function GetCETrackLabs(self)
                 table.insert(armor, armsLab)
             elseif track == "weapon" then
                 table.insert(weapon, armsLab)
+            else
+                table.insert(untracked, armsLab)
             end
 
+        end
+
+    end
+
+    --[[
+        ADOPT ANY ARMS LAB THAT HAS NO TRACK.
+
+        ceTrackIndex is stamped in CombatBuilder.lua from the build-menu entry the player chose, so
+        it is only ever set for a lab placed through the Combat Builder. A lab that arrives by ANY
+        other route carries none: a console/cheat spawn, a map prefab, a commander-placed lab from
+        before Combat Engineers was researched, or a lab that predates this system in a running round.
+
+        Such a lab used to fall into neither track list, and the consequences were silent and total -
+        it never researched anything, it never counted toward either level, and its hover name fell
+        through to a bare "Arms Lab" with no status line. Nothing reported an error; the lab simply
+        stood there doing nothing forever.
+
+        Adopting it into the track with fewer labs (weapons on a tie, so a lone adopted lab does
+        something useful immediately) means the mode works no matter how the lab came to exist. The
+        assignment is written back to ceTrackIndex, which is networked, so the name and the status
+        line start showing correctly on the very next update rather than only after a rebuild.
+    ]]
+    for _, armsLab in ipairs(untracked) do
+
+        local track = (#armor < #weapon) and "armor" or "weapon"
+
+        armsLab.ceTrackIndex = GetCombatEngineersTrackIndex(track)
+
+        if track == "armor" then
+            table.insert(armor, armsLab)
+        else
+            table.insert(weapon, armsLab)
         end
 
     end
@@ -487,14 +522,54 @@ local function GetCELabResearchDone(armsLab)
     return owned ~= nil and owned ~= kTechId.None
 end
 
-local function GetCETrackLevel(labs)
+--[[
+    How many levels does this track actually hold?
 
-    local done = 0
+    DISTINCT levels, not finished labs. The difference only shows up when two labs have completed
+    the SAME level - which should be impossible and, before the claim fix below, was not. When it
+    happened the raw lab count read 2 while only Weapons 1 was genuinely owned, and ApplyTrackTechs
+    duly marked Weapons 2 researched as well. The team was handed a level nobody had researched, and
+    a third lab would then start researching that very node - which is why the tech tree showed
+    Weapons 2 as researched AND in progress at the same time.
+
+    Counting a level once however many labs hold it makes that impossible by construction, rather
+    than relying on the claim logic never slipping again.
+
+    `labs` is still the BUILT, ALIVE and POWERED list, so losing power to a lab still costs the team
+    the level - that is the intended rule. Whether the level has already been RESEARCHED is a
+    separate question and is answered separately, over every lab, in StartTrackResearch.
+]]
+local function GetCETrackLevel(labs, trackList)
+
+    local seen, done = {}, 0
 
     for _, armsLab in ipairs(labs) do
+
         if GetCELabResearchDone(armsLab) then
-            done = done + 1
+
+            -- Resolve the tech id back to its level so duplicates collapse. A lab whose owned tech
+            -- is not on this track at all (which would mean its track was reassigned after it
+            -- finished) counts once and no more, under a key it cannot share with a real level.
+            local level = nil
+
+            if trackList then
+                for i, techId in ipairs(trackList) do
+                    if techId == armsLab.ceOwnedTechId then
+                        level = i
+                        break
+                    end
+                end
+            end
+
+            local key = level or ("other:" .. tostring(armsLab.ceOwnedTechId))
+
+            if not seen[key] then
+                seen[key] = true
+                done = done + 1
+            end
+
         end
+
     end
 
     return math.min(done, kCombatEngineersMaxTrackLevel)
@@ -503,9 +578,30 @@ end
 --[[
     Start the next research on any idle lab of a track.
 
-    The target level is (finished + already researching + 1), so two labs on the same track never
-    chase the same upgrade. A lab beyond the third on its track has nothing left to research and
-    simply sits idle -- it still counts as a lab for pricing and for the six-lab cap.
+    ONE RESEARCH AT A TIME PER TRACK, and it is the oldest idle lab that takes it.
+
+    While any lab on a track is researching, no other lab on that track starts anything - however
+    many are standing. So a track's three levels are earned one after another, in order, and building
+    all three labs at once buys no speed, only the right to continue the moment the current level
+    lands.
+
+    This is deliberate and is what stops a delayed Combat Engineers from being the strictly stronger
+    play. Researching in parallel meant three labs completed Weapons 1, 2 and 3 in the time of a
+    SINGLE research: a commander who held CE back to bank the team's personal resources could convert
+    them into a full base and the whole upgrade ladder almost at once. Sequential research puts the
+    ladder back on a real clock that banked resources cannot buy past.
+
+    Which level a lab takes is still the LOWEST NOBODY HAS SPOKEN FOR - a level is spoken for when a
+    lab has completed it or when it sits at or below the pre-CE floor - so nothing is researched
+    twice and a destroyed lab's level is simply picked up again by the next one.
+
+    Claiming levels rather than counting them fixes a collision the count could not see. The old rule
+    aimed at (finished + researching + 1), which assumes a lab in progress is working on finished+1.
+    That assumption breaks the moment a COMPLETED lab of the same track is destroyed: say W1 is done
+    and a second lab is mid-research on W2, and the W1 lab dies. finished drops to 0 while the
+    in-progress lab is still on W2, so the next lab built is aimed at 0+1+1 = 2 -- W2 again, which is
+    already under way on another lab. Two structures would then research one tech node. Reading the
+    levels actually claimed cannot drift from reality this way.
 ]]
 local function StartTrackResearch(self, labs, trackList, floor)
 
@@ -519,47 +615,132 @@ local function StartTrackResearch(self, labs, trackList, floor)
     local researcher = GetEntitiesForTeam("Marine", self:GetTeamNumber())[1]
     if not researcher then return end
 
-    local finished, researching, idle = 0, 0, {}
+    -- Which level does this tech id sit at on this track?
+    local function GetTrackLevelOf(techId)
+        for level, id in ipairs(trackList) do
+            if id == techId then
+                return level
+            end
+        end
+        return nil
+    end
 
-    for _, armsLab in ipairs(labs) do
+    local claimed, idle = {}, {}
+
+    -- Everything at or below the floor was researched before CE was enabled and is already held.
+    for level = 1, math.min(floor or 0, kCombatEngineersMaxTrackLevel) do
+        claimed[level] = true
+    end
+
+    --[[
+        IS THIS TRACK ALREADY BUSY?
+
+        Asked of EVERY Arms Lab the team owns, not just the built-and-powered ones in `labs`. A lab
+        that is mid-research and loses power keeps its researchingId - the research is merely paused -
+        but it drops out of GetCETrackLabs, which filters on power. Checking only the filtered list
+        would therefore declare the track idle and start a SECOND research on another lab, which is
+        the concurrent research this is meant to prevent, reappearing the moment a power node goes
+        down. Matching on the tech id against this track's list means no track name is needed.
+    ]]
+    for _, armsLab in ipairs(GetEntitiesForTeam("ArmsLab", self:GetTeamNumber())) do
 
         local researchingId = armsLab.GetResearchingId and armsLab:GetResearchingId()
 
-        if GetCELabResearchDone(armsLab) then
-            finished = finished + 1
-        elseif researchingId and researchingId ~= kTechId.None then
-            researching = researching + 1
-        else
+        if researchingId and researchingId ~= kTechId.None and GetTrackLevelOf(researchingId) then
+            return
+        end
+
+    end
+
+    --[[
+        WHICH LEVELS HAVE ALREADY BEEN RESEARCHED?
+
+        Asked of EVERY Arms Lab the team owns, exactly as the busy check above is, and NOT just of
+        the built-and-powered ones in `labs`. This was the bug behind "Weapons 1 is finished but a
+        lab is researching Weapons 1 again".
+
+        A lab that has completed a level but is unpowered, or is mid-rebuild, drops out of `labs`.
+        Its claim on that level used to vanish with it, so the level read as unclaimed and the next
+        idle lab was sent to research it a second time. The level itself is SUPPOSED to lapse while
+        the lab is unpowered - that is the intended cost of losing power - but the fact that the
+        research has already been done is permanent and must be read from every lab that exists.
+
+        Matching ceOwnedTechId against this track's list means no track field is consulted, so an
+        unpowered lab that has never been through the adoption pass is still counted correctly.
+    ]]
+    for _, armsLab in ipairs(GetEntitiesForTeam("ArmsLab", self:GetTeamNumber())) do
+
+        local level = GetCELabResearchDone(armsLab) and GetTrackLevelOf(armsLab.ceOwnedTechId)
+
+        if level then
+            claimed[level] = true
+        end
+
+    end
+
+    --[[
+        A level the team ALREADY HOLDS is spoken for, whoever gave it to them.
+
+        This is the self-healing half. Nothing should ever research a tech the tech tree already
+        marks as researched, and if the two records have drifted for any reason - a level granted by
+        the floor, a save from an older build, a lab lost in a way not accounted for here - this
+        catches it at the point of decision instead of starting a research whose node is already
+        complete, which is precisely the state that showed up as "researched and researching".
+    ]]
+    for level = 1, kCombatEngineersMaxTrackLevel do
+
+        local techId = trackList[level]
+        local node = techId and techTree:GetTechNode(techId)
+
+        if node and node:GetResearched() then
+            claimed[level] = true
+        end
+
+    end
+
+    -- Only labs that are built, alive and powered can be given work, so the idle list is still
+    -- drawn from `labs` alone.
+    for _, armsLab in ipairs(labs) do
+
+        if not GetCELabResearchDone(armsLab) then
             table.insert(idle, armsLab)
         end
 
     end
 
-    -- Never aim below the pre-CE floor: those levels are already researched, and a lab sent after one
-    -- of them would burn its whole research on tech the team already has.
-    local nextLevel = math.max(finished + researching, floor or 0) + 1
+    if #idle == 0 then
+        return
+    end
 
-    for _, armsLab in ipairs(idle) do
+    -- The OLDEST idle lab takes the next level, so the first one built is the first to work. Entity
+    -- ids are handed out in ascending order, so the lowest id is the earliest survivor - and sorting
+    -- rather than trusting list order matters because GetEntitiesForTeam makes no such guarantee.
+    table.sort(idle, function(a, b) return a:GetId() < b:GetId() end)
 
-        if nextLevel > kCombatEngineersMaxTrackLevel then
+    local nextLevel = nil
+    for level = 1, kCombatEngineersMaxTrackLevel do
+        if not claimed[level] then
+            nextLevel = level
             break
         end
+    end
 
-        local techId = trackList[nextLevel]
-        local node   = techId and techTree:GetTechNode(techId)
+    -- Every level on this track is spoken for; the labs standing here have nothing left to do.
+    if not nextLevel then
+        return
+    end
 
-        -- GetCanResearch keeps ResearchMixin's own rules (idle, powered, not recycling) authoritative
-        -- rather than reimplementing them here.
-        if node and (not armsLab.GetCanResearch or armsLab:GetCanResearch(techId)) then
+    local armsLab = idle[1]
+    local techId  = trackList[nextLevel]
+    local node    = techId and techTree:GetTechNode(techId)
 
-            armsLab:SetResearching(node, researcher)
-            node:SetResearching(true)
-            techTree:SetTechNodeChanged(node, "researching = true")
-
-            nextLevel = nextLevel + 1
-
-        end
-
+    -- GetCanResearch keeps ResearchMixin's own rules (idle, powered, not recycling) authoritative
+    -- rather than reimplementing them here. If this lab refuses, nothing starts this pass and the
+    -- next recount tries again - the recount runs on a timer, so a momentary refusal is not fatal.
+    if node and (not armsLab.GetCanResearch or armsLab:GetCanResearch(techId)) then
+        armsLab:SetResearching(node, researcher)
+        node:SetResearching(true)
+        techTree:SetTechNodeChanged(node, "researching = true")
     end
 
 end
@@ -578,8 +759,8 @@ function MarineTeam:UpdateCombatEngineerTechLevel()
         armour and weapon levels it had legitimately earned. The floors are seeded once at
         conversion (below) and only ever raised past by CE labs of the team's own.
     ]]
-    self.ceArmorLevel  = math.max(GetCETrackLevel(armorLabs),  self.ceArmorFloor  or 0)
-    self.ceWeaponLevel = math.max(GetCETrackLevel(weaponLabs), self.ceWeaponFloor or 0)
+    self.ceArmorLevel  = math.max(GetCETrackLevel(armorLabs,  kCombatEngineersArmorTrack),  self.ceArmorFloor  or 0)
+    self.ceWeaponLevel = math.max(GetCETrackLevel(weaponLabs, kCombatEngineersWeaponTrack), self.ceWeaponFloor or 0)
 
     ApplyTrackTechs(self)
 

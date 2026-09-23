@@ -794,10 +794,26 @@ local function TEH_ChooseLifeform(player, counts, caps, list)
     return bestTech
 end
 
+-- True when this Skulk already holds enough p-res for an Onos and Onos is evolvable right now.
+local function TEH_GetIsSavedForOnos(player)
+    local res = player.GetPersonalResources and player:GetPersonalResources() or 0
+    return res >= (GetCostForTech(kTechId.Onos) or math.huge) and TEH_IsAvailable(player, kTechId.Onos)
+end
+
 local kRawSkulkEvolveAction = CreateAlienEvolveAction(SkulkObjectiveWeights, kSkulkBrainObjectiveTypes.Evolve, kTechId.Skulk)
 local function CappedSkulkEvolveAction(bot, brain, player)
 
     if player and player.isa and player:isa("Skulk") then
+
+        -- A bot that respawns as a Skulk with an Onos worth of p-res goes Onos instead of hoarding it
+        -- or spending it on a cheaper lifeform. The lifeform cap is skipped, but WHEN and WHERE it
+        -- evolves is still the stock evolve action's call: near a Hive, no threat within 25m and not
+        -- in combat.
+        if TEH_GetIsSavedForOnos(player) then
+            bot.lifeformEvolution = kTechId.Onos
+            return kRawSkulkEvolveAction(bot, brain, player)
+        end
+
         local counts, caps, list, N = TEH_GetCountsAndCaps(player)
         local target = bot.lifeformEvolution
         -- Keep the current target only if it is under cap AND still evolvable; otherwise
@@ -1100,8 +1116,18 @@ local kSkulkBrainActionTypes = enum({
 
 local SkulkActionWeights = MakeBotActionWeights(kSkulkBrainActionTypes, 10)
 
+Script.Load("lua/bots/TEH_AlienOrderAction.lua")
+
 kSkulkBrainActions =
 {
+
+    ------------------------------------------
+    -- Alien Commander order (below Attack's 8)
+    ------------------------------------------
+    CreateTEHAlienOrderAction(4, PerformMove,
+        function(skulk, target, lastSeenPos, bot, brain, move)
+            PerformAttackEntity( skulk:GetEyePos(), target, lastSeenPos, bot, brain, move )
+        end),
     
     ------------------------------------------
     -- Debug Idle

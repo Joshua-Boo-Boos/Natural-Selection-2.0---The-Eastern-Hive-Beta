@@ -477,7 +477,24 @@ function Marine:GetArmorAmount(armorLevels)
 end
 
 if Client then
-    
+
+    -- Ghost guides are the COMMANDER's HUD overlay - the translucent range circles drawn around a
+    -- structure being placed. Commander:AddGhostGuide (Commander_Client.lua) is the only definition,
+    -- so it does not exist on a Marine.
+    --
+    -- That matters because the Combat Builder drives the SAME vanilla ghost model system the
+    -- commander uses (it sets self.currentTechId, which is what GhostModelUI keys off). GhostModel:Update
+    -- then reaches an unguarded player:AddGhostGuide(...) for any tech that declares a kVisualRange -
+    -- Supply Depot and Sentry Battery both do - and threw "attempt to call method 'AddGhostGuide'
+    -- (a nil value)" every single frame the ghost was up. The throw aborted the REST of
+    -- MarineGhostModel:Update, so the placement circle and the power indicator never updated.
+    --
+    -- A no-op is the correct behaviour rather than a workaround: a marine has no commander HUD to
+    -- draw range circles onto, so there is genuinely nothing to do. Defining it here keeps the
+    -- vanilla ghost code working unmodified.
+    function Marine:AddGhostGuide(origin, radius)
+    end
+
     function Marine:UpdateGhostModel()
 
         self.currentTechId = nil

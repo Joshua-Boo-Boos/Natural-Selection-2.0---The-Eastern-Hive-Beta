@@ -83,6 +83,27 @@ function GetPlayersAboveLimit(team)
     return math.max(0,(info.playerCount or 0) - kMatchMinPlayers)
 end
 
+-- Human (non-bot) players on a team, commanders and dead players included.
+local function GetHumanPlayerCountForTeam(teamIndex)
+    local count = 0
+    for _, teamPlayer in ipairs(GetEntitiesForTeam("Player", teamIndex)) do
+        local client = teamPlayer.GetClient and teamPlayer:GetClient()
+        if client and not client:GetIsVirtual() then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+-- Respawn times only start extending once the server reaches 9v8 humans: at least 9 humans on one
+-- team AND at least 8 on the other (9v8, 8v9, 9v9, ...). Up to 8 humans on each team (8v8, 5v7,
+-- 1v8), or a lopsided server like 1v15, keeps the base kMarineRespawnTime / kAlienSpawnTime.
+function GetRespawnTimeExtendPlayerCountReached()
+    local marineHumans = GetHumanPlayerCountForTeam(kTeam1Index)
+    local alienHumans = GetHumanPlayerCountForTeam(kTeam2Index)
+    return math.min(marineHumans, alienHumans) >= 8 and math.max(marineHumans, alienHumans) >= 9
+end
+
 function GetRespawnTimeExtend(player, teamIndex, _gameLength)
     -- player is not used in the code so ignore this variable
 
@@ -92,6 +113,10 @@ function GetRespawnTimeExtend(player, teamIndex, _gameLength)
     -- Has the round started?
     local gr = GetGamerules and GetGamerules()
     if gr and gr.GetGameStarted and not gr:GetGameStarted() then
+        return 0
+    end
+
+    if not GetRespawnTimeExtendPlayerCountReached() then
         return 0
     end
 

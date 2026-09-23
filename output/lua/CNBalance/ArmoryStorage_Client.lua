@@ -27,20 +27,15 @@ function GetArmoryStoredCount(armoryId, techId)
 
 end
 
--- Red at empty, orange for a thin stock, green once well supplied.
---
--- Brightened from the original values. Alpha was already 1, so the washed-out look was not
--- transparency but the colours themselves being too dark against the button art -- raising the
--- non-dominant channels lifts them well clear of the background without changing the three bands.
+-- YELLOW when nothing of that weapon type is stored, GREEN as soon as one or more is stored.
+-- (Was red / orange / green by stock level.) Bright values so both read clearly over the button art.
 function GetArmoryStoredCountColor(count)
 
     if count <= 0 then
-        return Color(1, 0.42, 0.42, 1)
-    elseif count <= 5 then
-        return Color(1, 0.78, 0.28, 1)
+        return Color(1, 0.88, 0.25, 1)      -- yellow: none stored
     end
 
-    return Color(0.55, 1, 0.55, 1)
+    return Color(0.55, 1, 0.55, 1)          -- green: one or more stored
 
 end
 

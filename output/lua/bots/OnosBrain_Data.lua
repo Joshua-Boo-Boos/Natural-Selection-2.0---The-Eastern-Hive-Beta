@@ -464,8 +464,18 @@ end
 -- along with a closure to perform the action
 -- The order they are listed matters - actions near the beginning of the list get priority.
 ------------------------------------------
+Script.Load("lua/bots/TEH_AlienOrderAction.lua")
+
 kOnosBrainActions =
 {
+
+    ------------------------------------------
+    -- Alien Commander order
+    ------------------------------------------
+    CreateTEHAlienOrderAction(GetOnosActionBaselineWeight(kOnosBrainActionTypes.Order), PerformMove,
+        function(onos, target, lastSeenPos, bot, brain, move)
+            PerformAttackEntity( onos:GetEyePos(), target, bot, brain, move )
+        end),
     
     ------------------------------------------
     -- Debug Idle

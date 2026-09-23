@@ -574,7 +574,7 @@ function GUIPrototypeLabBuyMenu:GetExperimentalUnlocked(track)
     -- Pre-game: upgrades are free for testing. On the CLIENT the game state must be
     -- read from the GameInfo entity (GetGamerules() has no reliable GetGameState here).
     local gameInfo = GetGameInfoEntity()
-    if gameInfo and gameInfo.GetState and gameInfo:GetState() < kGameState.Started then
+    if gameInfo and gameInfo.GetState and gameInfo:GetState() < kGameState.Countdown then
         return true
     end
     return false

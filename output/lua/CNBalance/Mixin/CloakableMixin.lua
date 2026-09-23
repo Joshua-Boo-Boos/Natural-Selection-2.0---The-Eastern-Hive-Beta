@@ -160,6 +160,14 @@ local function UpdateDesiredCloakFraction(self, deltaTime)
                 elseif self:isa("Drifter")  or self:isa("Web") then
                     self.maxCloakFraction = 0.9
                     self.cloakRate = 3
+                elseif self:isa("TunnelEntrance") then
+                    -- NS2.0-TEH: Tunnel Camouflage (ShadeTunnel) used to fall into the "else" below and
+                    -- get maxCloakFraction = 1, i.e. COMPLETELY invisible - far stronger than any alien
+                    -- camouflage (players cap at 0.82-0.91). Vanilla NS2 gives a tunnel entrance no
+                    -- camouflage at all, so this sits between the two: clearly harder to spot, but still
+                    -- visible as a shimmer when you look at it.
+                    self.maxCloakFraction = 0.75
+                    self.cloakRate = 3
                 elseif self:isa("Babbler") then  --Babbler sync parent
                     local babblerParent = self:GetParent()
                     if babblerParent and HasMixin(babblerParent, "Cloakable") then 

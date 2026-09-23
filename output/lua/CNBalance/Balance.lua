@@ -93,7 +93,7 @@ kGrenadeTechResearchTime = 45   --45
 
 kMaxARCs = 5 -- Was 6
 
-kMineCost = 10 -- Was 20 p-res for 4 mines
+kMineCost = 5 -- 5 p-res for ONE mine (kNumMines, BalanceMisc.lua). Was 20 for 4, then 10 for 2.
 kMineDamage = 130
 kDropMineCost = 6 -- Was 12 for 4 mines? Therefore 3 each
 kDropMineCooldown = 0
@@ -374,6 +374,7 @@ kOnosCost = 65
 kOnosEggCost = 100
 
 kTunnelEntranceCost = 7
+kTunnelExitCost = 7 -- was vanilla 8 (never overridden), so the Exit button still cost 8
 kTunnelRelocateCost = 5
 
 --Research with skill activation

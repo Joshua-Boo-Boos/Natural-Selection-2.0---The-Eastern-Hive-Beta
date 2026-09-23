@@ -214,4 +214,74 @@ function ArmsLab:OnCreate()
     self.ceTrackIndex  = kCombatEngineersTrackNone or 0
 end
 
+--[[
+    HOVER NAME: "Weapons Arms Lab" / "Armor Arms Lab".
+
+    The two Combat Engineers Arms Labs are the SAME structure with the same model and differ only by
+    the track they research, so on the field there is otherwise nothing to tell them apart - which
+    matters, because a player deciding whether to build or defend one needs to know which it is.
+
+    GetUnitNameOverride is the vanilla hook UnitStatusMixin:GetUnitName calls for the WHOLE name, so
+    everything else about how the title is drawn - the team colour an alien sees it in, the position
+    above the structure, the fade, the health/armour percentage that can replace it - is left to the
+    existing unit-status system and is not reimplemented here. Only the text changes. This mirrors
+    PrototypeLab:GetUnitNameOverride, which solves the same "which one of these is it" problem.
+
+    ceTrackIndex is a networked field, so the track is known client-side where the name is drawn.
+    A lab with no track - a vanilla Arms Lab, or any lab outside a CE round - falls through to the
+    ordinary display name and reads exactly as it always has.
+]]
+function ArmsLab:GetUnitNameOverride(viewer)
+
+    local track = GetCombatEngineersLabTrack and GetCombatEngineersLabTrack(self)
+
+    local unitName
+    if track == "weapon" then
+        unitName = Locale.ResolveString("CE_ARMS_LAB_WEAPONS")
+    elseif track == "armor" then
+        unitName = Locale.ResolveString("CE_ARMS_LAB_ARMOR")
+    else
+        unitName = GetDisplayName(self)
+    end
+
+    -- Keep vanilla's "under construction" wording. Deliberately KEEPS the track in the name while
+    -- unbuilt, unlike PrototypeLab's override which falls back to the plain name: which track a
+    -- half-built lab belongs to is the most useful thing about it, since that is exactly when a
+    -- player is deciding whether to finish it. No status line here - a lab that is not built yet is
+    -- not doing anything, and "under construction" already says so.
+    if HasMixin(self, "Construct") and self.GetIsBuilt and not self:GetIsBuilt() then
+        return string.format(Locale.ResolveString("UNBUILT_STRUCTURE"), unitName)
+    end
+
+    -- Not a CE lab (vanilla Arms Lab, or any lab outside a CE round): name only, exactly as before.
+    if not track then
+        return unitName
+    end
+
+    --[[
+        SECOND LINE: what this particular lab is doing.
+
+        A newline inside the name is genuinely rendered as a second line rather than a stray glyph -
+        vanilla's WordWrap joins its lines with a newline character and hands the result straight to
+        SetText (Utility.lua), so GUIItem text is multi-line. Everything else about the drawing is untouched,
+        so the second line inherits the same colour, centring and position as the first.
+
+        Three states, because research is SEQUENTIAL per track: only one lab of a track researches at
+        a time, so a second or third lab genuinely does sit idle waiting its turn, and without a word
+        for that state it would look broken rather than deliberate.
+    ]]
+    local status
+    local researchingId = self.GetResearchingId and self:GetResearchingId()
+
+    if researchingId and researchingId ~= kTechId.None then
+        status = Locale.ResolveString("CE_ARMS_LAB_RESEARCHING")
+    elseif self.ceOwnedTechId and self.ceOwnedTechId ~= kTechId.None then
+        status = Locale.ResolveString("CE_ARMS_LAB_RESEARCHED")
+    else
+        status = Locale.ResolveString("CE_ARMS_LAB_WAITING")
+    end
+
+    return unitName .. "\n" .. status
+end
+
 Shared.LinkClassToMap("ArmsLab", ArmsLab.kMapName, networkVars)

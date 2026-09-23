@@ -605,10 +605,32 @@ local function GetOpenAlienBotLifeformSlots(counts, caps)
     return slots
 end
 
+-- A Skulk bot that can already pay for an Onos (and Onos is evolvable) is saving for one.
+local function GetIsAlienBotSavedForOnos(player)
+    local res = player.GetPersonalResources and player:GetPersonalResources() or 0
+    return res >= (GetCostForTech(kTechId.Onos) or math.huge) and GetIsLifeformEvolveAvailable(player, kTechId.Onos)
+end
+
 local function AssignAlienBotLifeformTargets(team)
 
-    local counts, caps, skulkBots = GetAlienBotLifeformCountsAndCaps(team)
+    local counts, caps, allSkulkBots = GetAlienBotLifeformCountsAndCaps(team)
     local slots = GetOpenAlienBotLifeformSlots(counts, caps)
+
+    -- Skulk bots saving for an Onos keep Onos as their target and stay out of the slot hand-out below;
+    -- their brain's evolve action decides when and where they evolve (SkulkBrain_Data).
+    local skulkBots = {}
+    for _, player in ipairs(allSkulkBots) do
+        if GetIsAlienBotSavedForOnos(player) then
+            player.botEcoLifeformTarget = kTechId.Onos
+            local client = player.GetClient and player:GetClient()
+            if client and client.bot then
+                client.bot.lifeformEvolution = kTechId.Onos
+                client.bot.lifeformAssignedByServer = true
+            end
+        else
+            table.insert(skulkBots, player)
+        end
+    end
 
     table.sort(skulkBots, function(a, b)
         local aRes = a.GetPersonalResources and a:GetPersonalResources() or 0
@@ -680,6 +702,8 @@ local function TryEvolveAlienBot(player, counts, caps)
     -- Only base lifeforms get auto-evolved; already-evolved bots have spent.
     if not player.isa or not player:isa("Skulk") then return end
     if not player:GetIsAlive() then return end
+    -- Saving for an Onos: the brain's own evolve action picks when and where (near a Hive, safe).
+    if GetIsAlienBotSavedForOnos(player) then return end
     if player.GetIsAllowedToBuy and not player:GetIsAllowedToBuy() then return end
     if not GetIsBotSafeToEvolve(player) then return end
 

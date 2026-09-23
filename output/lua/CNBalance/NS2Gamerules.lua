@@ -54,11 +54,25 @@
                  SendTeamMessage(self.team1, kTeamMessageTypes.GameStarted)
                  SendTeamMessage(self.team2, kTeamMessageTypes.GameStarted)
 
-                 -- Reset player resources to normal starting amounts when the game
-                 -- transitions from pre-game to Started (force-start or countdown end).
-                 -- Pre-game grants 100 p-res for testing; clear that on real start.
+             end
+
+             --[[
+                 PRE-GAME'S 100 P-RES IS TAKEN BACK THE MOMENT THE REAL ROUND BEGINS - at the COUNTDOWN, and
+                 again at Started as a safety net (a round can reach Started without a countdown).
+
+                 The countdown is the right moment: ResetGame runs immediately before it and puts everyone
+                 into the real round at their spawns, so from here nothing is pre-game any more. Previously
+                 the free 100 p-res and free purchases carried on through the whole countdown, so a player
+                 could evolve into an Onos for nothing during it and keep that Onos into the round.
+
+                 EVERY team player is reset, dead or alive. Previously only living players were: someone
+                 dead or waiting to spawn at that instant kept their 100 p-res into the round, respawned
+                 with it and could buy an Onos straight away.
+             ]]
+             if self.gameState == kGameState.Countdown or self.gameState == kGameState.Started then
+
                  local function ResetPlayerRes(player, startingRes)
-                     if player.SetResources and player.GetIsAlive and player:GetIsAlive() then
+                     if player.SetResources then
                          player:SetResources(startingRes)
                      end
                      player._preGameResGranted = false
@@ -69,6 +83,16 @@
                  for _, p in ipairs(GetEntitiesForTeam("Player", kTeam2Index)) do
                      ResetPlayerRes(p, kAlienInitialIndivRes)
                  end
+
+                 --[[
+                     AND THE SAVED COPY. Vanilla keeps every player's p-res per team in self.clientpres, saved on
+                     each team change and handed back when the player joins that team again. ResetGame empties it,
+                     but the team changes that happen around the round start (the shuffle moving pre-game players,
+                     a player swapped or replaced during the intro) save their PRE-GAME 100 into it again - so a
+                     player who died and came back through a team change during the intro was handed that 100
+                     back after this reset. Emptying it here means nothing from pre-game can be restored.
+                 ]]
+                 self.clientpres = {}
 
              end
 
@@ -387,8 +411,8 @@
      local kPreGameSpawnResources = 100
      function NS2Gamerules:UpdatePreGameResources()
 
-         -- Only during the pre-round period; once the game has started, stop.
-         if self:GetGameState() >= kGameState.Started then
+         -- Only during the pre-round period; stops at the COUNTDOWN (see SetGameState), not at Started.
+         if self:GetGameState() >= kGameState.Countdown then
              return
          end
 

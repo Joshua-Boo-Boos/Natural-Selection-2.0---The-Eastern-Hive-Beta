@@ -1357,6 +1357,17 @@ end
 -- 30-second redistribution: re-point every free Skulk bot at a balanced lifeform.
 -- Each assignment reserves its slot immediately so the next bot is pointed at the
 -- next most-underrepresented lifeform instead of stacking onto the same target.
+-- A Skulk bot that can already pay for an Onos (and Onos is evolvable) is saving for one.
+local function GetIsSkulkBotSavedForOnos(player)
+    local res = player:GetPersonalResources()
+    if res < (GetCostForTech(kTechId.Onos) or math.huge) then
+        return false
+    end
+    local techTree = player:GetTechTree()
+    local node = techTree and techTree:GetTechNode(kTechId.Onos)
+    return node ~= nil and node:GetAvailable(player, kTechId.Onos, false) == true
+end
+
 function TeamBrain:UpdateAlienLifeformDistribution()
     PROFILE("TeamBrain:UpdateAlienLifeformDistribution")
 
@@ -1365,14 +1376,20 @@ function TeamBrain:UpdateAlienLifeformDistribution()
     local counts = self:GetCurrentLifeformCounts()
 
     -- Gather free Skulk bots (the only ones we can re-point) and clear their targets.
+    -- Bots saving for an Onos are not re-pointed: they stay on Onos.
     local eligible = {}
     for i = 1, #self.teamBots do
         local bot = self.teamBots[i]
         local player = bot and bot.GetPlayer and bot:GetPlayer()
         if player and player.GetIsAlive and player:GetIsAlive() and player:isa("Skulk") then
-            bot.lifeformEvolution = nil
-            bot.lifeformAssignedByServer = nil
-            table.insert(eligible, { bot = bot, player = player })
+            if GetIsSkulkBotSavedForOnos(player) then
+                bot.lifeformEvolution = kTechId.Onos
+                bot.lifeformAssignedByServer = true
+            else
+                bot.lifeformEvolution = nil
+                bot.lifeformAssignedByServer = nil
+                table.insert(eligible, { bot = bot, player = player })
+            end
         end
     end
 

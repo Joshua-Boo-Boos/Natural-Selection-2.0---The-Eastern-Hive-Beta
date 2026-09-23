@@ -163,7 +163,7 @@ if Server then
     end
 
     
-    local kRallyTickInterval = 2
+    local kRallyCheckInterval = 0.1
     function Pheromone:OnUpdate()
 
         -- Expire pheromones after a time
@@ -173,12 +173,22 @@ if Server then
         end
 
         if self:GetType() == kTechId.ThreatMarker then
+            -- Rally reward: kRallyPResEachDuration p-res (and kRallyScoreEachDuration score) given IMMEDIATELY
+            -- when a player reaches the rally point, and only ONCE per player per rally point. Keyed by the
+            -- player's client, so dying/respawning/evolving (new player entity) doesn't earn it again.
+            -- Checked every kRallyCheckInterval rather than on the old 2 s tick, so the reward is instant.
             local now = Shared.GetTime()
-            if not self.timeLastRally or now - self.timeLastRally > kRallyTickInterval then
+            if not self.timeLastRally or now - self.timeLastRally >= kRallyCheckInterval then
                 self.timeLastRally = now
+                self.rallyRewardedClients = self.rallyRewardedClients or {}
                 local players = GetEntitiesForTeamWithinXZRange("Player",self.teamNumber,self:GetOrigin(),kRallyRadius)
-                for _, player in pairs(players) do
-                    player:AddContinuousScore("Rally",kRallyTickInterval, kRallyResultDuration,kRallyScoreEachDuration,kRallyPResEachDuration)
+                for _, player in ipairs(players) do
+                    local client = Server.GetOwner(player)
+                    if client and player:GetIsAlive() and not self.rallyRewardedClients[client] then
+                        self.rallyRewardedClients[client] = true
+                        player:AddScore(kRallyScoreEachDuration, kRallyPResEachDuration)
+                        player:AddResources(kRallyPResEachDuration)
+                    end
                 end
             end
             

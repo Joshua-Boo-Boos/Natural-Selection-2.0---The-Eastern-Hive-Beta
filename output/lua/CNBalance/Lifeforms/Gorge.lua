@@ -184,3 +184,25 @@ if Server then
 end
 
 Shared.LinkClassToMap("Gorge", Gorge.kMapName, networkVars, true)
+
+-- Alien Commander right-click orders for Gorges: the Marine build and weld orders become Construct
+-- (unbuilt friendly structure) and Heal (damaged friendly). Only Gorges get these - everything else
+-- falls back to Alien:OnOverrideOrder (Defend / Attack / Move).
+function Gorge:OnOverrideOrder(order)
+
+    if order:GetType() ~= kTechId.Default then
+        return
+    end
+
+    local teamNumber = self:GetTeamNumber()
+    local constructTarget = GetOrderTargetIsConstructTarget(order, teamNumber)
+
+    if constructTarget and constructTarget:GetTeamNumber() == teamNumber then
+        order:SetType(kTechId.Construct)
+    elseif GetOrderTargetIsHealTarget(order, teamNumber) then
+        order:SetType(kTechId.Heal)
+    else
+        Alien.OnOverrideOrder(self, order)
+    end
+
+end

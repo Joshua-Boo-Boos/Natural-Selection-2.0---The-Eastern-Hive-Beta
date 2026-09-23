@@ -123,7 +123,8 @@ if Server then
     function Player:AddResources(amount)
         if amount < 0 then
             local gr = GetGamerules and GetGamerules()
-            if gr and gr.GetGameState and gr:GetGameState() < kGameState.Started then
+            -- Free only before the countdown: the countdown is already the real round (see NS2Gamerules).
+            if gr and gr.GetGameState and gr:GetGameState() < kGameState.Countdown then
                 return 0
             end
         end

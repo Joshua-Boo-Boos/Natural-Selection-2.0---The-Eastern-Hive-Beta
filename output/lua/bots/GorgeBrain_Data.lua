@@ -707,12 +707,25 @@ local kExecOrderAction = function(move, bot, brain, gorge, action)
 
     if order then
 
+        local orderType = order:GetType()
         local target = Shared.GetEntity(order:GetParam())
 
-        if target ~= nil and order:GetType() == kTechId.Attack then
+        if target ~= nil and orderType == kTechId.Attack then
 
-            PerformAttackEntity( gorge:GetEyePos(), target, bot, brain, move )
-            
+            PerformAttackEntity( gorge:GetEyePos(), target, order:GetLocation(), bot, brain, move )
+
+        elseif target ~= nil and (orderType == kTechId.Construct or orderType == kTechId.Heal) then
+        -- Build / heal order: heal spray builds unbuilt structures and heals damaged ones
+
+            brain.teamBrain:UnassignBot(bot)
+            brain.teamBrain:AssignBotToEntity( bot, target:GetId() )
+            PerformHealSpray( gorge, target, bot, brain, move )
+
+        elseif target ~= nil and orderType == kTechId.Defend then
+
+            bot:GetMotion():SetDesiredViewTarget( nil )
+            PerformMove(gorge:GetEyePos(), target:GetOrigin(), bot, brain, move)
+
         else
 
             if brain.debug then

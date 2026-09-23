@@ -108,7 +108,11 @@ function Alien:ProcessBuyAction(techIds)
             if lifeTech then break end
         end
 
-        if lifeTech and (counts[lifeTech] or 0) >= (caps[lifeTech] or 0) then
+        -- A bot that can already pay for an Onos was saving for it: never redirect it to a cheaper lifeform.
+        local savedForOnos = lifeTech == kTechId.Onos
+            and self:GetPersonalResources() >= (GetCostForTech(kTechId.Onos) or math.huge)
+
+        if lifeTech and not savedForOnos and (counts[lifeTech] or 0) >= (caps[lifeTech] or 0) then
             -- Over cap: redirect to the most underrepresented open + available lifeform.
             local swap, bestDeficit, bestCount
             for j = 1, #list do

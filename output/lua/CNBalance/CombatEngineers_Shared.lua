@@ -108,24 +108,31 @@ end
 --   * The BASE term is the minimum. Even a tiny team pays a real price rather than a token one.
 --   * The PER-PLAYER term still makes a big team pay meaningfully more, just less violently.
 --
--- Tuned so 5 players -> 2.0 and 25 players -> 5.0, i.e. the largest team pays 2.5x the price a small
--- one does rather than 5x:
---     1.25 + 5  * 0.15 = 2.00
---     1.25 + 25 * 0.15 = 5.00
+-- Tuned so 5 players -> 2.85 and 24 players -> 8.55, i.e. a full 25-man team pays about 3x what a
+-- small one does:
+--     1.35 + 5  * 0.30 = 2.85
+--     1.35 + 24 * 0.30 = 8.55
 --
--- TRADE-OFF, stated plainly: because this is no longer proportional to the player count, the cost
--- PER MARINE now falls as the team grows - a 25-man team pays about half as much per head as a
--- 5-man one, so it will tech roughly twice as fast. That is the direct consequence of asking for a
--- gentler slope, and the two constants below are the dial: raising kCombatEngineersCostPerPlayer
--- towards 0.4 restores near-proportional scaling, lowering it flattens further.
-kCombatEngineersCostScalarBase = 1.25
-kCombatEngineersCostPerPlayer  = 0.15
+-- WHY THE SLOPE WAS DOUBLED (was 0.15, giving 4.85 at a full team). At the old numbers an Armory on
+-- a 25-man server cost 17 p-res -- LESS THAN ONE SHOTGUN (20) -- while that team's collective income
+-- over a round is on the order of 3,500 p-res. An individual price that only rose ~1.7x from a small
+-- team to a full one could not keep pace with a collective pool that rises 5x, so the whole mode got
+-- cheaper the busier the server became, which is backwards. At 0.30 the same Armory is 30 on a full
+-- server and 10 on a six-man one: a real decision for a small group to fund at both ends, and never
+-- so dear that buying weapons stops being affordable (a marine earns roughly 150 p-res a round).
+--
+-- These two constants remain the dial. Raising kCombatEngineersCostPerPlayer towards 0.4 approaches
+-- fully proportional scaling (constant cost per head); lowering it flattens the curve again.
+kCombatEngineersCostScalarBase = 1.35
+kCombatEngineersCostPerPlayer  = 0.30
 
 -- Clamps. The minimum is now carried by the base term above, so these only guard the extremes: the
--- floor stops a scalar of zero if the player count ever reads as nothing, and the cap sits above
--- what 25 players produce (5.0) so it never binds in practice.
+-- floor stops a scalar of zero if the player count ever reads as nothing, and the cap sits just
+-- above what a full 25-man team produces (8.55) so it never binds in practice. The cap MUST be kept
+-- above that value -- at the old 6.0 it would have silently flattened every team above 16 players
+-- to the same price, quietly undoing the scaling exactly where it matters most.
 kCombatEngineersCostScalarMin = 1.0
-kCombatEngineersCostScalarMax = 6.0
+kCombatEngineersCostScalarMax = 9.0
 kCombatEngineersCostFloor = 5
 
 -- Placing a CE blueprint costs NOTHING. Every personal resource a structure needs is charged while
@@ -170,9 +177,9 @@ kCombatEngineersStructureBaseCost =
 ]]
 kCombatEngineersArmsLabBaseCost =
 {
-    15,   -- 1st lab on the track -> Armor1 / Weapons1
-    20,   -- 2nd lab on the track -> Armor2 / Weapons2
-    25,   -- 3rd lab on the track -> Armor3 / Weapons3
+    7,    -- 1st lab on the track -> Armor1 / Weapons1
+    9,    -- 2nd lab on the track -> Armor2 / Weapons2
+    12,   -- 3rd lab on the track -> Armor3 / Weapons3
 }
 
 -- Three labs per track, and nothing beyond that: a fourth would have no research left to do.

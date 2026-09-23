@@ -161,6 +161,9 @@ kOnosBoneShieldDamageReduction = {
 }
 
 kOnosDamageReduction = {
+    -- Multiplier on damage the Onos TAKES from that weapon class (doer classname): <1 reduces it,
+    -- >1 increases it. Applied in CNBalance/Lifeforms/Onos.lua ModifyDamageTaken.
+    ["Minigun"] = 1.1,   -- Exo Minigun: +10% damage to the Onos
     ["Sentry"] = 0.5,
     ["MarineSentry"] = 0.5,
     ["Mine"] = 0.5,

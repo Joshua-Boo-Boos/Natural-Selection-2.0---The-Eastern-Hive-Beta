@@ -76,6 +76,16 @@ function Marine:ApplyPrototypeBase(baseTechId)
     return nil
 end
 
+local function GetIsNearActivePrototypeLab(marine)
+    local labs = GetEntitiesForTeamWithinRange("PrototypeLab", marine:GetTeamNumber(), marine:GetOrigin(), PrototypeLab.kResupplyUseRange)
+    for i = 1, #labs do
+        if GetIsUnitActive(labs[i]) then
+            return true
+        end
+    end
+    return false
+end
+
 local baseAttemptToBuy = Marine.AttemptToBuy
 
 function Marine:AttemptToBuy(techIds)
@@ -85,6 +95,11 @@ function Marine:AttemptToBuy(techIds)
     -- Not a prototype bundle -> vanilla.
     if not (baseTechId and kPrototypeBaseTechIds[baseTechId]) then
         return baseAttemptToBuy(self, techIds)
+    end
+
+    -- Vanilla enforces this via GetHostStructureFor, which bundles skip; bot auto-buy calls this from anywhere.
+    if not GetIsNearActivePrototypeLab(self) then
+        return false
     end
 
     -- Track + speciality gate.
@@ -113,7 +128,7 @@ function Marine:AttemptToBuy(techIds)
     local preGame = false
     do
         local gr = GetGamerules and GetGamerules()
-        preGame = gr and gr.GetGameState and gr:GetGameState() < kGameState.Started or false
+        preGame = gr and gr.GetGameState and gr:GetGameState() < kGameState.Countdown or false
     end
     local expTechId   = kPrototypeExperimentalForTrack and kPrototypeExperimentalForTrack[track]
     local expUnlocked = (expTechId and GetHasTech(self, expTechId)) or preGame

@@ -153,6 +153,15 @@ kTranslateMessage["COMBATBUILDER_TOOLTIP"]="给予陆战队员基础建筑建造
 kTranslateMessage["CE_OPTION_PLAY_SOUNDS"]="战斗工兵相关音效"
 
 kTranslateMessage["CE_TAKE_CREDITS"]="提取资源"
+
+-- Combat Engineers Arms Lab titles. The two CE Arms Labs are the same structure with the same
+-- model and differ only by which track they research, so the hover name is the only thing that
+-- tells them apart on the field.
+kTranslateMessage["CE_ARMS_LAB_WEAPONS"]="武器兵工厂"
+kTranslateMessage["CE_ARMS_LAB_ARMOR"]="护甲兵工厂"
+kTranslateMessage["CE_ARMS_LAB_RESEARCHING"]="研究中"
+kTranslateMessage["CE_ARMS_LAB_RESEARCHED"]="研究完成"
+kTranslateMessage["CE_ARMS_LAB_WAITING"]="等待中"
 kTranslateMessage["CE_TAKE_CREDITS_TOOLTIP"]="将团队资源转换为个人资源.\n*从团队池扣除20, 并给予你20.\n+把闲置的团队收入转化为建筑资金."
 
 kTranslateMessage["COMBATBUILDER_BUYDESCRIPTION"]="给予基础建筑建造.\n*建造补给站与机枪塔.\n*机枪塔上限: 1; 高级军械库2, 高级军械库加原型实验室3.\n+战斗工兵: 免费并自动配发. 可用个人资源建造整个基地."
@@ -472,6 +481,15 @@ kLocales["COMBATBUILDER_TOOLTIP"]="Grant marines battlefield engineering."
 kLocales["CE_OPTION_PLAY_SOUNDS"]="Combat Engineers Related Sounds"
 
 kLocales["CE_TAKE_CREDITS"]="Take Credits"
+
+-- Combat Engineers Arms Lab titles, shown as the structure's hover name (ArmsLab.lua).
+kLocales["CE_ARMS_LAB_WEAPONS"]="Weapons Arms Lab"
+kLocales["CE_ARMS_LAB_ARMOR"]="Armor Arms Lab"
+
+-- Second line of the Arms Lab hover title, saying what this particular lab is doing.
+kLocales["CE_ARMS_LAB_RESEARCHING"]="Researching"
+kLocales["CE_ARMS_LAB_RESEARCHED"]="Research Complete"
+kLocales["CE_ARMS_LAB_WAITING"]="Waiting"
 kLocales["CE_TAKE_CREDITS_TOOLTIP"]="Converts team resources into personal resources.\n*Takes 20 from the team pool and gives you 20.\n+Turns idle team income into structure funding."
 
 kLocales["COMBATBUILDER_BUYDESCRIPTION"]="Battlefield engineering.\n*Build supply depots and sentries.\n*Sentry limit: 1; 2 with AA, 3 with AA and Proto.\n+Combat Engineers: free and auto-issued. Builds the whole base with personal resources."

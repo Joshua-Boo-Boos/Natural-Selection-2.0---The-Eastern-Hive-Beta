@@ -57,6 +57,18 @@ function AdvancedStructureAbility:GetDropMapName()
     return LookupTechData(self:GetDropStructureId(),kTechDataMapName)
 end
 
+-- The other two names StructureAbility asserts on when a child does not answer them (see GetDropMapName
+-- above). Every ability below this class inherited the asserts; other mods' placement code asks for these.
+function AdvancedStructureAbility:GetDropClassName()
+    local techId = self:GetDropStructureId()
+    local ok, name = pcall(EnumToString, kTechId, techId)
+    return (ok and name) or LookupTechData(techId, kTechDataMapName)
+end
+
+function AdvancedStructureAbility:GetSuffixName()
+    return LookupTechData(self:GetDropStructureId(), kTechDataMapName) or "structure"
+end
+
 function AdvancedStructureAbility:RequiresInfestation()
     return 
 end

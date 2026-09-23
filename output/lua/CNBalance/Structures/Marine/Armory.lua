@@ -258,7 +258,10 @@ if Server then
         -- had never been dropped.
         if GetArmoryShouldResupplyCombatBuilder(self, player) then
 
-            player:GiveItem(CombatBuilder.kMapName)
+            -- setActive = false: a free resupply is an automatic grant, not a purchase, and must
+            -- not take a marine's weapon out of their hands while they are standing at an Armory
+            -- under attack. See the note in CombatEngineers_Build.lua.
+            player:GiveItem(CombatBuilder.kMapName, false)
             player.ceBuilderDropped = false
             resuppliedPlayer = true
 

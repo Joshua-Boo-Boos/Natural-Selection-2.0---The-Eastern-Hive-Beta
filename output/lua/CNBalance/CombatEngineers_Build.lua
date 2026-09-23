@@ -71,7 +71,20 @@ function Marine:GiveCombatEngineerBuilder()
         return
     end
 
-    self:GiveItem(CombatBuilder.kMapName)
+    --[[
+        setActive = FALSE. This is not optional.
+
+        Player:GiveItem defaults setActive to TRUE, so every automatic grant used to force the
+        marine to draw the builder. That is survivable at spawn and lethal anywhere else: this pass
+        runs on a timer, so a marine who lost their builder mid-fight - to a Prowler's bile, to a
+        slot-4 eviction, to anything - had a Combat Builder shoved into their hands a couple of
+        seconds later while an Onos was on top of them, with their rifle put away.
+
+        A grant the player did not ask for must never change what they are holding. A DELIBERATE
+        purchase from an Armory buy node is a different matter and still switches, because there the
+        player asked for it.
+    ]]
+    self:GiveItem(CombatBuilder.kMapName, false)
 end
 
 local baseInitWeapons = Marine.InitWeapons

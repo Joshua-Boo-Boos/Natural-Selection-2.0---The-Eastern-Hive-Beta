@@ -54,7 +54,21 @@ kMaxInfantryPortalsPerCommandStation = 12 -- Was 9
 kMaxInfantryPortalsGlobal = 12 -- Was 9
 kMaxCommanderMines = 12
 kMaxAlienCommanderWhips = 6
-kNumMines = 2 -- Was 4 mines for 20 p-res
+--[[
+    ONE mine per pack, at kMineCost (5 p-res) each.
+
+    This is also what closes the free-mine exploit, without needing any special case in the armory
+    storage code. With TWO per pack a player could place one mine, keep the pack alive (LayMines only
+    destroys itself at minesLeft == 0), drop it at an Armory to be stored, and retrieve it free - and
+    storage records only the TECH ID, so Marine:GiveItem handed back a FRESH pack at full count. One
+    mine in, two out, repeatable forever.
+
+    At one per pack there is no partial state to bank: placing the mine empties the pack and the
+    weapon deletes itself, so there is nothing left to drop. A full pack can still be stored and
+    retrieved - including picking it up off the floor when an Armory is destroyed and spills its
+    stock - but that returns the single mine that was put in, which is a wash rather than a gain.
+]]
+kNumMines = 1 -- Was 4 for 20 p-res, then 2 for 10
 
 -- LOAD-ORDER FIX (alien respawn showing 5s/8s): kAlienSpawnTime is defined in BOTH Balance.lua
 -- (=10, the mod's intent) AND vanilla BalanceMisc.lua (=2). Vanilla loads BalanceMisc.lua AFTER

@@ -39,18 +39,19 @@ BotAim.kDistanceDebuffPerMeter = 0.25 -- -10% max (40 meters)
 -- Essentially the update rate for changing between "Missing" and "hitting" a target.
 BotAim.kMinAccuracyTime = 0.125
 
--- Accuracy thresholds by weapon group
+-- Accuracy thresholds by weapon group. NS2.0-TEH: every MARINE group (Bullets / ExoMinigun /
+-- ExoRailgun) is 85% of its previous value (-15%); alien groups are unchanged.
 -- Each weapon group holds a table of tiered accuracy percents
 -- 1 through 7, so "rookie" is never accounted for here.
 --
 -- Use BotAim:GetAccuracyGoal to get the correct accuracy value
 BotAim.kAccuracies =
 {   
-    [kBotAccWeaponGroup.Bullets] = { 14.5, 16.5, 21, 25, 28.5, 34, 38.5 },
+    [kBotAccWeaponGroup.Bullets] = { 12.32, 14.03, 17.85, 21.25, 24.22, 28.9, 32.73 },
 
     -- These guys should be stonker
-    [kBotAccWeaponGroup.ExoMinigun] = { 23, 25, 28, 30, 35, 39, 43 },
-    [kBotAccWeaponGroup.ExoRailgun] = { 25, 28, 30, 32, 35, 39, 43 },
+    [kBotAccWeaponGroup.ExoMinigun] = { 19.55, 21.25, 23.8, 25.5, 29.75, 33.15, 36.55 },
+    [kBotAccWeaponGroup.ExoRailgun] = { 21.25, 23.8, 25.5, 27.2, 29.75, 33.15, 36.55 },
 
     -- Similar to "bullets", but caps off in higher tiers
     [kBotAccWeaponGroup.LerkSpikes] = { 14.5, 16.5, 21, 25, 28.5, 28.5, 28.5 },
@@ -228,7 +229,35 @@ function BotAim:GetIsWeaponGroupDistanceAffected(weaponGroup)
     return self.kDistanceAffectedWeaponGroups[weaponGroup] == true
 end
 
+-- NS2.0-TEH: Marine bots take their accuracy goal from the skill tier of the player they are
+-- shooting at (NS2RPG's table, every weapon group), not from the server's average skill tier.
+-- Bots, hallucinations, structures and every other non-human target count as Tier 4.
+BotAim.kMarineAccuracyByTargetTier = { 8.5, 11.3, 14.19, 17, 19.8, 22.7, 25.5 }
+BotAim.kMarineNonHumanTargetTier = 4
+
+local function GetMarineBotTargetSkillTier(target)
+
+    local client = target:isa("Player") and target.GetClient and target:GetClient()
+    if not client or client:GetIsVirtual() then
+        return BotAim.kMarineNonHumanTargetTier
+    end
+
+    if target.GetIsRookie and target:GetIsRookie() then
+        return 1
+    end
+
+    -- GetSkillTier is -2 for unranked players, who count as Tier 1.
+    local tier = target.GetSkillTier and target:GetSkillTier() or BotAim.kMarineNonHumanTargetTier
+    return Clamp(tier, 1, 7)
+
+end
+
 function BotAim:GetAccuracyGoal(weaponGroup)
+
+    local ownerPlayer = self.owner:GetPlayer()
+    if self.target and ownerPlayer and ownerPlayer:GetTeamNumber() == kMarineTeamType then
+        return self.kMarineAccuracyByTargetTier[GetMarineBotTargetSkillTier(self.target)]
+    end
 
     local idealAccuracy = self.kMaximumAccuracy
     if self.kAccuracies[weaponGroup] then

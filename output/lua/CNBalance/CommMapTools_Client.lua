@@ -4,26 +4,22 @@
 --   * The N-key PING: trace the local player's aim, send GC_Ping (5s self-cooldown for feel).
 --   * Rendering incoming pings as world-anchored beacons + the pinger's NAME in team colour,
 --     through walls, auto-fading.
---   * Keeping the local copy of the commander DRAWING (gGCLocalDrawing) in sync from the network;
+--   * Keeping the local copy of the commander ORDER ICONS (gGCLocalIcons) in sync from the network;
 --     the actual on-map rendering + commander input live in CNBalance/GUIMinimapFrame.lua.
 
 if not Client then return end
 
--- The local drawing, shared (same VM) with the GUIMinimapFrame hook that renders it.
--- Each entry: { pos = Vector, penUp = bool }. A penUp entry breaks the line between strokes.
-gGCLocalDrawing = gGCLocalDrawing or {}
--- Bumped on EVERY change: the renderer appends the new points since it last synced.
-gGCDrawVersion = gGCDrawVersion or 0
--- Bumped ONLY on structural changes (clear / erase) that alter existing points, so the renderer
--- knows it must fully rebuild rather than just append (append can't remove/modify old dots).
-gGCDrawStructVersion = gGCDrawStructVersion or 0
+-- The local order icons, shared (same VM) with the GUIMinimapFrame hook that renders them.
+-- Each entry: { pos = Vector, order = int (index into kGCommMap.Orders[team]) }.
+gGCLocalIcons = gGCLocalIcons or {}
+-- Bumped on every change so the renderer knows to rebuild.
+gGCIconVersion = gGCIconVersion or 0
 
-local function ClearLocalDrawing()
-    for i = #gGCLocalDrawing, 1, -1 do
-        gGCLocalDrawing[i] = nil
+local function ClearLocalIcons()
+    for i = #gGCLocalIcons, 1, -1 do
+        gGCLocalIcons[i] = nil
     end
-    gGCDrawVersion = gGCDrawVersion + 1
-    gGCDrawStructVersion = gGCDrawStructVersion + 1
+    gGCIconVersion = gGCIconVersion + 1
 end
 
 -- ---- Ping input --------------------------------------------------------------------------------
@@ -147,40 +143,12 @@ Event.Hook("UpdateClient", function()
     end
 end)
 
--- ---- Drawing sync (data only; rendering is in the GUIMinimapFrame hook) -------------------------
-local function EraseLocalNear(position)
-    local rSq = kGCommMap.EraseRadius * kGCommMap.EraseRadius
-    for i = 1, #gGCLocalDrawing do
-        local p = gGCLocalDrawing[i].pos
-        if p then
-            local dx, dz = p.x - position.x, p.z - position.z
-            if (dx * dx + dz * dz) <= rSq then
-                -- Turn the erased point into a stroke BREAK (see server EraseNear): deleting it
-                -- would let the renderer bridge a line across the gap ("pulled away" pixels).
-                gGCLocalDrawing[i] = { penUp = true }
-            end
-        end
-    end
-end
-
-Client.HookNetworkMessage("GC_DrawShow", function(message)
-    if message.erase then
-        EraseLocalNear(message.position)
-        gGCDrawStructVersion = gGCDrawStructVersion + 1   -- erase modifies old points -> full rebuild
-    elseif message.penUp then
-        local last = gGCLocalDrawing[#gGCLocalDrawing]
-        if last and not last.penUp then
-            gGCLocalDrawing[#gGCLocalDrawing + 1] = { penUp = true }
-        end
-    else
-        -- No local cap check: the server only relays points it actually stored (its own point cap),
-        -- so we just mirror it. Gating on #gGCLocalDrawing here would drop points the server kept
-        -- (e.g. after erasing freed the cap), desyncing our drawing from the authoritative one.
-        gGCLocalDrawing[#gGCLocalDrawing + 1] = { pos = message.position, penUp = false }
-    end
-    gGCDrawVersion = gGCDrawVersion + 1
+-- ---- Order icon sync (data only; rendering is in the GUIMinimapFrame hook) ---------------------
+Client.HookNetworkMessage("GC_IconShow", function(message)
+    gGCLocalIcons[#gGCLocalIcons + 1] = { pos = message.position, order = message.order, size = message.size }
+    gGCIconVersion = gGCIconVersion + 1
 end)
 
 Client.HookNetworkMessage("GC_DrawClear", function(message)
-    ClearLocalDrawing()
+    ClearLocalIcons()
 end)

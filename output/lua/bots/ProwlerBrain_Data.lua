@@ -131,8 +131,39 @@ local kExecProwlerAttackAction = function(move, bot, brain, prowler, action)
     bot:GetMotion():SetDesiredMoveTarget(aimPos)
 end
 
+Script.Load("lua/bots/TEH_AlienOrderAction.lua")
+
 kProwlerBrainActions =
 {
+    ------------------------------------------
+    -- Alien Commander order (below Attack's 8)
+    ------------------------------------------
+    CreateTEHAlienOrderAction(4,
+        function(pos, targetPos, bot, brain, move)
+            bot:GetMotion():SetDesiredViewTarget(nil)
+            bot:GetMotion():SetDesiredMoveTarget(targetPos)
+        end,
+        function(prowler, target, lastSeenPos, bot, brain, move)
+            local sighted = not HasMixin(target, "LOS") or target:GetIsSighted()
+            local aimPos = sighted and GetBestAimPoint(target) or (lastSeenPos + Vector(0, 0.5, 0))
+
+            local activeWep = prowler:GetActiveWeapon()
+            if not activeWep or activeWep:GetMapName() ~= "volley" then
+                prowler:SetActiveWeapon("volley")
+            end
+
+            bot:GetMotion():SetDesiredViewTarget(aimPos)
+            if bot.aim then
+                bot.aim:UpdateAim(target, aimPos, kBotAccWeaponGroup.Bullets)
+            end
+
+            if GetDistanceToTouch(prowler:GetEyePos(), target) < kProwlerFireRange then
+                move.commands = AddMoveCommand(move.commands, Move.PrimaryAttack)
+            end
+
+            bot:GetMotion():SetDesiredMoveTarget(aimPos)
+        end),
+
     ------------------------------------------
     -- Attack
     ------------------------------------------

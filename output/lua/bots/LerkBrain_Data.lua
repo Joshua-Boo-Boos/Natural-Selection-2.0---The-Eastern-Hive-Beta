@@ -600,8 +600,18 @@ end
 -- along with a closure to perform the action
 -- The order they are listed matters - actions near the beginning of the list get priority.
 ------------------------------------------
+Script.Load("lua/bots/TEH_AlienOrderAction.lua")
+
 kLerkBrainActions =
 {
+
+    ------------------------------------------
+    -- Alien Commander order (below Attack)
+    ------------------------------------------
+    CreateTEHAlienOrderAction(GetLerkActionBaselineWeight(kLerkBrainActionTypes.Attack) * 0.5, PerformMove,
+        function(lerk, target, lastSeenPos, bot, brain, move)
+            PerformAttackEntity( lerk:GetEyePos(), target, lastSeenPos, bot, brain, move )
+        end),
     
     ------------------------------------------
     -- Debug Idle
