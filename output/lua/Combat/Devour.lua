@@ -36,6 +36,44 @@ local networkVars =
 
 AddMixinNetworkVars(StompMixin, networkVars)
 
+--[[
+    The stomach loop other players hear from an Onos with a marine inside (its FMOD event, see
+    sound/ns2plus.soundinfo). The devoured marine hears the same loop privately from DevouredPlayer
+    (combat_devour_stomach_inside), so they are set as this sound's predictor and are skipped here.
+    It is a LOOP, so it is held by id and explicitly stopped and destroyed whenever the stomach empties.
+]]
+local kStomachOutsideSound = PrecacheAsset("sound/ns2plus.fev/abilities/alien/onos/devour")
+local kStomachOutsideVolume = 0.2
+
+local function StopStomachSound(self)
+
+    if not Server then return end
+
+    local sound = self.stomachSoundId and Shared.GetEntity(self.stomachSoundId)
+    self.stomachSoundId = nil
+
+    if sound and sound:isa("SoundEffect") then
+        sound:Stop()
+        if not sound:GetIsDestroyed() then
+            DestroyEntity(sound)
+        end
+    end
+
+end
+
+local function StartStomachSound(self, onos, victim)
+
+    if not Server or not onos then return end
+
+    StopStomachSound(self)
+
+    local sound = StartSoundEffectOnEntity(kStomachOutsideSound, onos, kStomachOutsideVolume, victim)
+    if sound then
+        self.stomachSoundId = sound:GetId()
+    end
+
+end
+
 local function UpdateDevour(self)
 
     local onos = self:GetParent()
@@ -43,9 +81,15 @@ local function UpdateDevour(self)
     if onos and (not onos:isa("Onos") or not onos:GetIsAlive()) then
     
         self:ClearPlayer(true)
+        StopStomachSound(self)
         return false
    
     else
+        -- The stomach can be emptied from outside this callback (the marine's release, death); keep the loop in step.
+        if self.eatingPlayerId == 0 then
+            StopStomachSound(self)
+        end
+
         if self.eatingPlayerId ~= 0 then
             local player = Shared.GetEntity(self.eatingPlayerId)            
             if player then
@@ -105,6 +149,7 @@ function Devour:OnCreate()
 end
 
 function Devour:OnDestroy()
+    StopStomachSound(self)
     self:ClearPlayer(true)
 end
 
@@ -207,6 +252,8 @@ function Devour:ClearPlayer(isOnosDying)
     -- already nil. The old `if onos and ...` guard then skipped the release entirely and left the
     -- marine stuck as a DevouredPlayer (the "marine saved but bugged" state). The Onos is only
     -- needed for the little death-spot reposition, which we simply skip when it's already gone.
+    StopStomachSound(self)
+
     if self.eatingPlayerId == 0 then return end
 
     local devouredplayer = Shared.GetEntity(self.eatingPlayerId)
@@ -399,6 +446,7 @@ function Devour:DevourPlayer(targetPlayer)
     local vHeightOffset = Vector(0, Onos.YExtents, 0)
     devourCoords.origin = devourCoords.origin + vHeightOffset
 	onos:TriggerEffects("combat_devour_eat", {effecthostcoords = devourCoords})
+	StartStomachSound(self, onos, devouredPlayer)
 	
 	-- Switch to the Gore weapon if successful.
 	local owner = self:GetParent()

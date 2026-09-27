@@ -346,6 +346,8 @@ ModLoader.SetupFileHook("lua/Armory.lua", "lua/CNBalance/ArmoryStorage_Armory.lu
 ModLoader.SetupFileHook("lua/Weapons/Weapon_Server.lua", "lua/CNBalance/ArmoryStorage_Weapon.lua", "post")
 ModLoader.SetupFileHook("lua/Marine_Server.lua", "lua/CNBalance/ArmoryStorage_Marine.lua", "post")
 ModLoader.SetupFileHook("lua/NetworkMessages_Client.lua", "lua/CNBalance/ArmoryStorage_Client.lua", "post")
+-- Plays the devour-escape screen effect when the server says a marine got out of an Onos.
+ModLoader.SetupFileHook("lua/NetworkMessages_Client.lua", "lua/CNBalance/DevourEscape_Client.lua", "post")
 ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/CNBalance/ArmoryStorage_Gamerules.lua", "post")
 ModLoader.SetupFileHook("lua/PickupableWeaponMixin.lua", "lua/CNBalance/ArmoryStorage_Pickup.lua", "post")
 

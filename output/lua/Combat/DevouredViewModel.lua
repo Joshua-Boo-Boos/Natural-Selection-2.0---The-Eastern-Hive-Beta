@@ -153,14 +153,20 @@ function DevouredViewModel:OnTag(tagName)
 		-- (assuming they predict it locally) - so the marine actually punching never
 		-- heard it. Fix: play server-side, networked to everyone (no predictor), at a
 		-- fixed audible volume. The engine already applies the user's sound-fx volume.
-		if tagName == "attack_left_start" then
-			if Server and parent.GetHealth and parent:GetHealth() > 0 then
-				StartSoundEffectOnEntity(kPunchSoundLeft, parent, kPunchSoundVolume)
+		--
+		-- The sound is attached to the DEVOURING ONOS, not the devoured marine. DevouredPlayer is invisible and
+		-- SetPropagate(Entity.Propagate_Never), so no client is ever sent that entity - a networked SoundEffect
+		-- parented to it had no parent on any client and was never heard. The Onos is networked, is at the same
+		-- spot (UpdateDevour keeps the marine on the Onos' coords) and is relevant to the devoured marine too, so
+		-- everyone nearby - the punching marine included - hears the punches from inside the Onos.
+		if Server and (tagName == "attack_left_start" or tagName == "attack_right_start")
+		   and parent.GetHealth and parent:GetHealth() > 0 then
+			local soundHost = parent.GetDevouringOnosId and Shared.GetEntity(parent:GetDevouringOnosId()) or nil
+			if not soundHost or not soundHost:isa("Onos") or not soundHost:GetIsAlive() then
+				soundHost = parent
 			end
-		elseif tagName == "attack_right_start" then
-			if Server and parent.GetHealth and parent:GetHealth() > 0 then
-				StartSoundEffectOnEntity(kPunchSoundRight, parent, kPunchSoundVolume)
-			end
+			local punchSound = (tagName == "attack_left_start") and kPunchSoundLeft or kPunchSoundRight
+			StartSoundEffectOnEntity(punchSound, soundHost, kPunchSoundVolume)
 		end
 		
 		if tagName == "attack_left_end" or tagName == "attack_right_end" then

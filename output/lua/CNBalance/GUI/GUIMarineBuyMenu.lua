@@ -705,19 +705,20 @@ function GUIMarineBuyMenu:_CreateButton(parent, buttonPosition, buttonTechId)
     teamText:SetOptionFlag(GUIItem.CorrectScaling)
     GUIMakeFontScale(teamText, "kAgencyFB", kButtonNumberFontSize)
 
-    -- ARMORY WEAPON STORAGE: live "Stored: N" readout for weapons this host can bank. Anchored to
-    -- the button's bottom-right, which is the one corner none of the cost/team furniture occupies.
+    -- ARMORY WEAPON STORAGE: live "Stored: N" readout for weapons this host can bank.
     -- Created for every button unconditionally and simply hidden for techs that are never stored --
     -- cheaper than rebuilding buttons when the host structure changes, and it keeps the button table
     -- shape uniform so _UpdateRealTimeElements never has to nil-check the item itself.
     local storedText = self:CreateAnimatedTextItem()
     storedText:SetIsScaling(false)
     storedText:AddAsChildTo(buyButton)
-    -- Anchored to the button's bottom edge; y grows downward, so a more negative offset lifts it.
-    -- Raised from -4 to -12 to sit clear of the button's lower border.
-    storedText:SetAnchor(GUIItem.Middle, GUIItem.Bottom)
-    storedText:SetPosition(Vector(0, -iconPaddingY - 10, 0))
-    storedText:SetTextAlignmentX(GUIItem.Align_Center)
+    -- Bottom-LEFT corner, under the cost and team-count icons and lined up with their left edge
+    -- (iconpaddingX). Bottom-centre put it under the weapon silhouette, which made it hard to read on
+    -- wide weapons like the Grenade Launcher; the left corner is clear on every button.
+    -- y grows downward, so a more negative offset lifts it clear of the button's lower border.
+    storedText:SetAnchor(GUIItem.Left, GUIItem.Bottom)
+    storedText:SetPosition(Vector(iconpaddingX, -iconPaddingY - 10, 0))
+    storedText:SetTextAlignmentX(GUIItem.Align_Min)
     storedText:SetTextAlignmentY(GUIItem.Align_Max)
     -- AgencyFB IS the marine team font (Stamp is the alien one), and "kAgencyFBBold" is its bold
     -- family. GUIMakeFontScale picks the actual face from that family for the requested size and

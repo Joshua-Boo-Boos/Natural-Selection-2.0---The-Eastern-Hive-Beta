@@ -5,6 +5,18 @@ Script.Load("lua/bots/AlienCommanderBrain_TechPathData.lua")
 Script.Load("lua/bots/AlienCommanderBrain_Utility.lua")
 Script.Load("lua/bots/AlienCommanderBrain_Senses.lua")
 
+-- The same "hive that is not about to die" pick as vanilla's cheapestBiomassUnit sense (a local in
+-- AlienCommanderBrain_Senses.lua, so it cannot be called from here). Used for NS2.0-TEH's Recover Biomass.
+local function GetSafeHiveForBiomass(hiveTable)
+    if not hiveTable then return end
+    for _, hive in ipairs(hiveTable) do
+        local hiveMightDie = hive:GetHealthScalar() < 0.4 and hive:GetIsInCombat()
+        if not hiveMightDie then
+            return hive
+        end
+    end
+end
+
 local kAlienComActionTypes = enum({
 
     "WaitForHiveDrop", -- Waiting for Hive drop after decision, for a warning period. -- TODO: This blocks all other actions, use a "tres deficit/save" mechanism instead
@@ -605,6 +617,21 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
 
             local techTree = GetTechTree(comTeamNumber)
             local techNode = techTree and techTree:GetTechNode(nextTechId)
+
+            -- NS2.0-TEH: once the tech path has nothing left it can use - it is finished, or all that is left
+            -- wants a 4th hive (tier 4) and the team already has three - keep researching Biomass up to the
+            -- maximum the hives allow (4 per hive; health and armour scale with it up to Biomass 9) whenever
+            -- there are team resources to spare.
+            local pathDone = nextTechId == kTechId.None or (isHiveDrop and #GetEntitiesAliveForTeam("Hive", comTeamNumber) >= 3)
+            if pathDone and com:GetTeamResources() >= 60 then
+                local cheapestBioTable = senses:Get("cheapestBiomassUnit")
+                if cheapestBioTable.isValid then
+                    hiveToResearchAt = cheapestBioTable.hiveEnt
+                    researchTechId = cheapestBioTable.techId
+                    weight = GetAlienComBaselineWeight(kAlienComActionTypes.ResearchUpgrades)
+                end
+            end
+
             if nextTechId ~= kTechId.None and not isHiveDrop then
 
                 -- Since there are no biomass upgrades in the alien com tech path, if we can't do the research
@@ -613,11 +640,31 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                 
                 if doables[nextTechId] then -- Can afford, and do (has pre-reqs)
 
-                    if evoChamber then
+                    --[[
+                        NS2.0-TEH: not every path step is researched at the Evolution Chamber - Shift Tunnel is a
+                        Hive button (CNBalance/Structures/Alien/Hive.lua). Researching it at the chamber failed every
+                        think and blocked all other research. Use the chamber when it offers the tech (vanilla),
+                        otherwise the first idle unit that does.
+                    ]]
+                    local researchUnit
+                    local units = doables[nextTechId]
+                    if type(units) == "table" then
+                        for _, unit in ipairs(units) do
+                            if unit == evoChamber then researchUnit = unit break end
+                        end
+                        if not researchUnit then
+                            for _, unit in ipairs(units) do
+                                if not (unit.GetIsResearching and unit:GetIsResearching()) then researchUnit = unit break end
+                            end
+                        end
+                    end
+                    researchUnit = researchUnit or evoChamber
+
+                    if researchUnit then
 
                         weight = GetAlienComBaselineWeight(kAlienComActionTypes.ResearchUpgrades)
                         researchTechId = nextTechId
-                        hiveToResearchAt = evoChamber
+                        hiveToResearchAt = researchUnit
 
                     end
 
@@ -627,20 +674,22 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                     local preReq1TechId = techNode:GetPrereq1()
                     local preReq2TechId = techNode:GetPrereq2()
 
-                    -- Get the 1-12 biomass level tech id
+                    -- Get the 1-12 biomass level tech id.
+                    -- NS2.0-TEH: only prerequisites that ARE Biomass levels are read. Vanilla fed both into
+                    -- math.max, which throws when one is another tech (Xenocide Fuel = Biomass 10 + Xenocide:
+                    -- kTechToBiomassLevel[Xenocide] is nil). kTechToBiomassLevel also maps 1-12 back to tech
+                    -- ids, so an unchecked read could even return a tech id as a "level".
                     local highestBiomassPrereqLevel
-                    if preReq1TechId ~= kTechId.None and preReq2TechId ~= kTechId.None then
-                        highestBiomassPrereqLevel = math.max(kTechToBiomassLevel[preReq1TechId], kTechToBiomassLevel[preReq2TechId])
-                    elseif preReq1TechId ~= kTechId.None then
-                        highestBiomassPrereqLevel = kTechToBiomassLevel[preReq1TechId]
-                    elseif preReq2TechId ~= kTechId.None then
-                        highestBiomassPrereqLevel = kTechToBiomassLevel[preReq2TechId]
+                    for _, preTechId in ipairs({ preReq1TechId, preReq2TechId }) do
+                        if kBioMassTechIdsSet[preTechId] then
+                            highestBiomassPrereqLevel = math.max(highestBiomassPrereqLevel or 0, kTechToBiomassLevel[preTechId])
+                        end
                     end
 
-                    assert(highestBiomassPrereqLevel, "Prerequisite for research tech was not a biomass!")
-
+                    -- NS2.0-TEH: a prerequisite that is not a Biomass level (Shift Tunnel needs a Shift Hive)
+                    -- cannot be reached by researching Biomass. Vanilla asserted here; skip instead.
                     local inProgressBiomassLevel = com:GetTeam():GetInProgressBiomassLevel()
-                    if inProgressBiomassLevel < highestBiomassPrereqLevel then
+                    if highestBiomassPrereqLevel and inProgressBiomassLevel < highestBiomassPrereqLevel then
 
                         local cheapestBioTable = senses:Get("cheapestBiomassUnit")
                         if cheapestBioTable.isValid then
@@ -649,9 +698,48 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                             researchTechId = cheapestBioTable.techId
                             weight = GetAlienComBaselineWeight(kAlienComActionTypes.ResearchUpgrades)
 
+                        else
+
+                            --[[
+                                NS2.0-TEH: a hive rebuilt after one of its type was lost offers RECOVER Biomass
+                                instead of Research Biomass (CNBalance/Structures/Alien/Hive.lua, bioMassPreserve),
+                                and vanilla's cheapestBiomassUnit only knows the Research buttons. Use Recover.
+                            ]]
+                            for _, recoverTechId in ipairs({ kTechId.RecoverBiomassOne, kTechId.RecoverBiomassTwo, kTechId.RecoverBiomassThree }) do
+                                local hive = GetSafeHiveForBiomass(doables[recoverTechId])
+                                if hive then
+                                    hiveToResearchAt = hive
+                                    researchTechId = recoverTechId
+                                    weight = GetAlienComBaselineWeight(kAlienComActionTypes.ResearchUpgrades)
+                                    break
+                                end
+                            end
+
                         end
 
                     end
+                end
+            end
+        end
+
+        --[[
+            NS2.0-TEH: NEVER STALL ON A LOW BIOMASS. If nothing else was chosen above, the built hives allow more
+            Biomass than the team has (4 per built hive) and there are team resources to spare, research the
+            cheapest Biomass anyway - unless the commander is saving for a Hive it can still place (fewer than 3).
+        ]]
+        local savingForHive = brain.nextUpgradeStep == kTechId.Hive and #GetEntitiesAliveForTeam("Hive", comTeamNumber) < 3
+        if weight == 0 and not waitingForEarlyGameDrops and brain.droppedUpgradeChamber and not savingForHive
+                and com:GetTeamResources() >= 60 then
+            local builtHives = #senses:Get("builtHives")
+            local team = com:GetTeam()
+            local biomass = team and team.GetBioMassLevel and team:GetBioMassLevel() or 0
+            local inProgress = team and team.GetInProgressBiomassLevel and team:GetInProgressBiomassLevel() or biomass
+            if inProgress < math.min(12, builtHives * 4) then
+                local cheapestBioTable = senses:Get("cheapestBiomassUnit")
+                if cheapestBioTable.isValid then
+                    hiveToResearchAt = cheapestBioTable.hiveEnt
+                    researchTechId = cheapestBioTable.techId
+                    weight = GetAlienComBaselineWeight(kAlienComActionTypes.ResearchUpgrades)
                 end
             end
         end

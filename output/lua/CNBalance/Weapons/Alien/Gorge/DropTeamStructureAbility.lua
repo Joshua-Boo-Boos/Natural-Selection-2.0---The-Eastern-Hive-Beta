@@ -186,3 +186,82 @@ function DropTeamStructureAbility:GetNumStructuresCanDrop(techId,biomassLevel)
     return -1
 end
 Shared.LinkClassToMap("DropTeamStructureAbility", DropTeamStructureAbility.kMapName, networkVars)
+--[[
+    SERVER-SIDE CHECK OF EVERY TEAM-STRUCTURE DROP (Origin Form and the base team build menu).
+
+    Which structures a Gorge may drop was only ever decided by the CLIENT's menu (GetAvailableStructureTechIds
+    and GetTechChosen above), and the Hive abilities' IsAllowed returns true on the server. So two Gorges
+    clicking a Crag Hive at the same moment both got one - two Hives of the same type, and more Hives than the
+    three types allow - and a stale or modified client could drop anything.
+
+    Every drop, a human's (the GorgeBuildStructure message) or a bot's, arrives here first. The server
+    handles them one at a time and a new Hive exists the moment it is created, so the second of two
+    simultaneous Hive drops sees the first and is refused. The rules are the menu's rules:
+      * Cyst, Egg, Whip, Harvester - always (the base team build menu);
+      * everything else - only once Origin Form is researched;
+      * a Crag / Shift / Shade Hive - only while the team has no Hive of that type (alive, being built, or
+        being upgraded to that type), which also caps the team at one Hive of each type;
+      * a Shell / Spur / Veil - only once the matching Hive type exists.
+    Everything else (placement, p-res, energy, cooldown, Siege's Sudden Death rules) is still checked by
+    DropStructureAbility:DropStructure exactly as before.
+]]
+if Server then
+
+    local kAlwaysAllowed = { [kTechId.Cyst] = true, [kTechId.Egg] = true, [kTechId.Whip] = true, [kTechId.Harvester] = true }
+
+    local kHiveUpgradeResearch = {
+        [kTechId.CragHive] = kTechId.UpgradeToCragHive,
+        [kTechId.ShiftHive] = kTechId.UpgradeToShiftHive,
+        [kTechId.ShadeHive] = kTechId.UpgradeToShadeHive,
+    }
+
+    local kChamberHive = { [kTechId.Shell] = kTechId.CragHive, [kTechId.Spur] = kTechId.ShiftHive, [kTechId.Veil] = kTechId.ShadeHive }
+
+    local function GetTeamHasHiveType(teamNumber, hiveTechId)
+        local upgradeResearch = kHiveUpgradeResearch[hiveTechId]
+        for _, hive in ipairs(GetEntitiesForTeam("Hive", teamNumber)) do
+            if hive:GetIsAlive() then
+                if hive:GetTechId() == hiveTechId then return true end
+                if upgradeResearch and hive.GetResearchingId and hive:GetResearchingId() == upgradeResearch then return true end
+            end
+        end
+        return false
+    end
+
+    function GetTeamStructureDropAllowed(ability, player, techId)
+
+        if kAlwaysAllowed[techId] then return true end
+        if not GetHasTech(ability, kTechId.OriginForm) then return false end
+
+        local teamNumber = player:GetTeamNumber()
+
+        if kHiveUpgradeResearch[techId] then
+            return not GetTeamHasHiveType(teamNumber, techId)
+        end
+
+        if kChamberHive[techId] then
+            return GetTeamHasHiveType(teamNumber, kChamberHive[techId])
+        end
+
+        return true
+
+    end
+
+    local baseOnDropStructure = DropTeamStructureAbility.OnDropStructure
+
+    function DropTeamStructureAbility:OnDropStructure(origin, direction, structureTechId, ...)
+
+        local player = self:GetParent()
+        if not player then return end
+
+        local ok, allowed = pcall(GetTeamStructureDropAllowed, self, player, structureTechId)
+        if ok and not allowed then
+            player:TriggerInvalidSound()
+            return
+        end
+
+        return baseOnDropStructure(self, origin, direction, structureTechId, ...)
+
+    end
+
+end

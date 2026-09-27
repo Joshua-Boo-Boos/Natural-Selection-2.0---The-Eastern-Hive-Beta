@@ -179,6 +179,56 @@ function GetHasTechForTechPathForAliens(brain, com, techId)
 
     end -- END build node
 
+    --[[
+        NS2.0-TEH: ABILITIES UNLOCK BY THEMSELVES. Leap, Umbra, Spores, Bile Bomb and the rest are Activation
+        nodes here (AddActivation / AddUnlockActivation in CNBalance/AlienTeam.lua) that unlock the moment
+        their Biomass is reached - in vanilla they were researched. Nothing above recognised an Activation, so
+        every one of them stayed "NotStarted" for ever: the path froze on the first (Leap, Biomass 4), and as
+        the commander only researches Biomass for the current path step, Biomass stopped at 4 (5 once the
+        second hive's own level was added).
+
+        So an Activation counts as HAD once its prerequisites are met, and as IN PROGRESS while the Biomass it
+        needs is being researched or built.
+    ]]
+    if techType ~= kTechType.Research and techType ~= kTechType.Build then
+
+        if GetHasPrereqs(comTeam, techId) then
+            result = kHasTechResult.HasTech
+        else
+
+            local needed = 0
+            for _, preTechId in ipairs({ techNode:GetPrereq1(), techNode:GetPrereq2() }) do
+                if kBioMassTechIdsSet[preTechId] then
+                    needed = math.max(needed, kTechToBiomassLevel[preTechId] or 0)
+                end
+            end
+
+            local team = com:GetTeam()
+            local inProgress = team and team.GetInProgressBiomassLevel and team:GetInProgressBiomassLevel() or 0
+            if needed > 0 and inProgress >= needed then
+                result = kHasTechResult.InProgressOrUnbuilt
+            else
+                result = kHasTechResult.NotStarted
+            end
+
+        end
+
+    end
+
+    --[[
+        A step that needs something other than Biomass which the team does not have (Shift Tunnel needs a Shift
+        Hive) cannot be worked towards by researching Biomass, so it is stepped over rather than blocking the
+        whole path - and it is picked up again the moment that prerequisite exists.
+    ]]
+    if result == kHasTechResult.NotStarted then
+        for _, preTechId in ipairs({ techNode:GetPrereq1(), techNode:GetPrereq2() }) do
+            if preTechId ~= kTechId.None and not kBioMassTechIdsSet[preTechId] and not techTree:GetHasTech(preTechId) then
+                result = kHasTechResult.HasTech
+                break
+            end
+        end
+    end
+
     return result
 
 end

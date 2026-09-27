@@ -1,18 +1,30 @@
 local kAdditionalEffects =
 {
-    combat_devour_stomach_outside = 
+    -- The stomach loop's FMOD event is /abilities/alien/onos/devour (see sound/ns2plus.soundinfo). The old path
+    -- "abilities/onos/devour" (no "alien") named no event, so neither loop ever played.
+    combat_devour_stomach_outside =
     {
-        devourOutsideEffects = 
+        devourOutsideEffects =
         {
-            {parented_sound = "sound/ns2plus.fev/abilities/onos/devour", volume = 0.2, done = true},
+            {parented_sound = "sound/ns2plus.fev/abilities/alien/onos/devour", volume = 0.2, done = true},
         },
     },
-    
-    combat_devour_stomach_inside = 
+
+    combat_devour_stomach_inside =
     {
-        devourInsideEffects = 
+        devourInsideEffects =
         {
-            {private_sound = "sound/ns2plus.fev/abilities/onos/devour", done = true},
+            {private_sound = "sound/ns2plus.fev/abilities/alien/onos/devour", done = true},
+        },
+    },
+
+    -- Triggered by Devour whenever a marine leaves the stomach; stops the looping sounds on the triggering entity.
+    -- It was missing from this table, so those triggers did nothing.
+    combat_stop_effects =
+    {
+        stopEffects =
+        {
+            {stop_effects = ""},
         },
     },
     
