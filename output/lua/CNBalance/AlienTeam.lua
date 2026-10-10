@@ -1475,9 +1475,12 @@ function AlienTeam:OnOriginFormResourceFetch(_player)
     _player:AddResources(finalPRes)
     self:AddTeamResources(-finalPRes)
 
-    local chatMessage = string.format("<%s> ve taken [%s] resources from pool.", _player:GetName(),finalPRes)
+    -- "[Origin Form]: <player> has taken <n> t-res from the team pool as p-res." to the Alien team only. Sent as a
+    -- CETeamAnnounce line (printed exactly as given, in the team colour): the vanilla "Chat" message always put
+    -- "(Team) :" in front, which is what made this read "(Team) : <player> ve taken [n] resources from pool.".
+    local chatMessage = string.format("[Origin Form]: %s has taken %d t-res from the team pool as p-res.", _player:GetName(), finalPRes)
     local teamNumber = self:GetTeamNumber()
     for _, broadCastPlayer in pairs(GetEntitiesForTeam("Player", teamNumber)) do
-        Server.SendNetworkMessage(broadCastPlayer, "Chat", BuildChatMessage(true, "", -1, teamNumber, self:GetTeamType(), chatMessage), true)
+        Server.SendNetworkMessage(broadCastPlayer, "CETeamAnnounce", { message = string.sub(chatMessage, 1, 220) }, true)
     end
 end

@@ -864,6 +864,13 @@ local function FindUnitsToDisplayStatusFor(player)
 
     PROFILE("GUIUnitStatus:FindUnitsToDisplayStatusFor")
 
+    -- Not a player at all: for a moment while the local player's entity is being replaced, Client.GetLocalPlayer()
+    -- can hand back whatever entity now has that id (seen: a SoundEffect), and everything below calls player methods
+    -- on it - "attempt to call method 'GetTeamNumber' (a nil value)" every frame. Show nothing until it is a player.
+    if not player or not player.isa or not player:isa("Player") then
+        return {}
+    end
+
     -- commanders will show entities that are selected
     if player:isa("Commander") then
         local result = {}

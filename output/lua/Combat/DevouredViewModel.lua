@@ -15,8 +15,9 @@ DevouredViewModel.kMapName = "devoured_view_model"
 DevouredViewModel.kViewModelName = PrecacheAsset("models/alien/devour/onos_stomach_view.model")
 local kAnimationGraph = PrecacheAsset("models/alien/devour/onos_stomach_view.animation_graph")
 DevouredViewModel.kDevourGoopMaterial = "cinematics/vfx_materials/devour_goop.material"
-local kPunchSoundLeft = PrecacheAsset("sound/ns2plus.fev/common/marine/onos_punch_l")
-local kPunchSoundRight = PrecacheAsset("sound/ns2plus.fev/common/marine/onos_punch_r")
+-- From sound/Devour.fev, shipped in this mod (the game's own ns2plus.fev cannot be relied on for Devour sounds).
+local kPunchSoundLeft = PrecacheAsset("sound/Devour.fev/Devour/onos_punch_l")
+local kPunchSoundRight = PrecacheAsset("sound/Devour.fev/Devour/onos_punch_r")
 
 local kWoundSound = PrecacheAsset("sound/NS2.fev/marine/common/wound")
 local kRange = 0.0001
@@ -159,14 +160,32 @@ function DevouredViewModel:OnTag(tagName)
 		-- parented to it had no parent on any client and was never heard. The Onos is networked, is at the same
 		-- spot (UpdateDevour keeps the marine on the Onos' coords) and is relevant to the devoured marine too, so
 		-- everyone nearby - the punching marine included - hears the punches from inside the Onos.
-		if Server and (tagName == "attack_left_start" or tagName == "attack_right_start")
-		   and parent.GetHealth and parent:GetHealth() > 0 then
-			local soundHost = parent.GetDevouringOnosId and Shared.GetEntity(parent:GetDevouringOnosId()) or nil
-			if not soundHost or not soundHost:isa("Onos") or not soundHost:GetIsAlive() then
-				soundHost = parent
+		--
+		-- EVERY PUNCH IS HEARD. The server can miss an animation tag (a tick lands between two tags), so a punch
+		-- whose _start tag was missed still lands on its _end tag (the damage) but made no sound. The sound now
+		-- plays on the _start tag and, if that one was missed, on the matching _end tag instead - once per punch.
+		if Server and parent.GetHealth and parent:GetHealth() > 0 then
+
+			local side
+			if tagName == "attack_left_start" or tagName == "attack_left_end" then side = "left"
+			elseif tagName == "attack_right_start" or tagName == "attack_right_end" then side = "right" end
+
+			local isStart = tagName == "attack_left_start" or tagName == "attack_right_start"
+			local playNow = side and (isStart or self.punchSoundSide ~= side)
+
+			if playNow then
+				local soundHost = parent.GetDevouringOnosId and Shared.GetEntity(parent:GetDevouringOnosId()) or nil
+				if not soundHost or not soundHost:isa("Onos") or not soundHost:GetIsAlive() then
+					soundHost = parent
+				end
+				local punchSound = (side == "left") and kPunchSoundLeft or kPunchSoundRight
+				StartSoundEffectOnEntity(punchSound, soundHost, kPunchSoundVolume)
 			end
-			local punchSound = (tagName == "attack_left_start") and kPunchSoundLeft or kPunchSoundRight
-			StartSoundEffectOnEntity(punchSound, soundHost, kPunchSoundVolume)
+
+			if side then
+				self.punchSoundSide = isStart and side or nil
+			end
+
 		end
 		
 		if tagName == "attack_left_end" or tagName == "attack_right_end" then

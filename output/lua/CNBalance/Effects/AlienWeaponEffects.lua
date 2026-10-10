@@ -1,12 +1,12 @@
 local kAdditionalEffects =
 {
-    -- The stomach loop's FMOD event is /abilities/alien/onos/devour (see sound/ns2plus.soundinfo). The old path
-    -- "abilities/onos/devour" (no "alien") named no event, so neither loop ever played.
+    -- The stomach loop is /Devour/devour in sound/Devour.fev, shipped in this mod's sound folder. The game's own
+    -- ns2plus.fev has no devour event, so the old ns2plus paths never played and logged Event not found.
     combat_devour_stomach_outside =
     {
         devourOutsideEffects =
         {
-            {parented_sound = "sound/ns2plus.fev/abilities/alien/onos/devour", volume = 0.2, done = true},
+            {parented_sound = "sound/Devour.fev/Devour/devour_ambience", volume = 0.2, done = true},
         },
     },
 
@@ -14,7 +14,7 @@ local kAdditionalEffects =
     {
         devourInsideEffects =
         {
-            {private_sound = "sound/ns2plus.fev/abilities/alien/onos/devour", done = true},
+            {private_sound = "sound/Devour.fev/Devour/devour_ambience", done = true},
         },
     },
 
@@ -32,7 +32,7 @@ local kAdditionalEffects =
     {
         devourEatEffects = 
         {
-            {sound = "sound/ns2plus.fev/common/alien/devour_in"},
+            {sound = "sound/Devour.fev/Devour/devour_in"},
             {cinematic = "cinematics/alien/onos/devour_escape.cinematic", done = true},
         },
     },
@@ -41,7 +41,7 @@ local kAdditionalEffects =
     {
         devourEscapeEffects = 
         {
-            {sound = "sound/ns2plus.fev/common/alien/devour_out"},
+            {sound = "sound/Devour.fev/Devour/devour_out"},
             {cinematic = "cinematics/alien/onos/devour_escape.cinematic", done = true},
         },
     },

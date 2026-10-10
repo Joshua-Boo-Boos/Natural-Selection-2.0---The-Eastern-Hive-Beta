@@ -42,7 +42,7 @@ AddMixinNetworkVars(StompMixin, networkVars)
     (combat_devour_stomach_inside), so they are set as this sound's predictor and are skipped here.
     It is a LOOP, so it is held by id and explicitly stopped and destroyed whenever the stomach empties.
 ]]
-local kStomachOutsideSound = PrecacheAsset("sound/ns2plus.fev/abilities/alien/onos/devour")
+local kStomachOutsideSound = PrecacheAsset("sound/Devour.fev/Devour/devour_ambience")
 local kStomachOutsideVolume = 0.2
 
 local function StopStomachSound(self)

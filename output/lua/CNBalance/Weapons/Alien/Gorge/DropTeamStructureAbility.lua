@@ -201,6 +201,9 @@ Shared.LinkClassToMap("DropTeamStructureAbility", DropTeamStructureAbility.kMapN
       * everything else - only once Origin Form is researched;
       * a Crag / Shift / Shade Hive - only while the team has no Hive of that type (alive, being built, or
         being upgraded to that type), which also caps the team at one Hive of each type;
+      * and ANY Hive drop only while the team has fewer than kOriginFormMaxHives (3) living Hives of any kind,
+        built or still being built. One-of-each-type alone did not guarantee this: a team whose starting (or
+        Commander-built) Hive was still untyped could otherwise add all three typed Hives and reach four;
       * a Shell / Spur / Veil - only once the matching Hive type exists.
     Everything else (placement, p-res, energy, cooldown, Siege's Sudden Death rules) is still checked by
     DropStructureAbility:DropStructure exactly as before.
@@ -216,6 +219,16 @@ if Server then
     }
 
     local kChamberHive = { [kTechId.Shell] = kTechId.CragHive, [kTechId.Spur] = kTechId.ShiftHive, [kTechId.Veil] = kTechId.ShadeHive }
+
+    kOriginFormMaxHives = kOriginFormMaxHives or 3
+
+    local function GetTeamHiveCount(teamNumber)
+        local count = 0
+        for _, hive in ipairs(GetEntitiesForTeam("Hive", teamNumber)) do
+            if hive:GetIsAlive() then count = count + 1 end
+        end
+        return count
+    end
 
     local function GetTeamHasHiveType(teamNumber, hiveTechId)
         local upgradeResearch = kHiveUpgradeResearch[hiveTechId]
@@ -236,6 +249,7 @@ if Server then
         local teamNumber = player:GetTeamNumber()
 
         if kHiveUpgradeResearch[techId] then
+            if GetTeamHiveCount(teamNumber) >= kOriginFormMaxHives then return false end
             return not GetTeamHasHiveType(teamNumber, techId)
         end
 

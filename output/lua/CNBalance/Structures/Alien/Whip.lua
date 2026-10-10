@@ -76,4 +76,4 @@ function Whip:GetEyePos()
     return self:GetOrigin() + self:GetCoords().yAxis * 1.7
 end
 
-Shared.LinkClassToMap("Whip", Whip.kMapName, { commanderPlaced = "boolean" })
+Shared.LinkClassToMap("Whip", Whip.kMapName, { commanderPlaced = "boolean" }, true)
