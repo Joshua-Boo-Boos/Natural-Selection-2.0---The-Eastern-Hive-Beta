@@ -48,12 +48,12 @@ debug.appendtoenum(kTechId, "ARCSpecInferno4")
 
 ARCSpec = ARCSpec or {}
 
--- Balance. Specialised ARCs cost 50% more and take twice as long as a normal ARC (see ARCSpec_TechData.lua).
+-- Balance. Specialised ARCs cost 18 team resources and take twice as long as a normal ARC (see ARCSpec_TechData.lua).
 ARCSpec.kSpecResearchCost = 15
 ARCSpec.kSpecResearchTime = 20
-ARCSpec.kUpgradeCosts = { 10, 20, 30, 40 }
+ARCSpec.kUpgradeCosts = { 10, 15, 20, 25 }
 ARCSpec.kUpgradeTimes = { 30, 40, 50, 60 }
-ARCSpec.kARCCostScalar = 1.5
+ARCSpec.kARCCost = 18
 ARCSpec.kARCBuildTimeScalar = 2
 
 ARCSpec.kSpecs =

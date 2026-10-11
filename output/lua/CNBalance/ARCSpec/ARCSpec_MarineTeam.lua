@@ -12,9 +12,10 @@
         still sees one.
       - <Spec>ARC is manufactured only at a <Spec>Factory. With every such factory gone its prerequisite fails and it cannot
         be built, until another factory converts.
-      - <Spec>1..4 are team research, each needing the one before it, the first needing a <Spec>Factory. Vanilla research
-        rules then give exactly the requested behaviour: while no factory of that specialisation exists the upgrades stop
-        applying, and once one is converted again every upgrade that WAS researched applies again - unresearched ones do not.
+      - <Spec>1..4 are team research, each needing the one before it, the first needing a <Spec>Factory. While no factory of
+        that specialisation exists, no further upgrade can be researched. Specialised ARCs already built keep every level
+        researched (ARCSpec.GetUpgradeTier reads the researched flag, not GetHasTech), and a newly converted factory
+        continues from the last researched level.
 ]]
 
 local baseInitTechTree = MarineTeam.InitTechTree

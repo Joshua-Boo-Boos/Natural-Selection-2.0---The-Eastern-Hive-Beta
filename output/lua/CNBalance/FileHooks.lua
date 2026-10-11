@@ -382,3 +382,4 @@ ModLoader.SetupFileHook("lua/ARC.lua", "lua/CNBalance/ARCSpec/ARCSpec_ARC.lua", 
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/ARCSpec/ARCSpec_Shots.lua", "post")
 ModLoader.SetupFileHook("lua/RoboticsFactory.lua", "lua/CNBalance/ARCSpec/ARCSpec_FactorySkins.lua", "post")
 ModLoader.SetupFileHook("lua/GUIProduction.lua", "lua/CNBalance/ARCSpec/ARCSpec_Production.lua", "post")
+ModLoader.SetupFileHook("lua/Commander_MouseActions.lua", "lua/CNBalance/ARCSpec/ARCSpec_Selection.lua", "post")

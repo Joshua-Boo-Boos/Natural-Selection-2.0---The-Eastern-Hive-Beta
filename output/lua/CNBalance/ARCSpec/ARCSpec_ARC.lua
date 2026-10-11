@@ -74,10 +74,19 @@ local kRetargetInterval = 0.25
 local kTierRefreshInterval = 1
 
 --[[ ---------------------------------------------------------------------------------------------------------------------
-    Upgrade tier: how many upgrades of this ARC's specialisation the team currently HAS (researched, and a factory of that
-    specialisation standing - see ARCSpec_MarineTeam.lua). Re-read once a second. Works on the server and on the
-    commander's client (which has the team tech tree), where it sizes the range circle.
+    Upgrade tier: how many upgrades of this ARC's specialisation the team has RESEARCHED. A built specialised ARC keeps
+    every level researched, even after every factory of its specialisation is destroyed - so the node's researched flag is
+    read, not GetHasTech (which also needs the factory standing, the upgrade's prerequisite). Re-read once a second. Works
+    on the server and on the commander's client (which has the team tech tree), where it sizes the range circle.
 ]] ---------------------------------------------------------------------------------------------------------------------
+local function GetTeamTechTree(arc)
+    if Server then
+        local team = arc.GetTeam and arc:GetTeam()
+        return team and team.GetTechTree and team:GetTechTree()
+    end
+    return GetTechTree and GetTechTree()
+end
+
 function ARCSpec.GetUpgradeTier(arc)
 
     local spec = ARCSpec.GetARCSpec(arc)
@@ -89,10 +98,14 @@ function ARCSpec.GetUpgradeTier(arc)
     end
 
     local tier = 0
-    for i = #spec.upgrades, 1, -1 do
-        if GetHasTech(arc, spec.upgrades[i], true) then
-            tier = i
-            break
+    local techTree = GetTeamTechTree(arc)
+    if techTree then
+        for i = #spec.upgrades, 1, -1 do
+            local node = techTree:GetTechNode(spec.upgrades[i])
+            if node and node:GetResearched() then
+                tier = i
+                break
+            end
         end
     end
 

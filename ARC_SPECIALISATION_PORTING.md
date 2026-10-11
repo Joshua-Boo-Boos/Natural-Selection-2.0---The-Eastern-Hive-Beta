@@ -28,10 +28,11 @@ Behaviour that applies to all three:
 - **Any mix is allowed.** Several factories can be converted, to the same or different specialisations.
 - **The ARC limit is shared.** Every ARC of every type counts towards the existing `kMaxARCs` (5).
 - **Each ARC keeps its own skin and name**, set by its own type.
+- **Double-click / Ctrl-click selects only the clicked ARC type** among the usual on-screen candidates: normal ARC, H.A.M.M.E.R., V.A.T. or H.E.L.L. Shift keeps its usual toggle behaviour; marquee selection can still select mixed types. Added to Beta and Event on 2026-10-11.
 - **Losing every factory of a specialisation:**
-  - its specialised ARCs can't be built,
-  - its researched upgrades stop applying,
-  - converting another factory to that specialisation brings back the upgrades that were researched; unresearched ones stay unresearched.
+  - its specialised ARCs can't be built, and no further upgrade can be researched,
+  - **specialised ARCs already built keep every level researched** (Level 0 up to the last one, with later levels replacing earlier effects as usual). `ARCSpec.GetUpgradeTier` reads each upgrade node's researched flag, not `GetHasTech`, which would also need the factory standing,
+  - converting another factory to that specialisation continues from the last researched level; unresearched upgrades stay unresearched.
 
 ## Commander 2x4 grid (root level, no submenus)
 
@@ -54,13 +55,15 @@ Unspecialised ARC Factory           Specialised factory
 | Item | Team resources | Time |
 |---|---|---|
 | Conversion (any of the three) | 15 | 20 s |
-| Specialised ARC | 23 (normal ARC 15 + 50%, rounded) | 10 s (twice the normal ARC's 5 s) |
+| Specialised ARC | 18 (normal ARC remains 15) | 10 s (twice the normal ARC's 5 s) |
 | Upgrade 1 | 10 | 30 s |
-| Upgrade 2 | 20 | 40 s |
-| Upgrade 3 | 30 | 50 s |
-| Upgrade 4 | 40 | 60 s |
+| Upgrade 2 | 15 | 40 s |
+| Upgrade 3 | 20 | 50 s |
+| Upgrade 4 | 25 | 60 s |
 
-The constants are in `ARCSpec_TechIds.lua`: `kSpecResearchCost`, `kSpecResearchTime`, `kUpgradeCosts`, `kUpgradeTimes`, `kARCCostScalar` and `kARCBuildTimeScalar`.
+The constants are in `ARCSpec_TechIds.lua`: `kSpecResearchCost`, `kSpecResearchTime`, `kUpgradeCosts`, `kUpgradeTimes`, `kARCCost` and `kARCBuildTimeScalar`.
+
+Costs updated in Beta and Event on 2026-10-11: specialised ARCs cost a fixed 18 team resources; upgrade levels 1-4 cost 10, 15, 20 and 25. Conversion costs and all build/research times are unchanged.
 
 ## H.A.M.M.E.R.: Hammerworks (PvE)
 
@@ -123,7 +126,10 @@ Every hit is Flame damage. Each pulse also burns other aliens within 1.5 m of th
 ## Research tray icons (Commander and spectator HUD)
 
 - **What's shown:** one icon per specialisation the team has had, in the research tray (`GUIProduction`) next to the normal researched techs. It shows the acronym and level, e.g. "H.E.L.L." over "Level 3".
-- **Colours:** team colour (blue) while a factory of that specialisation stands, and **red** once every one is destroyed. Hovering shows the factory's name.
+- **Colours:** team colour (blue) while a factory of that specialisation stands, and **red** once every one is destroyed.
+- **Hover text:** the factory's name and level, then one "- effect" line per effect of the levels researched so far. An effect a later level replaces (a stronger cannon, a longer flame) is shown only in its latest form. A red icon adds an "Offline" line.
+  - The lines are in `ARCSpec.kLevelEffects` (`ARCSpec_TechData.lua`) as `{ slot, text }` pairs per level; a later line in the same slot replaces the earlier one. Keep them in step with the numbers in `ARCSpec_ARC.lua`.
+  - Built by `ARCSpec.GetLevelTooltip(key, level)`, and shown by a `GUIProduction:Update` wrapper in `ARCSpec_Production.lua`, which runs after the tray's own Update.
 - **Why a message:** the tray normally reads `TeamInfo`'s tech bitmask, which is already full. So the state travels in a second network message, `ARCSpecTeamState`:
   - sent by the server when it changes, and every 10 s for late joiners,
   - holds, per specialisation, a state (0 none, 1 active, 2 lost) and a level from 0 to 4.
@@ -177,6 +183,7 @@ For all three, cloaked aliens must be detected, and nothing inside a Shade ink c
 | `output/lua/CNBalance/ARCSpec/ARCSpec_RoboticsFactory.lua` | `lua/RoboticsFactory.lua` | 2x4 grid, allowed checks, ARC limit, conversion progress/cancel/complete, building specialised ARCs, no free MACs at specialised Factories |
 | `output/lua/CNBalance/ARCSpec/ARCSpec_FactorySkins.lua` | `lua/RoboticsFactory.lua` | Factory skin by tech ID (client) |
 | `output/lua/CNBalance/ARCSpec/ARCSpec_Production.lua` | `lua/GUIProduction.lua` | ARCUS icons in the Commander / spectator research tray (client) |
+| `output/lua/CNBalance/ARCSpec/ARCSpec_Selection.lua` | `lua/Commander_MouseActions.lua` | Filters double-click / Ctrl-click ARC selection by the clicked ARC's tech ID (client) |
 | `output/ui/arcus/*.dds` (15 files) | | Research tray icons: acronym plus "Level 0" to "Level 4" for each specialisation |
 | `output/lua/CNBalance/ARCSpec/ARCSpec_Skins.lua` | `lua/ARCVariantMixin.lua` | ARC skin by tech ID (client) |
 | `output/lua/CNBalance/ARCSpec/ARCSpec_ARC.lua` | `lua/ARC.lua` | All ARC behaviour: targeting, weapons, cannon charge, turret, orders, ink, H.A.M.M.E.R. shell, Deflector Plating, range circle |
@@ -199,7 +206,7 @@ About the textures:
 
 ### Edited
 
-- `output/lua/CNBalance/FileHooks.lua`: 11 `SetupFileHook` lines added at the very end. They must stay after the mod's own hooks on the same files.
+- `output/lua/CNBalance/FileHooks.lua`: 12 `SetupFileHook` lines added at the very end. They must stay after the mod's own hooks on the same files.
 
 ### Removed (were part of the first version)
 
@@ -208,10 +215,18 @@ About the textures:
 
 Nothing outside the ARCSpec files was removed.
 
+## Ports done
+
+| Branch | Date | Notes |
+|---|---|---|
+| NS2.0-TEH-Event | 2026-10-11 | Straight copy, no code changes. Event's mod `FireMixin`, `RoboticsFactory.lua` and `MarineTeam.lua` are identical to Beta's; `GetTechIdIsInstanced`, `AlienDetectionParry` and every tech ID ARCUS uses exist there. Event has no `CNBalance/GUI/GUIProduction.lua` hook; ARCUS doesn't need it. Event's `CNBalance/Structures/Marine/ARC.lua` lacks Beta's ARC auto-deploy and "deployed ARC never sleeps" fixes; ARCUS doesn't depend on them (its tanks never sleep by their own `GetCanSleep` wrapper), but with no Commander a H.A.M.M.E.R. there won't deploy itself, same as a normal Event ARC. Backup taken by the user before the port: `NS2.0-TEH-Event - PRE ARC SPECIALISATIONS - 11TH OCTOBER 2026`. |
+
+When ARCUS changes in Beta, copy the changed ARCSpec files to every branch in this table as well.
+
 ## Porting to another NS2.0-TEH branch
 
-1. **Copy the files:** the whole `output/lua/CNBalance/ARCSpec/` folder and `output/models/marine/arc_spec/`.
-2. **Register the hooks:** append the 11 `SetupFileHook` lines (see the end of the Beta's `FileHooks.lua`) after that branch's own hooks.
+1. **Copy the files:** the whole `output/lua/CNBalance/ARCSpec/` folder, `output/models/marine/arc_spec/` and `output/ui/arcus/`.
+2. **Register the hooks:** append the 12 `SetupFileHook` lines (see the end of the Beta's `FileHooks.lua`) after that branch's own hooks.
 3. **Check what the target branch must already have:**
    - `GetTechIdIsInstanced` (mod hook on `lua/TechTree.lua`),
    - `AlienDetectionParry` (in `CNBalance/NS2Utility.lua`). The tanks skip the parry if it's missing.
@@ -227,4 +242,5 @@ Nothing outside the ARCSpec files was removed.
    - H.A.M.M.E.R.: check it shells eggs and cysts but never players or Babblers,
    - check Shade ink stops the tanks,
    - check the ARC limit across mixed types,
-   - destroy the only Factory of a type, convert another, and check the researched upgrades return.
+   - place two of each ARC type together: double-click each type and check only its pair is selected; check Ctrl-click, Shift toggling, and mixed-type marquee selection too,
+   - destroy the only Factory of a type: its built ARCs must keep their researched levels; convert another and check research continues from the last level.

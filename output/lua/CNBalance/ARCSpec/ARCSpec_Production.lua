@@ -8,7 +8,7 @@
     One icon per specialisation the team has had, showing its acronym and level ("H.E.L.L." / "Level 3"):
       team colour (blue)  a factory of that specialisation stands
       red                 every factory of it has been destroyed (the researched levels return with a new one)
-    Hovering it shows the factory's name, like any other tray entry.
+    Hovering it shows the factory's name and the current effects of its researched levels (ARCSpec.GetLevelTooltip).
 ]]
 
 local kDeactivatedColor = Color(1, 0.2, 0.2, 1)
@@ -100,6 +100,41 @@ local baseUpdateTech = GUIProduction.UpdateTech
 function GUIProduction:UpdateTech(onChange)
     baseUpdateTech(self, onChange)
     SyncARCUSEntries(self)
+end
+
+--[[
+    Hovering an ARCUS icon shows the factory's name and every effect its researched levels give (ARCSpec.GetLevelTooltip),
+    instead of the plain name the tray shows for other entries. Applied after the tray's own Update, which has just set
+    (and shown) the plain name for the hovered entry.
+]]
+local baseUpdate = GUIProduction.Update
+function GUIProduction:Update(deltaTime)
+    baseUpdate(self, deltaTime)
+
+    if not GUIProduction.kShowProgressTooltip or not self.tooltip or not self.Complete or self.TeamIndex ~= kTeam1Index then
+        return
+    end
+
+    local teamState = ARCSpec.teamState and ARCSpec.teamState[self.TeamIndex]
+    local mouseX, mouseY = Client.GetCursorPosScreen()
+
+    for _, spec in ipairs(ARCSpec.kSpecOrder) do
+        local tech = self.Complete:Get(spec.factory)
+        if tech and tech.Icon and GUIItemContainsPoint(tech.Icon, mouseX, mouseY) then
+            local info = teamState and teamState[spec.key]
+            local text = ARCSpec.GetLevelTooltip(spec.key, info and info.level or 0)
+            if text then
+                if info and info.state == 2 then
+                    text = text .. "\n- Offline: no factory. Existing ARCs keep these levels"
+                end
+                self.tooltip:SetText(text)
+                if not self.tooltip:GetShown() then
+                    self.tooltip:Show()
+                end
+            end
+            return
+        end
+    end
 end
 
 -- A team change rebuilds the tray from scratch, so forget what was shown.
