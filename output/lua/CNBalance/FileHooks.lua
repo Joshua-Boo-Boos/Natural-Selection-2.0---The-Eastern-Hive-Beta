@@ -368,3 +368,17 @@ ModLoader.SetupFileHook("lua/EquipmentOutline.lua", "lua/CNBalance/EquipmentOutl
 -- Polls (Shine ShineCustomVote) wrap onto lines of 25 characters; the vote box grows to fit. Client only. See PollWrap_Voting.lua.
 ModLoader.SetupFileHook("lua/Voting.lua", "lua/CNBalance/GUI/PollWrap_Voting.lua", "post")
 ModLoader.SetupFileHook("lua/GUIVoteMenu.lua", "lua/CNBalance/GUI/PollWrap_VoteMenu.lua", "post")
+
+-- ARC FACTORY SPECIALISATIONS (Hammerworks / Vanguard / Inferno). Registered last so each hook runs after the mod's own hook
+-- on the same file. No new networked class or network variable - see lua/CNBalance/ARCSpec/ARCSpec_TechIds.lua.
+ModLoader.SetupFileHook("lua/TechTreeConstants.lua", "lua/CNBalance/ARCSpec/ARCSpec_TechIds.lua", "post")
+ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/ARCSpec/ARCSpec_TechData.lua", "post")
+ModLoader.SetupFileHook("lua/TechTree.lua", "lua/CNBalance/ARCSpec/ARCSpec_TechTree.lua", "post")
+ModLoader.SetupFileHook("lua/TechTreeButtons.lua", "lua/CNBalance/ARCSpec/ARCSpec_Buttons.lua", "post")
+ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/ARCSpec/ARCSpec_MarineTeam.lua", "post")
+ModLoader.SetupFileHook("lua/RoboticsFactory.lua", "lua/CNBalance/ARCSpec/ARCSpec_RoboticsFactory.lua", "post")
+ModLoader.SetupFileHook("lua/ARCVariantMixin.lua", "lua/CNBalance/ARCSpec/ARCSpec_Skins.lua", "post")
+ModLoader.SetupFileHook("lua/ARC.lua", "lua/CNBalance/ARCSpec/ARCSpec_ARC.lua", "post")
+ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/ARCSpec/ARCSpec_Shots.lua", "post")
+ModLoader.SetupFileHook("lua/RoboticsFactory.lua", "lua/CNBalance/ARCSpec/ARCSpec_FactorySkins.lua", "post")
+ModLoader.SetupFileHook("lua/GUIProduction.lua", "lua/CNBalance/ARCSpec/ARCSpec_Production.lua", "post")
