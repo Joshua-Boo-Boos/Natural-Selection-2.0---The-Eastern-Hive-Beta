@@ -56,7 +56,65 @@ local function EstimateVokexResponseUtility(vokex, target)
     return Clamp(1.0 - ( ( dist - 30.0 ) / 60.0 ), 0.0, 1.0)
 end
 
--- Vokex-safe movement: path to target and Metabolize when it helps. No blink-jump.
+--[[
+    HELD SHADOW STEP (ported from Combat Enhancer's VokexBrain_Data.lua, 2026-10-13). Shadow Step is held on the secondary
+    attack of every Vokex weapon and moves the Vokex horizontally at a constant speed in its move direction; holding JUMP
+    during a step climbs. The bot:
+      * starts a step towards a target at least kShadowStepMinTargetDistance away, with kShadowStepEnergyReserve start
+        costs' worth of energy, when the short re-press gap allows;
+      * keeps holding it until within striking distance or down to kShadowStepKeepEnergy of its energy;
+      * holds jump while stepping wherever the route rises (GetShouldClimb).
+]]
+local kShadowStepEnergyReserve = 3
+local kShadowStepMinTargetDistance = 8.0
+local kShadowStepKeepEnergy = 0.05
+
+local function GetCanShadowStep(vokex, desiredDiff)
+    if vokex.GetIsShadowStepping and vokex:GetIsShadowStepping() then return false end
+    if vokex.GetHasShadowStepCooldown and vokex:GetHasShadowStepCooldown() then return false end
+    if desiredDiff:GetLength() < kShadowStepMinTargetDistance then return false end
+    return vokex:GetEnergy() >= (kVokexShadowStepEnergyCost or 6) * kShadowStepEnergyReserve
+end
+
+local kClimbLookAhead = 4.0        -- metres along the path to judge the gradient over
+local kClimbRise = 0.6             -- climb when the route that far ahead is this much higher than the Vokex's feet
+local kClimbBlockedSpeed = 4.0     -- or when stepping this slowly horizontally (pressed against a ledge / lip)
+
+local function GetShouldClimb(vokex, bot, targetPos)
+
+    local origin = vokex:GetOrigin()
+
+    if targetPos and (targetPos - origin):GetLengthXZ() <= kClimbLookAhead and targetPos.y - origin.y > kClimbRise then
+        return true
+    end
+
+    local motion = bot:GetMotion()
+    local path = motion.GetPath and motion:GetPath()
+    if path and #path > 0 then
+        local index = (motion.GetPathIndex and motion:GetPathIndex()) or 1
+        local ahead
+        for i = math.max(1, index), #path do
+            ahead = path[i]
+            if (ahead - origin):GetLengthXZ() >= kClimbLookAhead then
+                break
+            end
+        end
+        if ahead and ahead.y - origin.y > kClimbRise then
+            return true
+        end
+    end
+
+    local velocity = vokex:GetVelocity()
+    if velocity and velocity:GetLengthXZ() < kClimbBlockedSpeed
+       and targetPos and (targetPos - origin):GetLengthXZ() > kVokexMeleeRange + 1 then
+        return true
+    end
+
+    return false
+
+end
+
+-- Vokex-safe movement: path to target, held Shadow Step (above), and Metabolize when it helps.
 local function PerformMove( alienPos, targetPos, bot, brain, move )
 
     local postIgnore = HandleAlienTunnelMove( alienPos, targetPos, bot, brain, move )
@@ -73,6 +131,20 @@ local function PerformMove( alienPos, targetPos, bot, brain, move )
 
     local time = Shared.GetTime()
     local isStepping = vokex.GetIsShadowStepping and vokex:GetIsShadowStepping()
+
+    -- Held Shadow Step (ported from Combat Enhancer, 2026-10-13): hold it all the way to the target, climb where the
+    -- route rises. See GetCanShadowStep / GetShouldClimb above.
+    local desiredDiff = targetPos - vokex:GetOrigin()
+    local energyFraction = vokex:GetEnergy() / math.max(1, vokex:GetMaxEnergy())
+    local keepStepping = isStepping and energyFraction > kShadowStepKeepEnergy and desiredDiff:GetLength() > kVokexMeleeRange + 1
+
+    if keepStepping or (not isStepping and GetCanShadowStep(vokex, desiredDiff)) then
+        move.commands = AddMoveCommand( move.commands, Move.SecondaryAttack )
+        if isStepping and GetShouldClimb(vokex, bot, targetPos) then
+            move.commands = AddMoveCommand( move.commands, Move.Jump )
+        end
+    end
+
     if not isStepping and (not brain.timeOfMetab or brain.timeOfMetab < time) then
         local maxEnergy = vokex:GetMaxEnergy()
         local eFrac = maxEnergy > 0 and (vokex:GetEnergy() / maxEnergy) or 1

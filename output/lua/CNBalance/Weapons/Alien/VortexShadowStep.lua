@@ -64,10 +64,23 @@ function VortexShadowStep:OnPrimaryAttack(player)
     local shadowStepping = false --player:GetIsShadowStepping()
     if not shadowStepping and hasEnergy and cooledDown then
         self.primaryAttacking = true
+
+        --[[
+            Combat Enhancer: the vortex is normally created on the view model animation's "hit" tag, and that animation
+            does not play while Shadow Stepping - so during a step it is cast here directly, once per stab animation's
+            length (the weapon's normal rate).
+        ]]
+        local now = Shared.GetTime()
+        if player.GetIsShadowStepping and player:GetIsShadowStepping()
+           and now - (self.timeLastVortexCast or 0) >= kAttackAnimationLength then
+            self.timeLastVortexCast = now
+            self:TriggerEffects("stab_attack")
+            self:DoAttack()
+        end
     else
         self.primaryAttacking = false
     end
-    
+
 end
 
 function VortexShadowStep:OnPrimaryAttackEnd()
@@ -137,6 +150,12 @@ function VortexShadowStep:OnTag(tagName)
 
     elseif tagName == "hit" and self.stabbing then
 
+        -- (Skip a "hit" straight after a vortex cast directly during a Shadow Step - see OnPrimaryAttack.)
+        if Shared.GetTime() - (self.timeLastVortexCast or 0) < kAttackAnimationLength * 0.8 then
+            self.stabbing = false
+            return
+        end
+        self.timeLastVortexCast = Shared.GetTime()
         self:DoAttack()
 
     end

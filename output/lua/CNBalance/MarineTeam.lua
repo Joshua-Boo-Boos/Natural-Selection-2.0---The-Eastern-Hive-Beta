@@ -270,10 +270,112 @@ local function TickMotionTrack(self)
     
 end
 
+--[[
+    MILITARY PROTOCOL: TEAM-SIZE-SCALED STRUCTURE BONUS + ECONOMY LOG (first test package, 2026-10-13; full notes in
+    NS2.0-TEH-Beta/Opus_And_Astra_MP_Edits.md).
+
+    Team size for the scale = the HIGHEST Marine team size (GetNumPlayers: players incl. Commander and bots; spectators
+    are on another team) sampled once a second over the last kMilitaryProtocolStructureScaleWindow seconds of the
+    current round. A brief departure does not cut payouts at once; a brief join raises them for up to that window. The
+    samples (and the log totals) reset whenever a new round starts.
+]]
+local kTeamSizeSampleInterval = 1
+
+-- The round this team's samples belong to: the game start time, or nil while no round is live.
+local function GetRoundKey()
+    local gamerules = GetGamerules and GetGamerules()
+    if gamerules and gamerules.GetGameStarted and gamerules:GetGameStarted() then
+        return gamerules:GetGameStartTime()
+    end
+    return nil
+end
+
+local function ResetMPRoundState(self, roundKey)
+    self.mpRoundKey = roundKey
+    self.mpTeamSizeSamples = {}
+    self.mpNextTeamSizeSample = 0
+    self.mpIncome = { towers = 0, lifeforms = 0, structures = 0, other = 0 }
+    self.mpNextEconomyLog = Shared.GetTime() + kMilitaryProtocolEconomyLogInterval
+end
+
+local function CheckMPRound(self)
+    local roundKey = GetRoundKey()
+    if roundKey ~= self.mpRoundKey or not self.mpIncome then
+        ResetMPRoundState(self, roundKey)
+    end
+    return roundKey ~= nil
+end
+
+local function SampleTeamSize(self)
+    local now = Shared.GetTime()
+    if now < (self.mpNextTeamSizeSample or 0) then return end
+    self.mpNextTeamSizeSample = now + kTeamSizeSampleInterval
+
+    local samples = self.mpTeamSizeSamples
+    samples[#samples + 1] = { time = now, count = self:GetNumPlayers() }
+
+    -- Drop samples older than the window (oldest first).
+    local cutoff = now - kMilitaryProtocolStructureScaleWindow
+    local firstKept = 1
+    while samples[firstKept] and samples[firstKept].time < cutoff do
+        firstKept = firstKept + 1
+    end
+    if firstKept > 1 then
+        local kept = {}
+        for i = firstKept, #samples do kept[#kept + 1] = samples[i] end
+        self.mpTeamSizeSamples = kept
+    end
+end
+
+function MarineTeam:GetMilitaryProtocolTeamSize()
+    CheckMPRound(self)
+    local cutoff = Shared.GetTime() - kMilitaryProtocolStructureScaleWindow
+    local best = self:GetNumPlayers()
+    for _, sample in ipairs(self.mpTeamSizeSamples or {}) do
+        if sample.time >= cutoff and sample.count > best then best = sample.count end
+    end
+    return best
+end
+
+function MarineTeam:GetMilitaryProtocolStructureScale()
+    local scale = self:GetMilitaryProtocolTeamSize() / kMilitaryProtocolStructureScaleReference
+    return Clamp(scale, kMilitaryProtocolStructureScaleMin, kMilitaryProtocolStructureScaleMax)
+end
+
+local function AddMPIncome(self, source, amount)
+    if self.mpIncome and amount and amount > 0 then
+        self.mpIncome[source] = (self.mpIncome[source] or 0) + amount
+    end
+end
+
+local function LogMPEconomy(self)
+    local now = Shared.GetTime()
+    if now < (self.mpNextEconomyLog or 0) then return end
+    self.mpNextEconomyLog = now + kMilitaryProtocolEconomyLogInterval
+
+    local income = self.mpIncome
+    local total = income.towers + income.lifeforms + income.structures + income.other
+    Print("[MP economy] round %ds marines=%d scale=x%.2f | t-res income so far: towers=%.1f lifeforms=%.1f structures=%.1f other=%.1f total=%.1f | bank=%d",
+        math.floor(now - (self.mpRoundKey or now)), self:GetMilitaryProtocolTeamSize(), self:GetMilitaryProtocolStructureScale(),
+        income.towers, income.lifeforms, income.structures, income.other, total, self:GetTeamResources())
+end
+
+local kMPLifeforms = {
+    [kTechId.Skulk] = true, [kTechId.Gorge] = true, [kTechId.Prowler] = true, [kTechId.Lerk] = true,
+    [kTechId.Fade] = true, [kTechId.Vokex] = true, [kTechId.Onos] = true,
+}
+
 local baseUpdate = MarineTeam.Update
 function MarineTeam:Update(timePassed)
     baseUpdate(self,timePassed)
     TickMotionTrack(self)
+
+    if CheckMPRound(self) then
+        SampleTeamSize(self)
+        if self:IsMilitaryProtocol() then
+            LogMPEconomy(self)
+        end
+    end
 end
 
 function MarineTeam:IsMilitaryProtocol()
@@ -284,12 +386,34 @@ function MarineTeam:OnTeamKill(_techId, _fraction)
 
     local pRes = PlayingTeam.OnTeamKill(self, _techId,_fraction)
     if self:IsMilitaryProtocol() then
+
+        CheckMPRound(self)
+
+        -- Lifeforms and Drifters: their fixed MP reward (unchanged by this package).
         local tRes = (kMilitaryProtocolTeamResourcesPerKill[_techId] or 0) * _fraction
         if tRes > 0 then
-            self:AddTeamResources(tRes)  
+            self:AddTeamResources(tRes, true)
+            AddMPIncome(self, kMPLifeforms[_techId] and "lifeforms" or "other", tRes)
         end
+
+        -- Listed structures: the MP bonus, scaled by team size, on top of the normal reward PlayingTeam just paid.
+        local normal = (kTechDataTeamResOnKill[_techId] or 0) * _fraction
+        local bonusBase = kMilitaryProtocolStructureBonusPerKill[_techId]
+        if bonusBase then
+            local scale = self:GetMilitaryProtocolStructureScale()
+            local bonus = bonusBase * scale * _fraction
+            if bonus > 0 then
+                self:AddTeamResources(bonus, true)
+            end
+            AddMPIncome(self, "structures", normal + bonus)
+            Print("[MP economy] %s kill (share %.2f): normal %.1f + MP bonus %.1f (x%.2f, %d marines) = %.1f t-res",
+                EnumToString(kTechId, _techId), _fraction, normal, bonus, scale, self:GetMilitaryProtocolTeamSize(), normal + bonus)
+        elseif normal > 0 then
+            AddMPIncome(self, "structures", normal)
+        end
+
     end
-    
+
     return pRes
 end
 
@@ -304,6 +428,8 @@ function MarineTeam:CollectTeamResources(teamRes,playerRes,rtActiveCount)
     if self:IsMilitaryProtocol() then
         playerRes = 0   --No player res now
         teamRes = rtActiveCount * kTeamResourceEachTower
+        CheckMPRound(self)
+        AddMPIncome(self, "towers", teamRes)
     end
 
     PlayingTeam.CollectTeamResources(self,teamRes,playerRes)

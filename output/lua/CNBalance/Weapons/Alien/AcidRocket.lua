@@ -92,44 +92,63 @@ end
 
 
 
+local function FireAcidRocket(self, player)
+
+    if Server or (Client and Client.GetIsControllingPlayer()) then
+        self:FireBombProjectile(player)
+    end
+
+    player:DeductAbilityEnergy(self:GetEnergyCost(player))
+    self.timeLastAcidRocket = Shared.GetTime()
+
+    self:TriggerEffects("acidrocket_attack")
+
+    if Client then
+        local cinematic = Client.CreateCinematic(RenderScene.Zone_ViewModel)
+        cinematic:SetCinematic(kAcidRocketViewEffect)
+    end
+
+end
+
+-- Seconds between rockets (the weapon's own rate of fire).
+local function GetFireInterval()
+    return 1 / math.max(0.1, kAcidRocketRoundPerSecond or 1)
+end
+
 function AcidRocket:OnTag(tagName)
 
     PROFILE("AcidRocket:OnTag")
 
     if self.primaryAttacking and tagName == "shoot" then
         local player = self:GetParent()
-        if player then
-
-            if Server or (Client and Client.GetIsControllingPlayer()) then
-                self:FireBombProjectile(player)
-            end
-
-            player:DeductAbilityEnergy(self:GetEnergyCost(player))
-            self.timeLastAcidRocket = Shared.GetTime()
-
-            self:TriggerEffects("acidrocket_attack")
-
-            if Client then
-                local cinematic = Client.CreateCinematic(RenderScene.Zone_ViewModel)
-                cinematic:SetCinematic(kAcidRocketViewEffect)
-            end
-
-            -- TEST_EVENT("DelayedShoot")
+        -- (Skip a "shoot" tag straight after a rocket fired directly during a Shadow Step - see OnPrimaryAttack.)
+        if player and Shared.GetTime() - (self.timeLastAcidRocket or 0) >= GetFireInterval() * 0.8 then
+            FireAcidRocket(self, player)
         end
     end
-    
+
 end
 
 function AcidRocket:OnPrimaryAttack(player)
 
     if player:GetEnergy() >= self:GetEnergyCost(player) then
-    
+
         self.primaryAttacking = true
-        
+
+        --[[
+            Combat Enhancer: the rocket normally fires on the view model animation's "shoot" tag, and that animation does
+            not play while Shadow Stepping - so during a step the rocket is fired here directly, at the weapon's normal
+            rate of fire.
+        ]]
+        if player.GetIsShadowStepping and player:GetIsShadowStepping()
+           and Shared.GetTime() - (self.timeLastAcidRocket or 0) >= GetFireInterval() then
+            FireAcidRocket(self, player)
+        end
+
     else
         self.primaryAttacking = false
-    end  
-    
+    end
+
 end
 
 function AcidRocket:OnPrimaryAttackEnd(player)

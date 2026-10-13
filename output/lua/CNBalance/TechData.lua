@@ -1160,7 +1160,8 @@ function BuildTechData()
         [kTechDataGestateName] = Vokex.kMapName,
         [kTechDataGestateTime] = kVokexGestateTime,
         [kTechDataDisplayName] = "VOKEX",
-        [kTechDataTooltipInfo] = "VOKEX_EGG_TOOLTIP",
+        -- The lifeform's own description (evolve menu hover). Was "VOKEX_EGG_TOOLTIP", the egg's text (2026-10-13).
+        [kTechDataTooltipInfo] = "VOKEX_TOOLTIP",
         [kTechDataModel] = Vokex.kModelName,
         [kTechDataCostKey] = kVokexCost,
         [kTechDataMaxHealth] = Vokex.kHealth,

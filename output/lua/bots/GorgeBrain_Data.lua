@@ -1707,3 +1707,19 @@ function CreateGorgeBrainSenses()
 
     return s
 end
+
+-- Defensive Gorge construction uses the human build API and observed enemy memories.
+if Server then
+    Script.Load("lua/CNBalance/OriginGorgeBuilder.lua")
+    local originalActions = kGorgeBrainActions
+    local builderAction = OriginGorgeBuilder.CreateAction(PerformMove, PerformHealSpray)
+    kGorgeBrainActions = { function(bot, brain, player)
+        if not player.isHallucination then return builderAction(bot, brain, player) end
+        local best = {name = "idle", weight = 0, perform = function() end}
+        for _, evaluate in ipairs(originalActions) do
+            local action = evaluate(bot, brain, player)
+            if action.weight > best.weight then best = action end
+        end
+        return best
+    end }
+end

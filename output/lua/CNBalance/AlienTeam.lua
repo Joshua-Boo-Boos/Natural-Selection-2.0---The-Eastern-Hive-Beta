@@ -1475,6 +1475,9 @@ function AlienTeam:OnOriginFormResourceFetch(_player)
     _player:AddResources(finalPRes)
     self:AddTeamResources(-finalPRes)
 
+    -- All-bot Alien teams need neither a notice nor a withdrawal chat broadcast.
+    if _player:GetIsVirtual() and OriginGorgeHasHumanAliens and not OriginGorgeHasHumanAliens(self) then return end
+
     -- "[Origin Form]: <player> has taken <n> t-res from the team pool as p-res." to the Alien team only. Sent as a
     -- CETeamAnnounce line (printed exactly as given, in the team colour): the vanilla "Chat" message always put
     -- "(Team) :" in front, which is what made this read "(Team) : <player> ve taken [n] resources from pool.".

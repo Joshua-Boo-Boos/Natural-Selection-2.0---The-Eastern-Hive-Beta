@@ -383,3 +383,7 @@ ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/ARCSpec/ARCSpe
 ModLoader.SetupFileHook("lua/RoboticsFactory.lua", "lua/CNBalance/ARCSpec/ARCSpec_FactorySkins.lua", "post")
 ModLoader.SetupFileHook("lua/GUIProduction.lua", "lua/CNBalance/ARCSpec/ARCSpec_Production.lua", "post")
 ModLoader.SetupFileHook("lua/Commander_MouseActions.lua", "lua/CNBalance/ARCSpec/ARCSpec_Selection.lua", "post")
+
+-- Alien-only Origin Form bot fetch vote and server-side enforcement.
+ModLoader.SetupFileHook("lua/Voting.lua", "lua/CNBalance/OriginGorgeVote.lua", "post")
+ModLoader.SetupFileHook("lua/AlienTeam.lua", "lua/CNBalance/OriginGorgeFetchGate.lua", "post")

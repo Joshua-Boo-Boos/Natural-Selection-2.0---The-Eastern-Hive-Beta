@@ -1,4 +1,6 @@
 Script.Load("lua/Utility.lua")
+-- Siege: Shadow Step rework ported from Combat Enhancer (lua/Xmenu2/Vokex/Vokex.lua, 2026-10-13); comments marked
+-- "Combat Enhancer:" describe that rework and apply here unchanged.
 Script.Load("lua/CNBalance/Weapons/Alien/SwipeShadowStep.lua")
 Script.Load("lua/CNBalance/Weapons/Alien/ReadyRoomShadowStep.lua")
 Script.Load("lua/CNBalance/Weapons/Alien/MetabolizeShadowStep.lua")
@@ -52,10 +54,23 @@ local kJumpHeight = 1.4
 local kVokexScanDuration = 4
 
 -- Slow the Vokex down while Shadow Stepping by 10% (from 25 to 22.5) and increase the cooldown by 0.05 seconds (from 0.4 to 0.45).
-local kShadowStepSpeed = 22.5 -- 25 --40
+-- Combat Enhancer: Shadow Step is HELD (secondary attack, any Vokex weapon) and moves the Vokex at a constant speed - the
+-- Fade's Blink speed (vanilla Fade.lua kBlinkSpeed, 14) - in the direction of the held movement keys. Was a 22.5 dash.
+-- 20% faster than Blink (user 2026-10-12: 14 * 1.2 = 16.8), then 80% of that (user 2026-10-13): 13.44.
+local kShadowStepSpeed = 14 * 1.2 * 0.8
+-- Vanilla NS2's Blink speed cap (Fade.lua kBlinkMaxSpeed): the step's top speed, and the jump-during-a-step launch speed.
+local kShadowStepMaxSpeed = 25
+-- 80% of the step speed, with or without Celerity (user 2026-10-13): applied to the FINAL speed, after Celerity and any
+-- other ModifyMaxSpeed bonus and after the cap, so both cases drop by the same 20% (13.44 -> 10.75 base, cap 25 -> 20).
+local kShadowStepSpeedScale = 0.8
+-- Holding jump during a step: gravity is balanced out; the climb builds up by this much a second to a steady climbing
+-- speed and holds it (user 2026-10-13: going up at a not too fast speed).
+local kShadowStepClimbAccel = 14
+local kShadowStepClimbSpeed = 7
 local kShadowStepSpeedBonusPerCelerity = 0.66
 Vokex.kShadowStepDuration = 0.2
-local kShadowStepCooldown = 0.45 -- 0.4
+-- Combat Enhancer: back to the pre-nerf 0.4 (user 2026-10-13; the nerf had raised it to 0.45).
+local kShadowStepCooldown = 0.4
 
 local kMaxSpeed = 7.2
 
@@ -66,7 +81,7 @@ local kVokexGravityMod = 1.5
 
 if Server then
     Script.Load("lua/CNBalance/Lifeforms/Vokex_Server.lua")
-elseif Client then    
+elseif Client then
     Script.Load("lua/CNBalance/Lifeforms/Vokex_Client.lua")
 end
 
@@ -82,7 +97,10 @@ local networkVars =
     etherealEndTime = "private time",
     
     hasDoubleJumped = "private compensated boolean",
-    
+
+    -- (NS2.0-TEH / Siege: NO new network variables for the held Shadow Step - CE's networked press latch and start time
+    -- are replaced by the player's input state and etherealStartTime above; see ShadowStep:OnSecondaryAttack.)
+
     -- // True when we're moving quickly "through the ether"
     ethereal = "boolean",
     
@@ -138,7 +156,7 @@ function Vokex:OnCreate()
     self.etherealStartTime = 0
     self.etherealEndTime = 0
     self.ethereal = false
-    
+
 end
 
 function Vokex:OnInitialized()
@@ -169,6 +187,9 @@ function Vokex:GetMapBlipType()
 end
 
 function Vokex:ModifyJump(input, velocity, jumpVelocity)
+
+    -- (Combat Enhancer: a jump during a Shadow Step is a normal Vokex jump; holding jump then climbs gently - see the
+    -- climb in Vokex:ModifyVelocity.)
     if not self.hasDoubleJumped then
         jumpVelocity:Scale(kVokexGravityMod)
     end
@@ -239,10 +260,9 @@ end
 function Vokex:OverrideInput(input)
 
     Alien.OverrideInput(self, input)
-    
-    if self:GetIsShadowStepping() then
-        input.move = self.shadowStepDirection
-    end
+
+    -- Combat Enhancer: the movement keys are NOT overridden while Shadow Stepping - their live direction steers the step
+    -- (Vokex:ModifyVelocity).
     return input
 end
 
@@ -295,26 +315,43 @@ function Vokex:GetHasDoubleJumped()
     return self.hasDoubleJumped
 end
 
+-- Combat Enhancer: a held Shadow Step runs along the ground, so it climbs stairs and small ledges like normal movement
+-- (it was blocked during the old 0.2 s dash).
 function Vokex:GetCanStep()
-    return not self:GetIsShadowStepping()
+    return true
 end
 
 function Vokex:ModifyGravityForce(gravityTable)
 
-    if self:GetIsShadowStepping() or self:GetIsOnGround() then
+    -- Combat Enhancer: normal gravity while Shadow Stepping (user 2026-10-13), except while jump is HELD during the step:
+    -- then gravity is balanced out and the Vokex climbs at a steady speed (Vokex:ModifyVelocity sets xmenuShadowClimb
+    -- earlier in the same move).
+    if self:GetIsOnGround() or (self.xmenuShadowClimb and self:GetIsShadowStepping()) then
         gravityTable.gravity = 0
     end
 
 end
 
+--[[
+    Combat Enhancer: while Shadow Stepping the step sets the horizontal velocity outright every move (Vokex:ModifyVelocity),
+    so the direction snaps to the movement keys at once. The movement code's own acceleration, air steering (air
+    control / forward control) and falling speed boost are switched off for the step - they ran AFTER the step's velocity
+    and tugged it around every frame, which made the step feel janky and added speed.
+]]
 function Vokex:GetAcceleration()
+    if self:GetIsShadowStepping() then
+        return 0
+    end
     return 11
 end
 
+function Vokex:GetHasFallAccel()
+    return not self:GetIsShadowStepping()
+end
+
+-- Combat Enhancer: the Vokex stays on the ground while Shadow Stepping (it runs, it does not float), so it can jump and
+-- crouch as normal.
 function Vokex:OverrideUpdateOnGround(onGround)
-    if self:GetIsShadowStepping() then
-        return false
-    end
     return onGround
 end
 
@@ -333,6 +370,9 @@ function Vokex:GetGroundFriction()
 end  
 
 function Vokex:GetAirControl()
+    if self:GetIsShadowStepping() then
+        return 0
+    end
     return 40
 end   
 
@@ -343,42 +383,93 @@ function Vokex:GetAirFriction()
         return 0
     end
 
+    --[[
+        Combat Enhancer: the Fade's air friction after a Blink (vanilla Fade:GetAirFriction), so a tapped or released
+        Shadow Step keeps its momentum in the air and bleeds it off gradually, and bunny-hopping carries speed. It used
+        to apply the GROUND friction ramp (3 rising to 9) in the air for 0.25 s after every step, which killed the speed
+        the moment the button was let go.
+    ]]
     local baseFriction = 0.17
-    local timeSinceLastEthereal = Shared.GetTime() - Vokex.kShadowStepDuration - self.timeShadowStep
-    if timeSinceLastEthereal < Vokex.kGroundFrictionPostBlinkDelay then
-        local frac = timeSinceLastEthereal / Vokex.kGroundFrictionPostBlinkDelay
-        return Vokex.kGroundFrictionPostBlink + (Vokex.kGroundFrictionBase - Vokex.kGroundFrictionPostBlink) * frac
+    local fastFriction = 0.40
+    local fastSpeed = GetHasCelerityUpgrade(self) and 20.5 or 19
+    if self:GetVelocityLength() > fastSpeed then
+        return fastFriction
     end
-    
+
     return baseFriction
+end
+
+--[[
+    Combat Enhancer: the held Shadow Step's speed. Blink's speed (14), passed through ModifyMaxSpeed exactly as vanilla
+    Fade:ModifyVelocity passes Blink's - so whatever raises a Blink's speed raises a Shadow Step's the same way: Celerity,
+    and Xmenu2's Hunger and Xmenu2+'s Pheromone Trail (both ModifyMaxSpeed wraps on every alien).
+]]
+function Vokex:GetShadowStepSpeed(input)
+    local speedTable = { maxSpeed = kShadowStepSpeed }
+    if self.ModifyMaxSpeed then
+        self:ModifyMaxSpeed(speedTable, input)
+    end
+    -- Never above vanilla's Blink speed cap (Fade.lua kBlinkMaxSpeed, 25), whatever bonuses stack.
+    local speed = math.min(kShadowStepMaxSpeed, math.max(kShadowStepSpeed, speedTable.maxSpeed or kShadowStepSpeed))
+    return speed * kShadowStepSpeedScale
 end
 
 function Vokex:ModifyVelocity(input, velocity, deltaTime)
 
+    --[[
+        Combat Enhancer: the held Shadow Step. While stepping, the Vokex's HORIZONTAL velocity is set to a constant
+        kShadowStepSpeed (the Fade's Blink speed) in the direction of the movement keys held right now. With no movement
+        key held it keeps going the way it was already moving; standing still, it stays still. Vertical velocity is left
+        alone, so jumping and falling work as normal.
+    ]]
     if self:GetIsShadowStepping() then
-        --velocity = self.shadowStepDirection
-        velocity:Add(self.shadowStepDirection)
-        velocity:Normalize()
-        velocity:Scale(kShadowStepSpeed)
-    else
-        local viewCoords = self:GetViewCoords()
-        local movementDirection = viewCoords:TransformVector( input.move)
 
-        if movementDirection:GetLength() == 0 then
-            movementDirection = viewCoords.zAxis
+        local viewCoords = self:GetViewCoords()
+        local direction = viewCoords:TransformVector(input.move)
+        direction.y = 0
+
+        if direction:GetLengthSquared() < 0.0001 then
+            direction = Vector(velocity.x, 0, velocity.z)
         end
 
-        movementDirection.y = 0
-        movementDirection:Normalize()
-        movementDirection:Scale(kShadowStepSpeed)
+        if direction:GetLengthSquared() > 0.0001 then
+            local speed = self:GetShadowStepSpeed(input)
+            direction:Normalize()
+            velocity.x = direction.x * speed
+            velocity.z = direction.z * speed
+            self.shadowStepDirection = direction * speed
+        end
 
-        self.shadowStepDirection = movementDirection
+        --[[
+            Jump HELD during a step (user 2026-10-13): gravity is balanced out completely (Vokex:ModifyGravityForce reads
+            xmenuShadowClimb) and the Vokex climbs at a steady, modest speed: below kShadowStepClimbSpeed it speeds up by
+            kShadowStepClimbAccel a second until it reaches it, and from then on it HOLDS that vertical speed for as long as
+            jump is held (a jump that started faster is brought down to it). Combined with the horizontal step, so it
+            climbs diagonally in whatever direction it is moving. Let go of jump and gravity takes over again.
+        ]]
+        self.xmenuShadowClimb = bit.band(input.commands, Move.Jump) ~= 0
+        if self.xmenuShadowClimb then
+            -- No wait after re-pressing jump (user 2026-10-13): any fall built up while jump was released is cancelled
+            -- at once, so the climb starts from level instead of first working off the falling speed.
+            if velocity.y < 0 then
+                velocity.y = 0
+            end
+            if velocity.y < kShadowStepClimbSpeed then
+                velocity.y = math.min(kShadowStepClimbSpeed, velocity.y + kShadowStepClimbAccel * deltaTime)
+            else
+                velocity.y = kShadowStepClimbSpeed
+            end
+        end
+
+    else
+        self.xmenuShadowClimb = false
     end
 
 end
 
+-- Combat Enhancer: jumping works the same while Shadow Stepping (normal Vokex jump height and timing).
 function Vokex:GetCanJump()
-    return (Alien.GetCanJump(self) or not self.hasDoubleJumped) and not self:GetIsShadowStepping()
+    return Alien.GetCanJump(self) or not self.hasDoubleJumped
 end
 
 function Vokex:GetIsShadowStepping()
@@ -389,6 +480,12 @@ function Vokex:GetMaxSpeed(possible)
 
     if possible then
         return kMaxSpeed
+    end
+
+    -- Combat Enhancer: the movement code's speed cap allows the held Shadow Step's constant speed (Vokex:ModifyVelocity
+    -- sets it; ModifyMaxSpeed's own bonuses are applied on top of this value by the movement code itself).
+    if self:GetIsShadowStepping() then
+        return kShadowStepSpeed * kShadowStepSpeedScale
     end
 
     -- // Take into account crouching.
@@ -435,8 +532,10 @@ function Vokex:TriggerShadowStep()
     
     local weapon = self:GetActiveWeapon()
     local canShadowStep = not weapon or not weapon.GetCanShadowStep or weapon:GetCanShadowStep()
-    
-    if canShadowStep and not self:GetHasShadowStepCooldown() then
+
+    -- Combat Enhancer: the start of a HELD step - the weapon (ShadowStep.lua) already checked energy and the short
+    -- re-press gap, so no cooldown is checked again here. It lasts until Vokex:OnShadowStepEnd.
+    if canShadowStep then
 
         --local velocity = self:GetVelocity()
         self.hasDoubleJumped = false
@@ -463,6 +562,10 @@ end
 
 function Vokex:OnShadowStepEnd()
     self.ethereal = false
+    -- Combat Enhancer: the held step ends here (released, or out of energy). timeShadowStep is moved so the ground
+    -- friction ramp after a step (GetGroundFriction / GetAirFriction) and the short re-press gap count from now.
+    self.shadowStepping = false
+    self.timeShadowStep = Shared.GetTime() - Vokex.kShadowStepDuration
 end
 
 function Vokex:GetHasMetabolizeAnimationDelay()
@@ -570,8 +673,9 @@ function Vokex:OnUpdateAnimationInput(modelMixin)
     return
 end
 
+-- Combat Enhancer: Shadow Step is held, not a timed dash - shadowStepping is set by Vokex:TriggerShadowStep and cleared by
+-- Vokex:OnShadowStepEnd (the weapon, ShadowStep.lua), no longer recomputed from a fixed duration here.
 function Vokex:PreUpdateMove(input, runningPrediction)
-    self.shadowStepping = self.timeShadowStep + Vokex.kShadowStepDuration > Shared.GetTime()
 end
 
 
@@ -594,8 +698,19 @@ function Vokex:OnGroundChanged(onGround, impactForce, normal, velocity)
 
     if onGround then
         self.hasDoubleJumped = false
+
+        -- Combat Enhancer: as Fade:OnGroundChanged - tell a bot's brain it has landed, so it queues its next jump in
+        -- the Shadow Step -> Jump -> Jump sequence (lua/Xmenu2/Bot_Fixes/VokexBrain_Data.lua).
+        local client = self.GetClient and self:GetClient()
+        if Server and self:GetIsAlive() and client and client:GetIsVirtual() then
+            local bot = client.bot
+            local brain = bot and bot.brain
+            if brain and brain.OnGroundLanded then
+                brain:OnGroundLanded()
+            end
+        end
     end
-    
+
 end
 
 function Vokex:GetMovementSpecialCooldown()

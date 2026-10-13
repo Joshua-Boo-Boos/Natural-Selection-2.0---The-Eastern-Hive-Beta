@@ -74,3 +74,6 @@ function GUITechMap:Update(deltaTime)
     end
 
 end
+
+-- ARCUS: the three ARC Factory specialisations and their four levels on the Marines' tech map.
+Script.Load("lua/CNBalance/ARCSpec/ARCSpec_TechMap.lua")

@@ -61,12 +61,36 @@ kMilitaryProtocolTResPerBountyClaim = 0.5
 kMilitaryProtocolResearchDurationMultiply = 1
 kMilitaryProtocolTeamResourcesPerKill = {          --Append kTechDataTeamResOnKill above
     [kTechId.Drifter] = 1,
-    [kTechId.Harvester] = 2, [kTechId.Tunnel] = 2, [kTechId.InfestedTunnel] = 2, [kTechId.GorgeTunnel] = 2,
-    [kTechId.Whip] = 2, [kTechId.Shift] = 2, [kTechId.Crag] = 2, [kTechId.Shade] = 2,
-    [kTechId.Skulk] = 2, [kTechId.Gorge] = 2,[kTechId.Prowler] = 3, [kTechId.Lerk] = 3, [kTechId.Fade] = 5, [kTechId.Vokex] = 5,[kTechId.Onos] = 8,
-    [kTechId.Shell] = 2, [kTechId.Veil] = 2, [kTechId.Spur] = 2,
-    [kTechId.Hive] = 20, [kTechId.ShiftHive] = 20, [kTechId.CragHive] = 20, [kTechId.ShadeHive] = 20
+    -- Skulk pays 50% of its original reward; Gorge through Onos scale from 100% to 325%.
+    [kTechId.Skulk] = 1, [kTechId.Gorge] = 2, [kTechId.Prowler] = 4.35, [kTechId.Lerk] = 5.7, [kTechId.Fade] = 11.75, [kTechId.Vokex] = 14, [kTechId.Onos] = 26,
 }
+
+--[[
+    MP STRUCTURE BONUS, SCALED BY MARINE TEAM SIZE (first test package, 2026-10-13 - see
+    NS2.0-TEH-Beta/Opus_And_Astra_MP_Edits.md). Paid ON TOP of the normal kTechDataTeamResOnKill reward (unchanged), and
+    multiplied by (Marines / kMilitaryProtocolStructureScaleReference), clamped to [ScaleMin, ScaleMax]. "Marines" is the
+    highest Marine team size (players incl. Commander and bots, no spectators) over the last
+    kMilitaryProtocolStructureScaleWindow seconds of the current round. Only the structures listed here are scaled;
+    lifeforms and Drifters keep their kMilitaryProtocolTeamResourcesPerKill values above.
+
+    At 25 Marines (x2.083): Hive 15 + 83.3 = 98.3, typed Hive 20 + 83.3 = 103.3, Harvester 8.3, Shell/Veil/Spur 5.2,
+    Whip/Shift/Crag/Shade and Tunnels 4.2. (Previously a flat MP 2 each, Hives a flat MP 20.)
+]]
+kMilitaryProtocolStructureBonusPerKill = {
+    [kTechId.Hive] = 40, [kTechId.ShiftHive] = 40, [kTechId.CragHive] = 40, [kTechId.ShadeHive] = 40,
+    [kTechId.Harvester] = 4,
+    [kTechId.Shell] = 2.5, [kTechId.Veil] = 2.5, [kTechId.Spur] = 2.5,
+    [kTechId.Whip] = 2, [kTechId.Shift] = 2, [kTechId.Crag] = 2, [kTechId.Shade] = 2,
+    [kTechId.Tunnel] = 2, [kTechId.InfestedTunnel] = 2, [kTechId.GorgeTunnel] = 2,
+}
+kMilitaryProtocolStructureScaleReference = 12   -- team size that gets x1
+kMilitaryProtocolStructureScaleMin = 1
+kMilitaryProtocolStructureScaleMax = 2.5
+kMilitaryProtocolStructureScaleWindow = 120     -- seconds: rolling maximum of the Marine team size
+
+-- MP economy log: every this many seconds of a live MP round, one server log line with t-res income by source.
+kMilitaryProtocolEconomyLogInterval = 60
+
 kMilitaryProtocolPlayerResourcesPerKill = {
     [kTechId.Skulk] = 0.8, [kTechId.Gorge] = 1.2, [kTechId.Prowler] = 1.5, [kTechId.Lerk] = 2, [kTechId.Fade] = 3,[kTechId.Vokex] = 3, [kTechId.Onos] = 5,
 }
@@ -463,7 +487,9 @@ kHealthOnBlink = 0
 kVokexCost = 39
 kVokexUpgradeCost = 5
 
-kVokexShadowStepEnergyCost = 14 -- 13
+-- Held Shadow Step (ported from Combat Enhancer, 2026-10-13): 6 to start, then 32 a second while held
+-- (CNBalance/Weapons/Alien/ShadowStep.lua). Was 14 for the old single dash.
+kVokexShadowStepEnergyCost = 6 -- 14 -- 13
 kSwipeShadowStepDamage = 40
 kVokexGestateTime = 25
 kVokexEggCost = 80
