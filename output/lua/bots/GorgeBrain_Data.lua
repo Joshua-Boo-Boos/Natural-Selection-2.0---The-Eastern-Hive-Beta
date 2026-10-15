@@ -350,6 +350,58 @@ end
 local kGorgeBabblerSendInterval = 7.0   -- seconds between babbler bursts
 local kGorgeBabblerSendWindow   = 0.6   -- how long each babbler burst lasts (deploy+fire)
 
+-- Share bile selection between ordinary attacks, attack orders and bombardment.
+local kGorgeMarineBileInterval = 5
+local kGorgeBileRange = 12
+
+local function GetGorgeBileWeapon(player)
+    local techTree = GetTechTree(player:GetTeamNumber())
+    local weapon = player:GetWeapon(BileBomb.kMapName)
+    if weapon and techTree and techTree:GetHasTech(kTechId.BileBomb)
+            and player:GetEnergy() > weapon:GetEnergyCost() then
+        return weapon
+    end
+end
+
+local function IsGorgeBileTarget(player, target)
+    return target and HasMixin(target, "Live") and target:GetIsAlive()
+        and HasMixin(target, "Corrode") and HasMixin(target, "Team")
+        and target:GetTeamNumber() ~= player:GetTeamNumber()
+end
+
+local function TryGorgeBileAttack(eyePos, target, bot, move)
+    local player = bot:GetPlayer()
+    if not IsGorgeBileTarget(player, target) then return false end
+    local weapon = GetGorgeBileWeapon(player)
+    if not weapon or not bot.aim or not bot:GetBotCanSeeTarget(target) then return false end
+
+    -- Marine armour benefits from one splash, not an endless bombard action.
+    -- GetTimeLastBomb changes on the actual projectile's animation event, not
+    -- when we merely request fire: keep the weapon drawn until it really shoots.
+    if target:isa("Marine") then
+        if target:GetArmor() <= 0 then return false end
+        local lastBomb = weapon:GetTimeLastBomb()
+        if lastBomb > 0 and Shared.GetTime() - lastBomb < kGorgeMarineBileInterval then return false end
+    end
+
+    local targetPos = target:GetEngagementPoint()
+    local distance = (targetPos - eyePos):GetLength()
+    if distance < 3 or distance > kGorgeBileRange then return false end
+    -- The projectile uses a fixed launch speed; Gorge movement does not add to it.
+    local aimDir = Ballistics.GetAimDirection(eyePos, targetPos, kBilebombVelocity)
+    if not aimDir then return false end
+    -- Keep the aim point at target distance. A point just one metre from the eye
+    -- makes BotAim's positional inaccuracy a huge angular error.
+    local aimPoint = eyePos + aimDir * distance
+    if not player:SetActiveWeapon(BileBomb.kMapName, true) then return false end
+    if bot.aim:UpdateAim(target, aimPoint, kBotAccWeaponGroup.Spit) then
+        move.commands = AddMoveCommand(move.commands, Move.PrimaryAttack)
+    end
+    -- Reserve this frame for aiming as well as firing, so spit/babblers cannot
+    -- cancel the bile draw animation while target acquisition is still pending.
+    return true
+end
+
 local function PerformAttackEntity( eyePos, bestTarget, lastSeenPos, bot, brain, move )
     assert(bestTarget)
 
@@ -372,20 +424,27 @@ local function PerformAttackEntity( eyePos, bestTarget, lastSeenPos, bot, brain,
         PerformMove(eyePos, targetPos, bot, brain, move)
     else
 
-        local aimPos = hasClearShot and GetBestAimPoint( bestTarget ) or (lastSeenPos + Vector(0,0.25,0))
+        local desiredRange = 20
+        if not bestTarget:isa("Marine") and IsGorgeBileTarget(player, bestTarget) and GetGorgeBileWeapon(player) then
+            desiredRange = kGorgeBileRange
+        end
+        if not hasClearShot or distance > desiredRange then
+            PerformMove(eyePos, targetPos, bot, brain, move)
+        end
+        local aimPos = hasClearShot and GetBestAimPoint( bestTarget ) or ((lastSeenPos or targetPos) + Vector(0,0.25,0))
         --local aimPosPlusVel = aimPos + (bestTarget.GetVelocity and bestTarget:GetVelocity() or 0) * math.min(distance,1) / math.min(player:GetMaxSpeed(),5) * 3
 
         if player:GetIsUnderFire() then
             shouldStrafe = true
         end
 
-        if distance <= 20 and distance > 16 and hasClearShot then
+        if distance <= desiredRange and distance > 16 and hasClearShot then
         --keep distance if possible
 
             bot:GetMotion():SetDesiredMoveTarget( nil )
             shouldStrafe = math.random() < 0.7 --orginal < 0.5
 
-        elseif distance < 15 and distance > 5 and hasClearShot then
+        elseif distance <= desiredRange and distance < 15 and distance > 5 and hasClearShot then
 
             local backDir = player:GetCoords().zAxis * -1   --FIXME incorrect
             local backPos = (player:GetOrigin():GetUnit() + backDir) * 1.5
@@ -395,24 +454,7 @@ local function PerformAttackEntity( eyePos, bestTarget, lastSeenPos, bot, brain,
 
         end
 
-        -- Use Bile Bomb as well as Spit while attacking: when Bile Bomb is
-        -- researched and we have energy, lob bile at players/MACs in arc range.
-        -- Spit is still used up close or when bile isn't available.
-        local usedBile = false
-        if isDodgeable and hasClearShot and distance >= 5 and distance <= 22 then
-            local techTree = GetTechTree(player:GetTeamNumber())
-            if techTree and techTree:GetHasTech(kTechId.BileBomb, true)
-                    and player:GetEnergy() > kBileBombEnergyCost then
-                player:SetActiveWeapon(BileBomb.kMapName, true)
-                local aimDir = Ballistics.GetAimDirection( eyePos, bestTarget:GetEngagementPoint(),
-                                   kBilebombVelocity + player:GetVelocity():GetLength() )
-                local aimTarg = aimDir + Vector( eyePos.x, eyePos.y, eyePos.z )
-                if bot.aim and bot.aim:UpdateAim(bestTarget, aimTarg, kBotAccWeaponGroup.Spit) then
-                    move.commands = AddMoveCommand( move.commands, Move.PrimaryAttack )
-                    usedBile = true
-                end
-            end
-        end
+        local usedBile = hasClearShot and TryGorgeBileAttack(eyePos, bestTarget, bot, move)
 
         if not usedBile and distance <= 20 and hasClearShot then     --TODO Change to local glob?
             doFire = true
@@ -427,7 +469,7 @@ local function PerformAttackEntity( eyePos, bestTarget, lastSeenPos, bot, brain,
 
             if shouldStrafe then
 
-                if math.random() < 0.25 and player.timeOfLastJump == nil or player.timeOfLastJump + 1.5 > Shared.GetTime() then
+                if math.random() < 0.25 and (not bot.timeOfLastJump or bot.timeOfLastJump + 1.5 < time) then
                     bot.timeOfLastJump = time
                     move.commands = AddMoveCommand( move.commands, Move.Jump )
                 end
@@ -537,34 +579,8 @@ local function BombardAttack( eyePos, mem, bot, brain, move )
 
         bot:GetMotion():SetDesiredViewTarget( targetPos )   --always keep tracking
 
-        local doBomb = true
-        local shouldStrafe = false
-        
-        if player:GetEnergy() <= kBileBombEnergyCost then
-            doBomb = false --don't consume everything, save one-shot worth for reserve / get-away
-        end
-
-        bot:GetPlayer():SetActiveWeapon(BileBomb.kMapName, true)
-
-        local gorgeVel = player:GetVelocity()
-
-        --TODO Add support for ARC, Exos, and groups/clusters of marines
-        local aimDir = Ballistics.GetAimDirection( eyePos, target:GetEngagementPoint(), kBilebombVelocity + gorgeVel:GetLength() )
-        local aimTarg = aimDir + Vector( eyePos.x, eyePos.y, eyePos.z )
-
-        doBomb = doBomb and bot.aim and bot.aim:UpdateAim(target, aimTarg, kBotAccWeaponGroup.Spit)
-
-        local canSeeTarget = bot:GetBotCanSeeTarget( target )
-
-        if not canSeeTarget and targDist < kMaxDistBombard then
-            shouldStrafe = true
-            doBomb = false
-        end
-        
-        if doBomb and canSeeTarget then
-        --Note: for things like jump+tiny-delay+bile-attack combos...we need complex action (e.g. sequence of key presses over X time ...key-patterns, etc. ...yeesh)
-            move.commands = AddMoveCommand( move.commands, Move.PrimaryAttack )
-        end
+        local canSeeTarget = bot:GetBotCanSeeTarget(target)
+        TryGorgeBileAttack(eyePos, target, bot, move)
 
         if targDist < kIdealBombardDist and canSeeTarget then
 
@@ -664,7 +680,7 @@ local kExecBombardAction = function(move, bot, brain, gorge, action)
 
         local targPos = target.GetEngagementPoint and target:GetEngagementPoint() or target:GetOrigin()
 
-        if dist > kMaxDistBombard then
+        if (eyePos - targPos):GetLength() > kMaxDistBombard then
         --extra distance padding because we want time to move into position, _and_ time to regen some energy
             bot:GetPlayer():SetActiveWeapon(SpitSpray.kMapName, true)   --just to make sure we're ready to fight
             PerformMove( eyePos, targPos, bot, brain, move )
@@ -921,15 +937,10 @@ kGorgeBrainActions =
         
         if bestMem ~= nil then
 
-            --check weapon, as to not disrupt bombard
-            local weapon = gorge:GetActiveWeapon()
-            local canAttack = weapon ~= nil and weapon:isa("SpitSpray")
-            
-            --local target = Shared.GetEntity(bestMem.entId) --unused
             local eHP = gorge:GetHealthScalar()
-            
-            if canAttack then    --check weapon so we don't ignore/disrupt Bombardment
-            
+            -- Score combat regardless of the previous action's active weapon.
+            -- Otherwise a bile/babbler draw changes the next decision's weight.
+            do
                 if gorge:GetIsUnderFire() then
                     weight = 3.0
                 end
@@ -940,7 +951,7 @@ kGorgeBrainActions =
                 if bestUrgency ~= nil then
 
                     weight = bestUrgency
-                    weight = weight * 20 / dist    --bias to closest / near out ideal range
+                    weight = weight * 20 / math.max(dist, 1)    --bias to closest / near out ideal range
                     weight = weight * eHP          --reduce per our health
 
                 else
@@ -998,7 +1009,7 @@ kGorgeBrainActions =
                 local techTree = GetTechTree(gorge:GetTeamNumber())
                 -- 'target and ...' guards a nil entity: GetAttackStructuresUrgency
                 -- asserts on a nil target, which would error the whole action.
-                if target and techTree and techTree:GetHasTech(kTechId.BileBomb, true) then
+                if IsGorgeBileTarget(gorge, target) and not target:isa("Marine") and GetGorgeBileWeapon(gorge) then
 
                     local targetUrgency = GetAttackStructuresUrgency(gorge, target)
 
@@ -1511,57 +1522,15 @@ function CreateGorgeBrainSenses()
 
         end)
         
-        s:Add("allBileAbleTargets", function(db, gorge) 
-    local team = gorge:GetTeamNumber() 
-    local memories = GetTeamMemories( team )
-
-        return FilterTableEntries( memories,
-            function( mem )                    
-                local ent = Shared.GetEntity( mem.entId )
-                
-                --Entferne die Zeilen, die Marines und PowerPoints ausschlie�en.
-                if HasMixin(ent, "Corrode") then
-                --if HasMixin(ent, "Corrode") then
-                    local isAlive = HasMixin(ent, "Live") and ent:GetIsAlive()
-                    local isEnemy = HasMixin(ent, "Team") and ent:GetTeamNumber() ~= team                    
-                    
-                    if HasMixin(ent, "Construct") then
-                        --Passe die Zeile an, die die Konstruktion ber�cksichtigt
-                        --return isAlive and isEnemy and ent:GetIsBuilt()    
-                        return isAlive and isEnemy and ent:GetIsBuilt()
-                    end
-
-                    return isAlive and isEnemy
-                else
-                    return false
-                end
-            end)                
+    s:Add("allBileAbleTargets", function(db, gorge)
+        return FilterTableEntries(GetTeamMemories(gorge:GetTeamNumber()), function(mem)
+            local target = Shared.GetEntity(mem.entId)
+            -- Marines get a single opening splash in PerformAttackEntity.
+            -- Structures (including construction sites), ARCs, MACs and Exos
+            -- remain sustained bombardment targets.
+            return IsGorgeBileTarget(gorge, target) and not target:isa("Marine")
+        end)
     end)
-
-    --[[s:Add("allBileAbleTargets", function(db, gorge)  --orginal
-            local team = gorge:GetTeamNumber()
-            local memories = GetTeamMemories( team )
-
-            return FilterTableEntries( memories,
-                function( mem )                    
-                    local ent = Shared.GetEntity( mem.entId )
-                    
-                    --For now, we don't want to bile Marines, because that will conflict with Attack action
-                    --For now, ignore power nodes, not worth the edge-cases  -- TODO deal with edgey-nodes...
-                    if HasMixin(ent, "Corrode") and ( not ent:isa("PowerPoint") and not ent:isa("Marine") ) then
-                        local isAlive = HasMixin(ent, "Live") and ent:GetIsAlive()
-                        local isEnemy = HasMixin(ent, "Team") and ent:GetTeamNumber() ~= team                    
-                        
-                        if HasMixin(ent, "Construct") then
-                            return isAlive and isEnemy and ent:GetIsBuilt()    
-                        end
-
-                        return isAlive and isEnemy
-                    else
-                        return false
-                    end
-                end)                
-        end)--]]
 
     s:Add("nearestBilebombTarget", function(db, gorge)
 
@@ -1571,9 +1540,8 @@ function CreateGorgeBrainSenses()
                 function( mem )
                     local origin = mem.lastSeenPos
                     local target = Shared.GetEntity(mem.entId)
-                    if origin == nil then
-                        origin = target:GetOrigin()
-                    end
+                    if not target then return nil end
+                    if origin == nil then origin = target:GetOrigin() end
                     return select(2, GetTunnelDistanceForAlien(gorge, target or origin))
                 end)
 
@@ -1713,13 +1681,50 @@ if Server then
     Script.Load("lua/CNBalance/OriginGorgeBuilder.lua")
     local originalActions = kGorgeBrainActions
     local builderAction = OriginGorgeBuilder.CreateAction(PerformMove, PerformHealSpray)
+    --[[
+        (2026-10-14) One server-log line per Gorge bot every kGorgeStatusLogInterval seconds - what it is doing and,
+        for the builder, which job - so a Gorge that seems idle can be diagnosed from the log alone. Server log only.
+    ]]
+    local kGorgeStatusLogInterval = 30
+    local function LogGorgeStatus(brain, player, actionName)
+        local now = Shared.GetTime()
+        if now < (brain.originNextStatusLog or 0) then return end
+        brain.originNextStatusLog = now + kGorgeStatusLogInterval
+        local job = brain.originJob
+        local jobText = job and string.format("%s %s in %s", job.kind or "?", job.className or "?", job.room or "?") or "none"
+        local team = player:GetTeam()
+        local state = GetOriginGorgeState and GetOriginGorgeState(team)
+        Print("[Origin Gorge] %s: action=%s job=%s pres=%.0f tres=%.0f originForm=%s commander=%s voteFinished=%s fetchDisallowed=%s",
+            string.sub(player:GetName() or "?", 1, 32), tostring(actionName), jobText, player:GetResources() or 0,
+            team and team:GetTeamResources() or 0, tostring(team and team.IsOriginForm and team:IsOriginForm()),
+            tostring(team and team:GetCommander() ~= nil), tostring(state and state.voteFinished),
+            tostring(state and state.disallowed))
+    end
+
     kGorgeBrainActions = { function(bot, brain, player)
-        if not player.isHallucination then return builderAction(bot, brain, player) end
+        -- (2026-10-13) The builder only takes the Gorge when it has work right now (OriginGorgeBuilder.HasWork);
+        -- otherwise the Gorge's normal actions run, instead of it standing still at the Hive.
+        if not player.isHallucination then
+            local ok, hasWork = pcall(OriginGorgeBuilder.HasWork, bot, brain, player)
+            if not ok then
+                if not brain.originHasWorkErrorShown then
+                    brain.originHasWorkErrorShown = true
+                    Print("[Origin Gorge] HasWork error: %s", tostring(hasWork))
+                end
+            elseif hasWork then
+                local action = builderAction(bot, brain, player)
+                pcall(LogGorgeStatus, brain, player, action and action.name)
+                return action
+            end
+        end
+        -- (2026-10-14) A human Commander's order outranks everything but self-defence (CNBalance/BotHumanOrders.lua).
+        if TEHWrapActionList then TEHWrapActionList(originalActions, "alien") end
         local best = {name = "idle", weight = 0, perform = function() end}
         for _, evaluate in ipairs(originalActions) do
             local action = evaluate(bot, brain, player)
             if action.weight > best.weight then best = action end
         end
+        if not player.isHallucination then pcall(LogGorgeStatus, brain, player, best.name) end
         return best
     end }
 end

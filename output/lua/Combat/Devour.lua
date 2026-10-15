@@ -337,7 +337,9 @@ function Devour:Attack(player)
         
         if target and HasMixin(target, "Live") and target:GetIsAlive() then
             
-            if target:isa("Marine") or target:isa("JetpackMarine") then -- Only devour Marine or JetpackMarine entities
+            -- A BMAC can't be swallowed (Exo parity); the bite above has already hit its AP.
+            local isBMAC = GetIsBMACMarine and GetIsBMACMarine(target)
+            if (target:isa("Marine") or target:isa("JetpackMarine")) and not isBMAC then -- Only devour Marine or JetpackMarine entities
                 if GetAreEnemies(self,target) then
                     self.eatingPlayerId = target:GetId()
                     self.timeDevourEnd = Shared.GetTime() + Devour.kEatCoolDown

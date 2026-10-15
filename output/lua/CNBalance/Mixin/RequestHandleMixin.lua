@@ -34,8 +34,13 @@ if Server then
         self.timeLastPrimaryRequestHandle = time + kAutoMedCooldown
         self:AddResources(-kAutoMedPRes)
 
-        self:AddHealth(MedPack.kHealth, false, true)
-        self:AddRegeneration(MedPack.kRegen)
+        -- BMAC character: 25 AP instead of 50 HP (CNBalance/BMAC/BMAC_MedPack.lua).
+        if GetIsBMACMarine and GetIsBMACMarine(self) and BMAC_GiveMedpackArmor then
+            BMAC_GiveMedpackArmor(self)
+        else
+            self:AddHealth(MedPack.kHealth, false, true)
+            self:AddRegeneration(MedPack.kRegen)
+        end
         self:TriggerEffects("medpack_pickup", { effecthostcoords = self:GetCoords() })
     end
 

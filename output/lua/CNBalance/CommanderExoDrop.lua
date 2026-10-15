@@ -330,6 +330,9 @@ if Client then
             -- Nothing configured yet -> this is the button click. Open the window and
             -- swallow the action; the ghost is armed later, from the BUY button.
             if not self.exoDropConfigured then
+                -- Retire any previous placement/targeted button before opening
+                -- this modal window. BUY alone is allowed to arm the Exo ghost.
+                baseSetCurrentTech(self, kTechId.None)
                 MarineCommanderExoDrop_Open()
                 return
             end
@@ -343,6 +346,19 @@ if Client then
         end
 
         baseSetCurrentTech(self, techId)
+    end
+
+    -- An explicit new button click always starts a new configuration, even if
+    -- an earlier BUY left a placement ghost active. Ghost updates themselves
+    -- still pass through SetCurrentTech without reopening the window.
+    local baseMenuButtonAction = CommanderUI_MenuButtonAction
+    function CommanderUI_MenuButtonAction(index)
+        local player = Client.GetLocalPlayer()
+        if player and player:isa("MarineCommander") and player.menuTechButtons
+                and player.menuTechButtons[index] == GetExoDropTechId() then
+            player.exoDropConfigured = nil
+        end
+        return baseMenuButtonAction(index)
     end
 
     -- Button colour. The tech tree already greys the button out without a researched Exosuit

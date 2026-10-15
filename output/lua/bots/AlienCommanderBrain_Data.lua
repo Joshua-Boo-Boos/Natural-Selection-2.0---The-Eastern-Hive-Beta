@@ -4,6 +4,29 @@ Script.Load("lua/bots/BrainSenses.lua")
 Script.Load("lua/bots/AlienCommanderBrain_TechPathData.lua")
 Script.Load("lua/bots/AlienCommanderBrain_Utility.lua")
 Script.Load("lua/bots/AlienCommanderBrain_Senses.lua")
+Script.Load("lua/CNBalance/AlienComPlan.lua")
+
+--[[
+    (2026-10-14) BUILD ORDERS: the Commander bot follows one of five plans (CNBalance/AlienComPlan.lua). Every call goes
+    through ComPlanCall (pcall): if anything in the plan code ever fails, the brain just behaves as it did before.
+]]
+local kComPlanErrorShown = false
+local function ComPlanCall(fnName, ...)
+    local fn = AlienComPlan and AlienComPlan[fnName]
+    if not fn then return nil end
+    local results = { pcall(fn, ...) }
+    if not results[1] then
+        if not kComPlanErrorShown then
+            kComPlanErrorShown = true
+            Print("[AlienComPlan] %s error: %s", fnName, tostring(results[2]))
+        end
+        return nil
+    end
+    return unpack(results, 2)
+end
+local function GetComPlan(com)
+    return ComPlanCall("Get", com:GetTeam())
+end
 
 -- The same "hive that is not about to die" pick as vanilla's cheapestBiomassUnit sense (a local in
 -- AlienCommanderBrain_Senses.lua, so it cannot be called from here). Used for NS2.0-TEH's Recover Biomass.
@@ -280,6 +303,12 @@ local kExecDropHive = function(move, bot, brain, com, action)
                         techPointLocationName,
                         kHiveSpawnDelay)
                 --bot:SendTeamMessage(message, 0, false, true)
+                -- (2026-10-14) Build order: tell the team where the Hive is going (not in Siege2.0-TEH).
+                if kAlienComPlanAnnounce and OriginGorgeTeamMessage then
+                    OriginGorgeTeamMessage(com:GetTeam(), string.format(
+                        "[Aliens Commander Bot]: Hive going down in %s in %d seconds - defend it!",
+                        string.sub(techPointLocationName, 1, 40), kHiveSpawnDelay))
+                end
 
                 -- Create a warning pheromone where we want to spawn the Hive.
                 CreatePheromone(kTechId.ExpandingMarker, action.targetTP:GetOrigin(), com:GetTeamNumber())
@@ -316,6 +345,12 @@ local kChamberTechToChamberSense =
 kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and modified, so when applicable, they take Location-Hostility and RoundTime into account
 {
     function(bot, brain, com)
+        -- (2026-10-14) Build order upkeep: create / announce / complete the plan. Never chosen as an action.
+        ComPlanCall("Update", brain, com)
+        return { name = "build order", weight = 0, perform = function() end }
+    end, -- Build order
+
+    function(bot, brain, com)
 
         local name = kAlienComActionTypes[kAlienComActionTypes.BuildCrag]
         local comTeamNum = com:GetTeamNumber()
@@ -326,6 +361,7 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
         local buildPos
 
         local canDo = doables[kTechId.Crag] and com:GetTeamResources() >= kCragCost
+            and not ComPlanCall("SavingForHive", GetComPlan(com), com:GetTeam())
         if canDo and #senses:Get("builtHives") >= 1 and --senses:Get("biomassLevel") >= kBiomassMinForPvE and
             brain:GetTimeSinceLastDroppedStructure("PVE") > kPVEDropInterval then
 
@@ -374,6 +410,7 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
         local buildPos
 
         local canDo = doables[kTechId.Shade] and com:GetTeamResources() >= kShadeCost
+            and not ComPlanCall("SavingForHive", GetComPlan(com), com:GetTeam())
         if canDo and #senses:Get("builtHives") >= 1 and senses:Get("biomassLevel") >= kBiomassMinForPvE and
             brain:GetTimeSinceLastDroppedStructure("PVE") > kPVEDropInterval then
 
@@ -426,6 +463,7 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
         local kMinHivesForWhips = 2
 
         if doables[kTechId.Whip] and not isEarlyGame and
+                not ComPlanCall("SavingForHive", GetComPlan(com), com:GetTeam()) and
                 #senses:Get("hives") >= kMinHivesForWhips and
                 #senses:Get("whips") < kMaxWhips and
                 senses:Get("biomassLevel") >= kBiomassMinForPvE and
@@ -482,29 +520,51 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
             local firstSafeHive = senses:Get("firstBuiltAndSafeHive")
             local chamberTechId = kTechId.None
 
+            --[[
+                (2026-10-14) Build order: chambers in the plan's Hive-type order, up to the plan's cap for each type
+                right now (AlienComPlan.ChamberCap: e.g. none until the 2nd Hive for Fast Hive / Two Hives First),
+                next to the Hive of that type when it is safe (e.g. 3 Shells by the Crag Hive).
+            ]]
+            local plan = GetComPlan(com)
+            local chamberOrder = ComPlanCall("ChamberOrder", plan)
+            if not chamberOrder then
+                chamberOrder = {}
+                for _, info in ipairs(kChamberTechToChamberSense) do chamberOrder[#chamberOrder + 1] = { info[1] } end
+            end
+            local chamberSenseFor = {}
+            for _, info in ipairs(kChamberTechToChamberSense) do chamberSenseFor[info[1]] = info[2] end
+
             -- Get first missing chamber upgrade structure
             if firstSafeHive and brain:GetDelayPassedForStructureRedrop(firstSafeHive:GetLocationName()) then
 
-                for _, info in ipairs(kChamberTechToChamberSense) do
+                for _, entry in ipairs(chamberOrder) do
 
-                    local chamberTechId = info[1]
-                    local chamberSense = info[2]
+                    local chamberTechId = entry[1]
+                    local chamberSense = chamberSenseFor[chamberTechId]
 
-                    if doables[chamberTechId] then
+                    if chamberSense and doables[chamberTechId] then
 
                         local numChambers = senses:Get(chamberSense)
 
-                        local harvesters = senses:Get("harvesters")
                         local maxChambers = 1
 
                         -- Limit to 1 chamber per hive type until later in the game
                         if senses:Get("gameMinutes") >= 2 or #senses:Get("harvesters") >= 4 then
                             maxChambers = 3
                         end
+                        local planCap = ComPlanCall("ChamberCap", plan, com:GetTeam(), chamberTechId)
+                        if planCap then
+                            -- The plan's own chamber focus does not wait for the late-game step-up.
+                            maxChambers = (planCap > 0 and plan and not plan.done) and planCap or math.min(maxChambers, planCap)
+                        end
 
                         if numChambers < maxChambers then
 
-                            hiveUnitToDropNear = firstSafeHive
+                            local typeHive = entry[2] and ComPlanCall("HiveOfType", com:GetTeam(), entry[2])
+                            if typeHive and not brain:GetIsSafeToDropInLocation(typeHive:GetLocationName(), com:GetTeamNumber(), senses:Get("isEarlyGame")) then
+                                typeHive = nil
+                            end
+                            hiveUnitToDropNear = typeHive or firstSafeHive
                             chamberDropTechId = chamberTechId
                             weight = GetAlienComBaselineWeight(kAlienComActionTypes.BuildUpgradeChamber)
                             break
@@ -558,9 +618,16 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
             end
         end
 
+        -- (2026-10-14) Build order: the plan decides which Hive type comes next, and when (nil = not yet).
+        local plan = GetComPlan(com)
+        if plan then
+            upgradeTechId = ComPlanCall("NextHiveUpgrade", plan, com:GetTeam())
+        end
+
         local waitingForEarlyGameDrops = senses:Get("isEarlyGame") and #senses:Get("harvesters") < 3
         local hiveToUpgrade
-        if not waitingForEarlyGameDrops and doables[upgradeTechId] then
+        if upgradeTechId and not waitingForEarlyGameDrops and doables[upgradeTechId]
+                and not ComPlanCall("SavingForHive", plan, com:GetTeam()) then
 
             if numNormalHives > 0 then
                 hiveToUpgrade = normalHives[1]
@@ -573,7 +640,7 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
         {
             name = name,
             weight = weight,
-            upgradeTechId = upgradeTechId,
+            upgradeTechId = upgradeTechId or kTechId.None,
             hiveToUpgrade = hiveToUpgrade,
             perform = kExecUpgradeHiveType
         }
@@ -603,7 +670,11 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                 #GetEntitiesAliveForTeam("Spur", comTeamNumber) > 0
         end
 
-        if not waitingForEarlyGameDrops and brain.droppedUpgradeChamber and hasMinimumTRes then
+        -- (2026-10-14) With a build order the plan decides when chambers come, so research does not wait for one.
+        local plan = GetComPlan(com)
+        local chambersReady = brain.droppedUpgradeChamber or plan ~= nil
+
+        if not waitingForEarlyGameDrops and chambersReady and hasMinimumTRes then
 
             -- GetResearchingBiomassLevel (includes currently researching biomass)
             local techTier, nextTechId, eTechResult = GetTechPathProgressForAlien(brain, com)
@@ -728,7 +799,7 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
             cheapest Biomass anyway - unless the commander is saving for a Hive it can still place (fewer than 3).
         ]]
         local savingForHive = brain.nextUpgradeStep == kTechId.Hive and #GetEntitiesAliveForTeam("Hive", comTeamNumber) < 3
-        if weight == 0 and not waitingForEarlyGameDrops and brain.droppedUpgradeChamber and not savingForHive
+        if weight == 0 and not waitingForEarlyGameDrops and chambersReady and not savingForHive
                 and com:GetTeamResources() >= 60 then
             local builtHives = #senses:Get("builtHives")
             local team = com:GetTeam()
@@ -742,6 +813,23 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                     weight = GetAlienComBaselineWeight(kAlienComActionTypes.ResearchUpgrades)
                 end
             end
+        end
+
+        --[[
+            (2026-10-14) Build order research: the plan's own priorities (the Shift Tunnel for Tunnel network, Biomass for
+            Biomass rush) and, once the plan is complete, everything left - every Tunnel upgrade and Biomass to the
+            maximum the Hives allow. Saving every t-res for a Fast Hive stops all research until it is down.
+        ]]
+        if plan and not waitingForEarlyGameDrops and hasMinimumTRes then
+            local planTechId, planUnit = ComPlanCall("Research", plan, com:GetTeam(), doables, senses)
+            if planTechId and planUnit then
+                researchTechId = planTechId
+                hiveToResearchAt = planUnit
+                weight = GetAlienComBaselineWeight(kAlienComActionTypes.ResearchUpgrades)
+            end
+        end
+        if ComPlanCall("SavingForHive", plan, com:GetTeam()) then
+            weight = 0
         end
 
         return
@@ -1093,6 +1181,17 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
         local rtPosition = resPoint and resPoint:GetOrigin()
         local cystPos
 
+        -- (2026-10-14) Build order: cyst towards the planned 2nd Hive location early when the plan wants that Hive soon.
+        local plan = GetComPlan(com)
+        local planCystTP = ComPlanCall("GetSecondHiveTP", plan, com:GetTeam())
+        if planCystTP and not (ComPlanCall("WantsHiveNow", plan, com:GetTeam(), #sdb:Get("harvesters"))
+                or brain.nextUpgradeStep == kTechId.Hive) then
+            planCystTP = nil
+        end
+        if planCystTP and (GetCystForPoint(sdb, planCystTP:GetOrigin()) or GetIsPointOnInfestation(planCystTP:GetOrigin())) then
+            planCystTP = nil
+        end
+
         -- Check if a structure needs to be re-cysted (most important override)
         if #brain.structuresInDanger > 0 then -- TODO: Pass in location name to avoid GetLocationForPoint
             rtPosition = brain.structuresInDanger[1]
@@ -1100,6 +1199,10 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
             resPoint = nil
             isReCystSuffocatingStucture = true
             isCystForNewHive = false
+        elseif planCystTP then
+            isCystForNewHive = true
+            resPoint = planCystTP
+            rtPosition = resPoint:GetOrigin()
         elseif brain.nextUpgradeStep == kTechId.Hive and nextHiveTechPoint and not GetCystForPoint(sdb, nextHiveTechPoint:GetOrigin()) then
             isCystForNewHive = true
             resPoint = nextHiveTechPoint
@@ -1334,35 +1437,69 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
             local tooMuchResTP = sdb:Get("techPointToTakeInfest")
             local emergencyTP = sdb:Get("techPointToTakeEmergency")
 
+            -- (2026-10-14) The build order's chosen Hive location stays valid while it is free and safe.
+            local planTP = ComPlanCall("GetSecondHiveTP", GetComPlan(com), com:GetTeam())
+            local planTPValid = planTP and targetTP and planTP:GetId() == brain.dropHiveTechPointId and not targetTP:GetAttached()
+                and brain:GetIsSafeToDropInLocation(targetTP:GetLocationName(), com:GetTeamNumber(), sdb:Get("isEarlyGame"))
+
             local techPointValid =
+                planTPValid or
                 targetTP and
                 not targetTP:GetAttached() and
                 (safeTP and safeTP:GetId() == brain.dropHiveTechPointId) or
                 (emergencyTP and emergencyTP:GetId() == brain.dropHiveTechPointId) or
                 (tooMuchResTP and tooMuchResTP:GetId() == brain.dropHiveTechPointId)
 
+            -- (2026-10-14) ARCs moved in while we waited: do not drop it into their fire.
+            if techPointValid and targetTP and TEHGetARCThreatNear and TEHGetARCThreatNear(com:GetTeamNumber(), targetTP:GetOrigin()) then
+                techPointValid = false
+            end
+
             if not techPointValid then -- Now invalid, say a "cancel" message
 
-                local techPointLocationName = targetTP:GetLocationName()
+                local techPointLocationName = targetTP and targetTP:GetLocationName() or ""
                 techPointLocationName = (techPointLocationName and techPointLocationName ~= "" and techPointLocationName) or "no name"
                 local message = string.format("I can't drop a Hive in %s anymore! Something is there...", techPointLocationName)
 
                 --bot:SendTeamMessage(message, 0, false, true)
+                -- (2026-10-14) Tell the team the announced Hive is off, and what comes next (not in Siege2.0-TEH).
+                local nextTP = ComPlanCall("GetSecondHiveTP", GetComPlan(com), com:GetTeam())
+                local nextName = nextTP and nextTP.GetLocationName and nextTP:GetLocationName() or ""
+                ComPlanCall("Notice", com:GetTeam(), string.format(
+                    "[Aliens Commander Bot]: Hive in %s not possible (Marines or spot taken) - next: %s",
+                    string.sub(techPointLocationName, 1, 40),
+                    (nextName ~= "" and nextName ~= techPointLocationName) and ("Hive in " .. string.sub(nextName, 1, 40))
+                        or "rest of the plan until a Hive spot is safe"))
                 brain.isDroppingHive = false
 
             else -- Do nothing else until we drop that hive, this way we guarantee we have enough res while avoiding cancellactions, etc
                 weight = GetAlienComBaselineWeight(kAlienComActionTypes.WaitForHiveDrop)
             end
 
-        elseif doables[kTechId.Hive] and
+        else
+
+        --[[
+            (2026-10-14) Build order: the plan may want a Hive now (Fast Hive / Two Hives First: the 2nd Hive early; once
+            the plan is complete: up to 3 Hives), and the 2nd Hive goes to the plan's chosen location while it is free
+            and safe.
+        ]]
+        local plan = GetComPlan(com)
+        local planWantsHive = ComPlanCall("WantsHiveNow", plan, com:GetTeam(), #sdb:Get("harvesters")) and true or false
+        local planTP = ComPlanCall("GetSecondHiveTP", plan, com:GetTeam())
+        if planTP and (planTP:GetAttached() or not brain:GetIsSafeToDropInLocation(planTP:GetLocationName(), com:GetTeamNumber(), sdb:Get("isEarlyGame"))) then
+            planTP = nil
+        end
+
+        if doables[kTechId.Hive] and
                 (
                     isEmergency or
                     brain.hasEnoughTechForHive or
-                    tooMuchRes
+                    tooMuchRes or
+                    planWantsHive
                 ) then
 
             -- Find a hive slot!
-            targetTP = sdb:Get("techPointToTake") -- Also checks if techpoint is "safe"
+            targetTP = (not isEmergency and planTP) or sdb:Get("techPointToTake") -- Also checks if techpoint is "safe"
             if not targetTP then
 
                 if isEmergency then
@@ -1371,6 +1508,18 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                     targetTP = sdb:Get("techPointToTakeInfest") -- Does not require friendly presence
                 end
 
+            end
+
+            --[[
+                (2026-10-14) NO HIVE UNDER ARCs. A Hive dropped where Marine ARCs we have seen can reach it dies before it
+                is built - the Commander kept re-dropping one there for the ARCs to kill again. Such a spot is skipped
+                (emergency or not) until the ARCs are gone, with one notice to the team.
+            ]]
+            if targetTP and TEHGetARCThreatNear and TEHGetARCThreatNear(com:GetTeamNumber(), targetTP:GetOrigin()) then
+                ComPlanCall("Notice", com:GetTeam(), string.format(
+                    "[Aliens Commander Bot]: Hive in %s waits - Marine ARCs cover it",
+                    string.sub(targetTP:GetLocationName() or "?", 1, 40)))
+                targetTP = nil
             end
 
             if targetTP and (isEmergency or tooMuchRes or brain:GetDelayPassedForStructureRedrop(targetTP:GetLocationName())) then
@@ -1387,7 +1536,7 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                         weight = GetAlienComBaselineWeight(kAlienComActionTypes.BuildEmergencyHive)
                     else
 
-                        if tooMuchRes then
+                        if tooMuchRes or planWantsHive then
                             weight = GetAlienComBaselineWeight(kAlienComActionTypes.BuildHive_TooMuchTRes)
                         else
                             weight = GetAlienComBaselineWeight(kAlienComActionTypes.BuildHive)
@@ -1397,6 +1546,8 @@ kAlienComBrainActions =     --BOT-TODO ALL below actions need to be reviewed and
                 end
             end
         end
+
+        end -- (build order) else
 
         return 
         { 
@@ -1430,8 +1581,18 @@ FIXME
         local buildPos
         local tunnelTechId = kTechId.None
 
+        --[[
+            (2026-10-14) Build order: Tunnel network places Commander Tunnels as soon as the first Harvesters are down;
+            the other plans wait until the 2nd Hive is in and a few minutes have passed (AlienComPlan.TunnelsAllowed).
+        ]]
+        local plan = GetComPlan(com)
+        local tunnelsAllowed = ComPlanCall("TunnelsAllowed", plan, com:GetTeam(), roundTime)
+        if tunnelsAllowed == nil then tunnelsAllowed = true end
+        local rtsReady = brain.droppedNaturalRts
+            or (plan and plan.name == "TunnelNetwork" and not plan.done and #sdb:Get("harvesters") >= 2)
+
         local timeSinceLastTunnelEval = Shared.GetTime() - brain.timeLastTunnelEval
-        if timeSinceLastTunnelEval >= brain.kTunnelDropEvalInterval and #tunnelEntrances < 8 and brain.droppedNaturalRts then
+        if timeSinceLastTunnelEval >= brain.kTunnelDropEvalInterval and #tunnelEntrances < 8 and rtsReady and tunnelsAllowed then
 
             local teamInfo = GetTeamInfoEntity(com:GetTeamNumber())
             local tunnelManager = teamInfo:GetTunnelManager()

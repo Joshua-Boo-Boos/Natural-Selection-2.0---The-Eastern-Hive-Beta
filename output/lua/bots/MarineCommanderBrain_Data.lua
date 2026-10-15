@@ -4,6 +4,27 @@ Script.Load("lua/OrderedIterableDict.lua")
 Script.Load("lua/bots/MarineCommanerBrain_TechPath.lua")
 Script.Load("lua/bots/MarineCommanderBrain_Senses.lua")
 Script.Load("lua/bots/MarineCommanderBrain_Utility.lua")
+Script.Load("lua/CNBalance/MarineComPlan.lua")
+
+--[[
+    (2026-10-14) BUILD ORDERS: the Marines Commander bot follows one of five plans (CNBalance/MarineComPlan.lua), then
+    goes for the rest of the J-menu. Every call goes through MarineComPlanCall (pcall): if anything in the plan code
+    ever fails, the brain carries on exactly as before and the server log gets one line.
+]]
+local kMarineComPlanErrorShown = false
+local function MarineComPlanCall(fnName, ...)
+    local fn = MarineComPlan and MarineComPlan[fnName]
+    if not fn then return nil end
+    local results = { pcall(fn, ...) }
+    if not results[1] then
+        if not kMarineComPlanErrorShown then
+            kMarineComPlanErrorShown = true
+            Print("[MarineComPlan] %s error: %s", fnName, tostring(results[2]))
+        end
+        return nil
+    end
+    return unpack(results, 2)
+end
 
 local kMarineComBrainTypes = enum({
 
@@ -197,6 +218,42 @@ end
 
 kMarineComBrainActions =
 {
+    function(bot, brain, com)
+        -- (2026-10-14) Build order upkeep and ARC orders. Never chosen as an action itself.
+        com = com or bot:GetPlayer()
+        if com then
+            MarineComPlanCall("Update", brain, com)
+            MarineComPlanCall("ManageARCs", brain, com)
+            MarineComPlanCall("DispatchDefenders", brain, com)
+        end
+        return { name = "build order upkeep", weight = 0, perform = function() end }
+    end, -- Build order upkeep
+
+    function(bot, brain, com)
+        -- (2026-10-14) The build order's next step (just above normal research, below every emergency and field
+        -- support action). Nothing doable right now = weight 0, and the normal actions carry on.
+        com = com or bot:GetPlayer()
+        local action = com and MarineComPlanCall("NextAction", brain, com)
+        local weight = 0
+        if action and action.perform then
+            weight = GetMarineComBaselineWeight(kMarineComBrainTypes.ResearchUpgrades) + 50
+        end
+        return
+        {
+            name = "build order",
+            weight = weight,
+            perform = function()
+                if action and action.perform then
+                    local ok, err = pcall(action.perform)
+                    if not ok and not kMarineComPlanErrorShown then
+                        kMarineComPlanErrorShown = true
+                        Print("[MarineComPlan] perform error: %s", tostring(err))
+                    end
+                end
+            end
+        }
+    end, -- Build order step
+
     function(bot, brain)
 
         local name = kMarineComBrainTypes[kMarineComBrainTypes.EveryoneIsDead_DoNothing]

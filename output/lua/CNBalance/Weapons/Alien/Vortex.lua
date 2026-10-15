@@ -143,7 +143,8 @@ function Vortex:SuckinPlayers(_deltaTime)
     for _, entity in pairs(players) do
 
         local mass = entity.GetMass and entity:GetMass() or Player.kMass
-        if mass < 200 then
+        -- A BMAC is never pulled, like a (980 mass) Exo; its mass is untouched so movement is unchanged.
+        if mass < 200 and not (GetIsBMACMarine and GetIsBMACMarine(entity)) then
             local playerOrigin = entity:GetEyePos()
 
             local reelOffset = (attackPoint - playerOrigin)

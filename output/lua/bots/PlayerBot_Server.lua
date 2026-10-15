@@ -33,6 +33,8 @@ Script.Load("lua/bots/FadeBrain.lua")
 Script.Load("lua/bots/OnosBrain.lua")
 Script.Load("lua/bots/VokexBrain.lua")
 Script.Load("lua/bots/ProwlerBrain.lua")
+-- (2026-10-14) Bots obey a human Commander's orders (after every brain class above exists).
+Script.Load("lua/CNBalance/BotHumanOrders.lua")
 
 
 local kBotPersonalSettings =
@@ -518,3 +520,6 @@ function PlayerBot:OnDestroy()
     self.motion = nil
 
 end
+
+-- (2026-10-14) Devoured Marine bots punch the Onos (wraps PlayerBot:GenerateMove above, so it must load last).
+Script.Load("lua/CNBalance/DevouredBotPunch.lua")

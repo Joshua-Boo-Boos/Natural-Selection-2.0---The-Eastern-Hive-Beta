@@ -206,7 +206,10 @@ if Server then
         if (player:GetHealthScalar() < 1) then
 
             -- third param true = ignore armor
-            if player:GetHealthFraction() < 1 then
+            -- An armour-only body (BMAC) has no health to heal: GetHealthFraction() is 0 for it, which
+            -- would send it down the health branch forever and never repair its armour.
+            local armorOnly = player.GetIgnoreHealth and player:GetIgnoreHealth()
+            if player:GetHealthFraction() < 1 and not armorOnly then
                 player:AddHealth(self.kHealAmount, false, true)
             else
                 player:AddArmor(self.kWeldAmount, false, true)

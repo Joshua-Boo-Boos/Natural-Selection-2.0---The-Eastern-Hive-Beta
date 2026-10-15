@@ -60,13 +60,14 @@ local kVokexScanDuration = 4
 local kShadowStepSpeed = 14 * 1.2 * 0.8
 -- Vanilla NS2's Blink speed cap (Fade.lua kBlinkMaxSpeed): the step's top speed, and the jump-during-a-step launch speed.
 local kShadowStepMaxSpeed = 25
--- 80% of the step speed, with or without Celerity (user 2026-10-13): applied to the FINAL speed, after Celerity and any
--- other ModifyMaxSpeed bonus and after the cap, so both cases drop by the same 20% (13.44 -> 10.75 base, cap 25 -> 20).
-local kShadowStepSpeedScale = 0.8
+-- Scale on the FINAL step speed (after Celerity and other bonuses, and after the cap). Was 0.8 briefly; back to full
+-- speed, with and without Celerity (user 2026-10-13): 13.44 base, up to 14.94 with full Celerity, cap 25.
+local kShadowStepSpeedScale = 1
 -- Holding jump during a step: gravity is balanced out; the climb builds up by this much a second to a steady climbing
 -- speed and holds it (user 2026-10-13: going up at a not too fast speed).
-local kShadowStepClimbAccel = 14
-local kShadowStepClimbSpeed = 7
+-- 80% of the earlier 14 / 7 (user 2026-10-13: the vertical speed was a bit too much) - same time to reach top speed.
+local kShadowStepClimbAccel = 14 * 0.8
+local kShadowStepClimbSpeed = 7 * 0.8
 local kShadowStepSpeedBonusPerCelerity = 0.66
 Vokex.kShadowStepDuration = 0.2
 -- Combat Enhancer: back to the pre-nerf 0.4 (user 2026-10-13; the nerf had raised it to 0.45).
@@ -77,7 +78,11 @@ local kMaxSpeed = 7.2
 local kCelerityFrictionFactor = 0.04
 
 
-local kVokexGravityMod = 1.5
+-- Gravity: 80% of the original 1.5x (user 2026-10-13) - the Vokex falls more slowly. (NS2 fall speed comes from this
+-- multiplier, not from the Vokex's mass.) The jump keeps its original HEIGHT: jump speed scales by
+-- sqrt(1.5 * new gravity), so height = speed^2 / (2 * gravity) is unchanged (it just rises and falls more slowly).
+local kVokexGravityMod = 1.5 * 0.8
+local kVokexJumpMod = math.sqrt(1.5 * kVokexGravityMod)
 
 if Server then
     Script.Load("lua/CNBalance/Lifeforms/Vokex_Server.lua")
@@ -191,7 +196,7 @@ function Vokex:ModifyJump(input, velocity, jumpVelocity)
     -- (Combat Enhancer: a jump during a Shadow Step is a normal Vokex jump; holding jump then climbs gently - see the
     -- climb in Vokex:ModifyVelocity.)
     if not self.hasDoubleJumped then
-        jumpVelocity:Scale(kVokexGravityMod)
+        jumpVelocity:Scale(kVokexJumpMod)
     end
 end
 

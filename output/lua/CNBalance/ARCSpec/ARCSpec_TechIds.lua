@@ -51,8 +51,9 @@ ARCSpec = ARCSpec or {}
 -- Balance. Specialised ARCs cost 18 team resources and take twice as long as a normal ARC (see ARCSpec_TechData.lua).
 ARCSpec.kSpecResearchCost = 15
 ARCSpec.kSpecResearchTime = 20
-ARCSpec.kUpgradeCosts = { 10, 15, 20, 25 }
-ARCSpec.kUpgradeTimes = { 30, 40, 50, 60 }
+-- (2026-10-14) Every level costs the same and adds about the same power (see ARCSpec_ARC.lua).
+ARCSpec.kUpgradeCosts = { 15, 15, 15, 15 }
+ARCSpec.kUpgradeTimes = { 40, 40, 40, 40 }
 ARCSpec.kARCCost = 18
 ARCSpec.kARCBuildTimeScalar = 2
 

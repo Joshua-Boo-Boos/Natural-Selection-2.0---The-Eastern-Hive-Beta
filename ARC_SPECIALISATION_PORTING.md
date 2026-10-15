@@ -2,6 +2,13 @@
 
 Built in NS2.0-TEH-Beta on 2026-10-10. Revised the same day after the first playtest. Not yet tested again in game.
 
+> **Current state (2026-10-15): ARCUS has been removed from every mod:** NS2.0-TEH Main, Beta and Event, and Siege2.0-TEH. The J-menu and ARCs are vanilla again.
+> - **Backup:** everything removed, per mod, is in `NS2.0-TEH/ARCUS REMOVED BACKUP - 15TH OCTOBER 2026/`.
+> - **Leftover files:** the `ARCSpec/`, `models/marine/arc_spec/` and `ui/arcus/` folders are still on disk in each mod, but nothing loads them.
+> - **Marine Commander bot** (`MarineComPlan.lua`): detects that there is no ARCUS and builds plain ARCs.
+>
+> The rest of this file describes the old design, for reference only.
+
 This file sits outside `output/`, so it is never published with the mod.
 
 ## What it does
@@ -56,14 +63,17 @@ Unspecialised ARC Factory           Specialised factory
 |---|---|---|
 | Conversion (any of the three) | 15 | 20 s |
 | Specialised ARC | 18 (normal ARC remains 15) | 10 s (twice the normal ARC's 5 s) |
-| Upgrade 1 | 10 | 30 s |
+| Upgrade 1 | 15 | 40 s |
 | Upgrade 2 | 15 | 40 s |
-| Upgrade 3 | 20 | 50 s |
-| Upgrade 4 | 25 | 60 s |
+| Upgrade 3 | 15 | 40 s |
+| Upgrade 4 | 15 | 40 s |
 
 The constants are in `ARCSpec_TechIds.lua`: `kSpecResearchCost`, `kSpecResearchTime`, `kUpgradeCosts`, `kUpgradeTimes`, `kARCCost` and `kARCBuildTimeScalar`.
 
 Costs updated in Beta and Event on 2026-10-11: specialised ARCs cost a fixed 18 team resources; upgrade levels 1-4 cost 10, 15, 20 and 25. Conversion costs and all build/research times are unchanged.
+
+Rebalanced in Main, Beta, Event and Siege2.0-TEH on 2026-10-14: every upgrade level costs 15 and takes 40 s, and each
+level adds about the same power (no big jump at level 4). H.A.M.M.E.R. levels reordered (armour, radius, payload, Hive).
 
 ## H.A.M.M.E.R.: Hammerworks (PvE)
 
@@ -74,10 +84,10 @@ The normal ARC siege cannon: 550 damage, 7 m blast. It can't move while deployed
 
 | # | Name | Effect |
 |---|---|---|
-| 1 | Hivebreaker Warheads | +25% damage to Hives |
+| 1 | Deflector Plating | Takes 25% less damage |
 | 2 | Fragmentation Casings | Blast radius 7 m → 10 m |
-| 3 | Deflector Plating | Takes 25% less damage |
-| 4 | Thermobaric Payload | +20% damage to everything in the blast, and sets it on fire |
+| 3 | Thermobaric Payload | +20% damage to everything in the blast, and sets it on fire |
+| 4 | Hivebreaker Warheads | +25% damage to Hives |
 
 ## V.A.T.: Vanguard (PvP)
 
@@ -85,11 +95,15 @@ Never fires at structures.
 
 | # | Name | Effect |
 |---|---|---|
-| Base | Machine gun (no research) | The same machine gun at half the fire rate and short range: 10 normal damage, 1 shot every 4 s, 6 m range (a little more than the H.E.L.L.'s 4 m Pilot Flame). Same targets, turret and effects |
-| 1 | Coaxial Machine Gun | Full rate and range: 10 normal damage per shot, 1 shot every 2 s, 30 m range. Rifle-style tracer, muzzle flash and pistol-shot sound. Targets alien lifeforms first, then Babblers |
-| 2 | Light Cannon Shells | Main cannon, alien lifeforms only. Charges 1 s (the ARC's own charge sound and effect at the muzzle), then fires (the ARC's own fire effect) 25 light damage. 5 s cooldown after firing, 22.5 m range |
-| 3 | Standard Cannon Shells | Cannon deals 30 normal damage |
-| 4 | Railgun Sabots | Cannon deals 65 heavy damage, with the railgun tracer |
+| Base | Machine gun (no research) | A real machine gun: 1.575 normal damage a bullet, 5 rounds a second (7.9 damage per second), 12 m range. Same targets, turret and effects |
+| 1 | Coaxial Machine Gun | 2.1 damage a bullet, about 7 rounds a second (14 per second), 20 m range. Rifle-style tracer, muzzle flash and pistol-shot sound. Targets alien lifeforms first, then Babblers |
+| 2 | Cannon Shells | Main cannon, alien lifeforms only. Charges 1 s (the ARC's own charge sound and effect at the muzzle), then fires (the ARC's own fire effect) 23.625 normal damage. 6 s cooldown after firing, 22.5 m range |
+| 3 | Autoloader | Machine gun 10 rounds a second (1.8375 damage a bullet, 18.4 per second) at 30 m; cannon cooldown 4.5 s |
+| 4 | Railgun Sabots | Cannon deals 36.75 heavy damage, with the railgun tracer and sound |
+
+All V.A.T. and H.E.L.L. damage values were scaled to 70% on 2026-10-14 (requested damage reduction), then both by a further 75% the same day: 52.5% of their original balance. V.A.T. damage per second: 7.9 → 14 → 17.9 → 23.6 → 26.5. The Commander tooltips (`ARCSpec_TechData.lua`) quote these numbers and were updated with them; keep them in step.
+
+Machine-gun bullets due between two ARC updates are fired together (up to 4), so the fire rate holds whatever the ARC's update rate.
 
 - **Upgrade 4 was reduced from 100 heavy.** Heavy damage strips armour twice as fast, which is why 100 heavy looked like about 180 damage on armoured aliens. The machine gun's 10 per shot also adds on top. It went 100 → 35 → 67.5 (the mean) → **65**, at the user's request.
 - **Cannon changes from the first version:** damage halved and range cut by 25%.
@@ -101,23 +115,26 @@ Never fires at structures.
 Every hit is Flame damage. Each pulse also burns other aliens within 1.5 m of the target.
 
 - **Target order when a burst is ready:**
-  1. bile bombs in flight (Gorge `Bomb` and Whip `WhipBomb`),
+  1. projectiles in flight: everything the Marine flamethrower burns (`Bomb`, `WhipBomb`, Prowler Acid Spray `AcidMissile`, `AcidRocketBomb`, `BabblerPheromone`, `Spit`, `DotMarker`),
   2. the Commander's Attack-order target,
   3. alien lifeforms,
-  4. spore clouds,
+  4. clouds: spores, `CragUmbra`, `StormCloud`, `MucousMembrane`, `EnzymeCloud`, `Vortex`,
   5. Babblers,
   6. any other alien structure.
-- **During the cooldown** it fires at nothing, and never picks bile bombs or spores.
-- **A bile bomb or spore target** takes one pulse: the stream reaches it at once and destroys it, then the normal cooldown starts.
-- **Every flame pulse** also burns any spores or bile bombs its stream passes through. This is the vanilla flamethrower's own rule (`BurnSporesAndUmbra`), with the same `burn_spore` / `burn_bomb` effects.
+- **During the cooldown** it fires at nothing, and never picks projectiles or clouds.
+- **A projectile or cloud target** takes one pulse: the stream reaches it at once and destroys it, then the normal cooldown starts.
+- **Every flame pulse** also burns any projectile or cloud its stream passes through, the flamethrower's own rule (`BurnSporesAndUmbra`), with the same `burn_spore` / `burn_umbra` / `burn_bomb` effects.
+- **Every level sets targets on fire** (two `SetOnFire` calls per pulse), so the fire's damage over time comes on top of the numbers below.
 
 | # | Name | Effect |
 |---|---|---|
-| Base | Pilot Flame (no research) | 0.25 s flicker, 4 m range, every 3 s. **No direct damage**; it sets targets on fire (two ignite stacks per pulse) |
-| 1 | Igniter Burst | 0.25 s burst, 6 m range, 20 damage, every 2 s |
-| 2 | Pressurised Flame Jet | 0.75 s burst (3 pulses of 15), 10 m range, every 2.5 s |
-| 3 | Napalm Gel | 3 pulses of 18, and sets targets on fire |
-| 4 | Thermite Lance | 14 m range, 3 pulses of 22, and sets targets on fire |
+| Base | Pilot Flame (no research) | 7.875 damage every second, 5 m range |
+| 1 | Igniter Burst | 3 pulses of 4.725 every second (14.2 per second), 7 m range |
+| 2 | Pressurised Flame Jet | 3 pulses of 6.3 every second (18.9 per second), 10 m range |
+| 3 | Napalm Gel | 3 pulses of 7.875 every second (23.6 per second), 12 m range |
+| 4 | Thermite Lance | Continuous stream: a 6.5625-damage pulse every 0.25 s (26.25 damage per second), no cooldown, 14 m range, lighting its target (one ignite call per pulse). Separately, every 0.05 s it burns EVERY projectile and cloud within 14 m that it has a line of fire to (one flame visual per sweep) |
+
+The H.E.L.L. kill times listed before the 75% change (~8 / 4.25 / 3.25 / 2.5 / 2.25 s against a Skulk) are now longer and have not been re-simulated. The earlier kill times were simulated against a Skulk (67 HP, 10 AP) with the real fire rules: every `SetOnFire` call delays the burn by 1 s, so the burn only adds damage between bursts. V.A.T. and H.E.L.L. damage is multiplied by `kSiegeAlienLifeformHPAPScalar` where a mod defines it (Siege2.0-TEH: 1.2, matching its +20% lifeform HP and AP), so kill times are the same there.
 
 - **The flame stream** is drawn from the muzzle straight to the target on every pulse, so it always reaches instantly.
 - **The range circle** on a placed H.E.L.L. or V.A.T. shows the reach of the weapon it currently has.
@@ -143,7 +160,14 @@ Every hit is Flame damage. Each pulse also burns other aliens within 1.5 m of th
 | V.A.T. | **Yes.** A clear trace from its own eye to the target, and no spore cloud on that line | **No.** Team sight doesn't help |
 | H.E.L.L. | **Yes.** A clear trace from its own eye to the target (bile bombs and spores too) | **No.** Team sight doesn't help |
 
-For all three, cloaked aliens must be detected, and nothing inside a Shade ink cloud can be targeted.
+For all three, nothing inside a Shade ink cloud can be targeted.
+
+**Camouflage (V.A.T. and H.E.L.L.), changed 2026-10-14:** the Sentry's rule exactly (vanilla `CloakTargetFilter`, `TargetCache.lua`). A fully cloaked alien (Camouflage, Shade cloak) is **never** targeted, however clear the line of sight; only detection (Scan, Observatory), which uncloaks it, makes it a target again. One helper (`GetIsHiddenByCamo` in `ARCSpec_ARC.lua`) is checked:
+- in target search and lock keeping (both tanks, including the V.A.T. cannon charge);
+- for the H.E.L.L.'s Commander Attack order, which previously ignored cloaking;
+- on every pulse of a H.E.L.L. burst, so a target that cloaks mid-burst is dropped at once.
+
+The H.E.L.L.'s 1.5 m flame splash around a visible target still hits a cloaked alien standing in it, because that's area damage, not targeting. The H.A.M.M.E.R. is unchanged (team sight or detection).
 
 ## Shade ink (tanks)
 

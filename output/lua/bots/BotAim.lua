@@ -113,6 +113,11 @@ BotAim.kMissDirections =
     ["Fade"]  = Vector(1, 0, 0),
     ["Onos"]  = Vector(0.5, 0, 0), -- Onos should be 100% accuracy  ....should it?
     ["Embryo"] = Vector(0, 1, 0),
+    -- (2026-10-14) TEH lifeforms. A class missing here is never deliberately missed, so Marine bots hit a Vokex or a
+    -- Prowler 100% of the time whatever their accuracy goal. As in Combat Enhancer: the Vokex misses like a Fade,
+    -- the Prowler like a Skulk.
+    ["Vokex"] = Vector(1, 0, 0),
+    ["Prowler"] = Vector(0, 1, 0),
 }
 
 -- Map of classnames -> speed modifiers for bot movements

@@ -31,50 +31,50 @@ ARCSpec.kNames =
     hammer =
     {
         research = "Hammerworks Conversion",
-        researchTip = "Anti-structure. Factory builds H.A.M.M.E.R. siege ARCs. One conversion per factory.",
+        researchTip = "Converts this ARC Factory into a Hammerworks Siege Foundry. Builds H.A.M.M.E.R. (Hive-Assault Mobile Mortar & Explosive Rig) siege ARCs against alien structures, never players. Stationary when deployed. Unlocks four upgrades: Deflector Plating, Fragmentation Casings, Thermobaric Payload and Hivebreaker Warheads. One permanent specialisation per factory.",
         factory = "Hammerworks Siege Foundry",
         factoryTip = "Builds H.A.M.M.E.R.s. Researches Hammerworks upgrades.",
         arc = "H.A.M.M.E.R.",
         arcTip = "Siege ARC: 550 splash, 7 m blast. All alien structures; never players or Babblers. Immobile when deployed.",
         upgrades =
         {
-            { "Hivebreaker Warheads",  "+25% damage to Hives." },
-            { "Fragmentation Casings", "Blast radius 7 m -> 10 m." },
             { "Deflector Plating",     "H.A.M.M.E.R.s take 25% less damage." },
+            { "Fragmentation Casings", "Blast radius 7 m -> 10 m." },
             { "Thermobaric Payload",   "+20% blast damage. Sets targets on fire." },
+            { "Hivebreaker Warheads",  "+25% damage to Hives." },
         },
     },
     vanguard =
     {
         research = "Vanguard Conversion",
-        researchTip = "Anti-personnel. Factory builds V.A.T. tanks. One conversion per factory.",
+        researchTip = "Converts this ARC Factory into Vanguard Armour Works. Builds V.A.T. (Vanguard Assault Tank) tanks against alien lifeforms and Babblers, never structures. Moves while deployed; spores block fire. Unlocks four upgrades: Coaxial Machine Gun, Cannon Shells, Autoloader and Railgun Sabots. One permanent specialisation per factory.",
         factory = "Vanguard Armour Works",
         factoryTip = "Builds V.A.T.s. Researches Vanguard upgrades.",
         arc = "V.A.T.",
-        arcTip = "Tank: machine gun 10 dmg / 4 s, 6 m. Lifeforms, then Babblers; never structures. Moves deployed. Spores block fire.",
+        arcTip = "Tank: machine gun 1.6 dmg, 5 rounds/s, 12 m. Lifeforms, then Babblers; never structures. Moves deployed. Spores block fire.",
         upgrades =
         {
-            { "Coaxial Machine Gun",    "Machine gun: every 2 s, 30 m." },
-            { "Light Cannon Shells",    "Cannon: 25 light, 1 s charge, 5 s cooldown, 22.5 m. Lifeforms only." },
-            { "Standard Cannon Shells", "Cannon: 30 normal." },
-            { "Railgun Sabots",         "Cannon: 65 heavy. Railgun tracer." },
+            { "Coaxial Machine Gun",    "Machine gun: 2.1 dmg, ~7 rounds/s, 20 m." },
+            { "Cannon Shells",          "Cannon: 23.6 normal, 1 s charge, 6 s cooldown, 22.5 m. Lifeforms only." },
+            { "Autoloader",             "Machine gun 10 rounds/s (1.8 dmg), 30 m. Cannon cooldown 4.5 s." },
+            { "Railgun Sabots",         "Cannon: 36.8 heavy. Railgun tracer." },
         },
     },
     inferno =
     {
         research = "Inferno Conversion",
-        researchTip = "Flamethrower tanks. Factory builds H.E.L.L. tanks. One conversion per factory.",
+        researchTip = "Converts this ARC Factory into an Inferno Forge. Builds H.E.L.L. (Heavy Embedded Liquid-fire Launcher) tanks against alien lifeforms and structures, burning projectiles and clouds. Moves while deployed. Unlocks four upgrades: Igniter Burst, Pressurised Flame Jet, Napalm Gel and Thermite Lance. One permanent specialisation per factory.",
         factory = "Inferno Forge",
         factoryTip = "Builds H.E.L.L.s. Researches Inferno upgrades.",
         arc = "H.E.L.L.",
-        arcTip = "Tank: Pilot Flame ignites, 0 dmg, 4 m, every 3 s. Bile bombs > lifeforms > spores > Babblers > structures. " ..
-                 "Attack order overrides. Moves deployed.",
+        arcTip = "Tank: Pilot Flame 7.9 dmg a second + sets on fire, 5 m. Burns bile, Acid Spray, spores, Umbra, Vortex and " ..
+                 "other projectiles and clouds. Attack order overrides. Moves deployed.",
         upgrades =
         {
-            { "Igniter Burst",          "Flame: 20 dmg, 0.25 s burst, 6 m, every 2 s." },
-            { "Pressurised Flame Jet",  "Flame: 3 x 15 dmg, 0.75 s burst, 10 m, every 2.5 s." },
-            { "Napalm Gel",             "Flame: 3 x 18 dmg. Ignites targets." },
-            { "Thermite Lance",         "Flame: 3 x 22 dmg, 14 m." },
+            { "Igniter Burst",          "Flame: 3 x 4.7 dmg every second (14.2 dps), 7 m." },
+            { "Pressurised Flame Jet",  "Flame: 3 x 6.3 dmg every second (18.9 dps), 10 m." },
+            { "Napalm Gel",             "Flame: 3 x 7.9 dmg every second (23.6 dps), 12 m." },
+            { "Thermite Lance",         "Continuous flame, no cooldown: 26.3 dmg/s, 14 m. Instantly burns every bile, spore, cloud and projectile in range." },
         },
     },
 }
@@ -89,26 +89,28 @@ ARCSpec.kLevelEffects =
     hammer =
     {
         [0] = { { "damage", "550 splash damage" }, { "radius", "7 m blast" }, { "targets", "All structures, never players" } },
-        [1] = { { "hive", "+25% damage to Hives" } },
+        [1] = { { "armour", "Takes 25% less damage" } },
         [2] = { { "radius", "10 m blast" } },
-        [3] = { { "armour", "Takes 25% less damage" } },
-        [4] = { { "damage", "660 splash damage (+20%)" }, { "fire", "Sets targets on fire" } },
+        [3] = { { "damage", "660 splash damage (+20%)" }, { "fire", "Sets targets on fire" } },
+        [4] = { { "hive", "+25% damage to Hives" } },
     },
     vanguard =
     {
-        [0] = { { "mg", "MG: 10 dmg every 4 s, 6 m" }, { "targets", "Lifeforms, then Babblers" }, { "spores", "Spores block fire" } },
-        [1] = { { "mg", "MG: 10 dmg every 2 s, 30 m" } },
-        [2] = { { "cannon", "Cannon: 25 light dmg, 22.5 m, 5 s cooldown" } },
-        [3] = { { "cannon", "Cannon: 30 normal dmg, 22.5 m, 5 s cooldown" } },
-        [4] = { { "cannon", "Cannon: 65 heavy dmg railgun, 22.5 m, 5 s cooldown" } },
+        [0] = { { "mg", "MG: 1.6 dmg, 5 rounds/s (7.9 dps), 12 m" }, { "targets", "Lifeforms, then Babblers" }, { "spores", "Spores block fire" } },
+        [1] = { { "mg", "MG: 2.1 dmg, ~7 rounds/s (14 dps), 20 m" } },
+        [2] = { { "cannon", "Cannon: 23.6 normal dmg, 22.5 m, 6 s cooldown" } },
+        [3] = { { "mg", "MG: 1.8 dmg, 10 rounds/s (18.4 dps), 30 m" }, { "cannon", "Cannon: 23.6 normal dmg, 22.5 m, 4.5 s cooldown" } },
+        [4] = { { "cannon", "Cannon: 36.8 heavy dmg railgun, 22.5 m, 4.5 s cooldown" } },
     },
     inferno =
     {
-        [0] = { { "flame", "Pilot Flame: ignites, 0 dmg, 4 m, every 3 s" }, { "targets", "Bile bombs > lifeforms > spores > Babblers > structures" } },
-        [1] = { { "flame", "Flame: 20 dmg, 6 m, every 2 s" } },
-        [2] = { { "flame", "Flame: 3 x 15 dmg, 10 m, every 2.5 s" } },
-        [3] = { { "flame", "Flame: 3 x 18 dmg, 10 m, every 2.5 s" }, { "ignite", "Ignites targets" } },
-        [4] = { { "flame", "Flame: 3 x 22 dmg, 14 m, every 2.5 s" } },
+        [0] = { { "flame", "Pilot Flame: 7.9 dmg every second, 5 m" }, { "ignite", "Always sets targets on fire" },
+                { "targets", "Projectiles > lifeforms > clouds > Babblers > structures" } },
+        [1] = { { "flame", "Flame: 3 x 4.7 dmg every second (14.2 dps), 7 m" } },
+        [2] = { { "flame", "Flame: 3 x 6.3 dmg every second (18.9 dps), 10 m" } },
+        [3] = { { "flame", "Flame: 3 x 7.9 dmg every second (23.6 dps), 12 m" } },
+        [4] = { { "flame", "Continuous flame: 26.3 dmg/s, 14 m, no cooldown" },
+                { "sweep", "Burns every projectile and cloud in range at once" } },
     },
 }
 

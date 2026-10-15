@@ -22,6 +22,19 @@ local kEmptyGrid = function()
 end
 
 local baseGetTechButtons = RoboticsFactory.GetTechButtons
+
+-- (2026-10-14, Siege port) A mod whose own ARC Factory buttons include Buy MAC (Siege puts the MAC button back on ARC
+-- Factories) keeps it, in the bottom row next to Buy ARC. NS2.0-TEH Main/Beta/Event have no MAC button there, so
+-- nothing changes for them.
+local function GetBaseHasMAC(self, techId)
+    local ok, base = pcall(baseGetTechButtons, self, techId)
+    if not ok or type(base) ~= "table" then return false end
+    for _, buttonTechId in ipairs(base) do
+        if buttonTechId == kTechId.MAC then return true end
+    end
+    return false
+end
+
 function RoboticsFactory:GetTechButtons(techId)
 
     local myTechId = self:GetTechId()
@@ -41,6 +54,7 @@ function RoboticsFactory:GetTechButtons(techId)
         end
 
         buttons[5] = kTechId.ARC
+        if GetBaseHasMAC(self, techId) then buttons[6] = kTechId.MAC end
         return buttons
 
     end
@@ -57,6 +71,7 @@ function RoboticsFactory:GetTechButtons(techId)
         end
 
         buttons[5] = spec.arc
+        if GetBaseHasMAC(self, techId) then buttons[6] = kTechId.MAC end
         return buttons
 
     end

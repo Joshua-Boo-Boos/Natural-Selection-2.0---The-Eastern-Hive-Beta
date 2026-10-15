@@ -73,15 +73,17 @@ kMilitaryProtocolTeamResourcesPerKill = {          --Append kTechDataTeamResOnKi
     kMilitaryProtocolStructureScaleWindow seconds of the current round. Only the structures listed here are scaled;
     lifeforms and Drifters keep their kMilitaryProtocolTeamResourcesPerKill values above.
 
-    At 25 Marines (x2.083): Hive 15 + 83.3 = 98.3, typed Hive 20 + 83.3 = 103.3, Harvester 8.3, Shell/Veil/Spur 5.2,
-    Whip/Shift/Crag/Shade and Tunnels 4.2. (Previously a flat MP 2 each, Hives a flat MP 20.)
+    Bonuses are 80% of the first test package's (user 2026-10-13: Hive 40 -> 32, Harvester 4 -> 3.2, Shell/Veil/Spur
+    2.5 -> 2, Whip/Shift/Crag/Shade and Tunnels 2 -> 1.6); the normal reward is unchanged.
+    At 25 Marines (x2.083): Hive 15 + 66.7 = 81.7, typed Hive 20 + 66.7 = 86.7, Harvester 6.7, Shell/Veil/Spur 4.2,
+    Whip/Shift/Crag/Shade and Tunnels 3.3. (Originally a flat MP 2 each, Hives a flat MP 20.)
 ]]
 kMilitaryProtocolStructureBonusPerKill = {
-    [kTechId.Hive] = 40, [kTechId.ShiftHive] = 40, [kTechId.CragHive] = 40, [kTechId.ShadeHive] = 40,
-    [kTechId.Harvester] = 4,
-    [kTechId.Shell] = 2.5, [kTechId.Veil] = 2.5, [kTechId.Spur] = 2.5,
-    [kTechId.Whip] = 2, [kTechId.Shift] = 2, [kTechId.Crag] = 2, [kTechId.Shade] = 2,
-    [kTechId.Tunnel] = 2, [kTechId.InfestedTunnel] = 2, [kTechId.GorgeTunnel] = 2,
+    [kTechId.Hive] = 32, [kTechId.ShiftHive] = 32, [kTechId.CragHive] = 32, [kTechId.ShadeHive] = 32,
+    [kTechId.Harvester] = 3.2,
+    [kTechId.Shell] = 2, [kTechId.Veil] = 2, [kTechId.Spur] = 2,
+    [kTechId.Whip] = 1.6, [kTechId.Shift] = 1.6, [kTechId.Crag] = 1.6, [kTechId.Shade] = 1.6,
+    [kTechId.Tunnel] = 1.6, [kTechId.InfestedTunnel] = 1.6, [kTechId.GorgeTunnel] = 1.6,
 }
 kMilitaryProtocolStructureScaleReference = 12   -- team size that gets x1
 kMilitaryProtocolStructureScaleMin = 1

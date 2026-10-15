@@ -30,11 +30,11 @@ kTechIdToMaterialOffset[kTechId.ARCSpecHammerARC] = kARC
 kTechIdToMaterialOffset[kTechId.ARCSpecVanguardARC] = kARC
 kTechIdToMaterialOffset[kTechId.ARCSpecInfernoARC] = kARC
 
--- Hammerworks: Hivebreaker Warheads, Fragmentation Casings, Deflector Plating, Thermobaric Payload
-kTechIdToMaterialOffset[kTechId.ARCSpecHammer1] = kWeapons1
+-- Hammerworks: Deflector Plating, Fragmentation Casings, Thermobaric Payload, Hivebreaker Warheads
+kTechIdToMaterialOffset[kTechId.ARCSpecHammer1] = kArmor2
 kTechIdToMaterialOffset[kTechId.ARCSpecHammer2] = kClusterGrenade
-kTechIdToMaterialOffset[kTechId.ARCSpecHammer3] = kArmor2
-kTechIdToMaterialOffset[kTechId.ARCSpecHammer4] = kWeapons3
+kTechIdToMaterialOffset[kTechId.ARCSpecHammer3] = kWeapons3
+kTechIdToMaterialOffset[kTechId.ARCSpecHammer4] = kWeapons1
 
 -- Vanguard: Coaxial Machine Gun, Light Cannon Shells, Standard Cannon Shells, Railgun Sabots
 kTechIdToMaterialOffset[kTechId.ARCSpecVanguard1] = kHeavyMachineGun

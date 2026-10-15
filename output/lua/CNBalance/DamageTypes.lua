@@ -59,6 +59,12 @@ function GetReceivesBiologicalDamage(entity)
     return entity.GetReceivesBiologicalDamage and entity:GetReceivesBiologicalDamage()
 end
 
+-- BMAC character (CNBalance/BMAC): an armour-only BMAC Marine takes Exo-style Crush, armour use and
+-- Corrode, and Bile Bomb can kill it. GetIsBMACMarine is defined in BMAC_Shared.lua.
+local function GetIsBMACTarget(target)
+    return GetIsBMACMarine ~= nil and GetIsBMACMarine(target)
+end
+
 local upgradedDamageScalars
 function NS2Gamerules_GetUpgradedDamageScalar( attacker, weaponTechId )
 
@@ -140,7 +146,7 @@ function NS2Gamerules_GetUpgradedAlienDamage( target, attacker, doer, damage, ar
     if isAffectedByCrush then --Crush
         local crushLevel = attacker:GetSpurLevel()
         if crushLevel > 0 then
-            if target:isa("Exo") or target:isa("Exosuit") or target.GetReceivesStructuralDamage and target:GetReceivesStructuralDamage(damageType) then
+            if target:isa("Exo") or target:isa("Exosuit") or GetIsBMACTarget(target) or target.GetReceivesStructuralDamage and target:GetReceivesStructuralDamage(damageType) then
                 damage = damage + ( damage * ( crushLevel * kAlienCrushDamagePercentByLevel ) )
             elseif target:isa("Player") then
                 armorFractionUsed = kBaseArmorUseFraction + ( crushLevel * kAlienCrushDamagePercentByLevel )
@@ -273,8 +279,8 @@ local function ApplyDefaultArmorUseFraction(_, _, _, damage, _, healthPerArmor, 
 end
 
 local function ApplyHighArmorUseFractionForExos(target, _, _, damage, armorFractionUsed, healthPerArmor, _, _, _, overshieldDamage)
-    
-    if target:isa("Exo") then
+
+    if target:isa("Exo") or GetIsBMACTarget(target) then
         armorFractionUsed = kExosuitArmorUseFraction
     end
     
@@ -392,7 +398,7 @@ local function ReducedDamageAgainstSmall(target, _, _, damage, armorFractionUsed
 end
 
 local function IgnoreHealthForPlayersUnlessExo(target, _, _, damage, armorFractionUsed, healthPerArmor)
-    if target:isa("Player") and not target:isa("Exo") then
+    if target:isa("Player") and not target:isa("Exo") and not GetIsBMACTarget(target) then
         local maxDamagePossible = healthPerArmor * target.armor
         damage = math.min(damage, maxDamagePossible) 
         armorFractionUsed = 1
@@ -409,7 +415,7 @@ local function IgnoreHealth(target, _, _, damage, _, healthPerArmor)
 end
 
 local function ReduceGreatlyForPlayers(target, _, _, damage, armorFractionUsed, healthPerArmor)
-    if target:isa("Exo") or target:isa("Exosuit") then
+    if target:isa("Exo") or target:isa("Exosuit") or GetIsBMACTarget(target) then
         damage = damage * kCorrodeDamageExoArmorScalar
     elseif target:isa("Player") then
         damage = damage * kCorrodeDamagePlayerArmorScalar

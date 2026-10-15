@@ -618,3 +618,5 @@ kLocales["COMMANDERERROR_ARMS_LAB_GLOBAL_LIMIT"] = "Too many Arms Labs on the ma
 kLocales["COMMANDERERROR_MINE_LIMIT_REACHED"] = "Too many marine comm placed mines!"
 kLocales["COMMANDERERROR_MINE_ON_INFESTATION"] = "No marine comm mines on infestation!"
 kLocales["COMMANDERERROR_WHIP_LIMIT_REACHED"] = "Too many commander whips!"
+-- BMAC character (CNBalance/BMAC/BMAC_MedPack.lua): a BMAC gets armour instead of health.
+kLocales["MED_PACK_TOOLTIP"] = "Restores 50 player health (25 armor for a BMAC)"

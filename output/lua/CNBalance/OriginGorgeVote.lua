@@ -51,10 +51,24 @@ function OriginGorgeHasHumanAliens(team)
     return false
 end
 
+-- CETeamAnnounce carries at most 220 characters. (2026-10-14) A longer line is cut at the last whole word with
+-- "..." rather than mid-word, so it never reads as if the text simply stopped.
+local kTeamMessageMax = 220
+local function FitTeamMessage(message)
+    if #message <= kTeamMessageMax then return message end
+    local cut = string.sub(message, 1, kTeamMessageMax - 3)
+    local lastSpace = cut:match(".*()%s")
+    if lastSpace and lastSpace > kTeamMessageMax / 2 then
+        cut = string.sub(cut, 1, lastSpace - 1)
+    end
+    return cut .. "..."
+end
+
 function OriginGorgeTeamMessage(team, message)
+    message = FitTeamMessage(message)
     for _, player in ipairs(GetEntitiesForTeam("Player", team:GetTeamNumber())) do
         if not player:GetIsVirtual() then
-            Server.SendNetworkMessage(player, "CETeamAnnounce", {message = string.sub(message, 1, 220)}, true)
+            Server.SendNetworkMessage(player, "CETeamAnnounce", {message = message}, true)
         end
     end
 end
@@ -93,6 +107,8 @@ end
 local function Finish(vote, passed)
     vote.state.disallowed = passed
     vote.state.voteFinished = true
+    -- (2026-10-14) Bot Gorges re-plan the moment the vote ends (OriginGorgeBuilder.lua), not on their next cycle.
+    vote.state.voteFinishedTime = Shared.GetTime()
     SendElectorate(vote, "VoteComplete", {voteId = vote.id})
     OriginGorgeTeamMessage(vote.team, passed
         and "[Origin Form] Vote passed: bot Gorges cannot use Biomass Fetch this round."
@@ -147,7 +163,7 @@ Event.Hook("UpdateServer", function()
         elseif originalAllowed("OriginGorgeVote", nil) == kVoteCannotStartReason.VoteAllowedToStart then
             serial = serial + 1
             active = {id = serial, team = team, state = state, electorate = humans,
-                votes = {}, required = math.floor(count / 2) + 1, expires = now + 30}
+                votes = {}, required = math.floor(count / 2) + 1, expires = now + 15}  -- (2026-10-14) 15-second vote
             SendElectorate(active, "OriginGorgeVote", {voteId = serial, expireTime = active.expires, client_index = 0})
         end
     end

@@ -352,6 +352,10 @@ function GUIDeathMessages:AddMessage(killerColor, killerName, targetColor, targe
         -- exactly as a fresh vanilla row would.
         if m["Killer"] then m["Killer"]:SetPosition(Vector(0, 0, 0)) end
         if m["Target"] then m["Target"]:SetPosition(Vector(0, 0, 0)) end
+        -- (2026-10-14) A text-only row (e.g. Exo Self-Destruct) HIDES the Weapon item, and
+        -- the vanilla builder never shows it again on reuse - but in a vanilla row Killer and Target are CHILDREN of
+        -- Weapon, so the whole row came out empty: just the outline (seen on an EMP Blast kill). Show it again.
+        if m["Weapon"] then m["Weapon"]:SetIsVisible(true) end
         if m["ExoLabel"] then m["ExoLabel"]:SetIsVisible(false) end
         if m["ExoSkull"] then m["ExoSkull"]:SetIsVisible(false) end
         if m["ExoText"] then m["ExoText"]:SetIsVisible(false) end

@@ -63,7 +63,8 @@ function Shockwave:Detonate()
 
 
                 local finalDamage = kStompDamage
-                if enemy:isa("Player") and not enemy:isa("Exo") then
+                -- A BMAC (armour-only Marine) is treated like an Exo here: no stun or knockback, flat Stomp damage to AP.
+                if enemy:isa("Player") and not enemy:isa("Exo") and not (GetIsBMACMarine and GetIsBMACMarine(enemy)) then
 
                     local index = #self.damagedEntIds
                     if index <= 2 then

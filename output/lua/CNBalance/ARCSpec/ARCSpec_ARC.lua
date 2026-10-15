@@ -33,42 +33,72 @@
 ]]
 
 -- Weapon numbers. Index = how many upgrades of that specialisation are researched (they can only be researched in order).
+--[[
+    (2026-10-14) REBALANCE: every upgrade costs the same (ARCSpec.kUpgradeCosts) and adds about the same power, instead
+    of weak early levels and one big jump at the end. Rough sustained damage per second against a lifeform:
+      V.A.T.:  7.9 -> 14 -> 17.9 -> 23.6 -> 26.5 (railgun, heavy) - a machine gun; scaled to 70%, then 75% of that
+      H.E.L.L.: 7.9 -> 14.2 -> 18.9 -> 23.6 -> 26.3 (level 4 a continuous stream; a flamethrower; scaled to 70%, then 75% of that), plus the burn of SetOnFire at EVERY level (the mod's fire DOT)
+]]
 ARCSpec.kVanguard =
 {
-    mgRange = 30, mgInterval = 2, mgDamage = 10, mgDamageType = kDamageType.Normal,       -- from upgrade 1
-    -- Before upgrade 1: the same machine gun (same damage, targets and turret) at half the fire rate and short range, a
-    -- little more than the H.E.L.L.'s 4 m Pilot Flame.
-    mgBaseRange = 6, mgBaseInterval = 4,
-    cannonRange = 22.5, cannonInterval = 5, cannonChargeTime = 1,                           -- from upgrade 2
-    cannon =
+    mgDamage = 10, mgDamageType = kDamageType.Normal,
+    cannonRange = 22.5, cannonChargeTime = 1,
+    -- Index = upgrades researched. mg: range / seconds between shots. cannon: from level 2.
+    --[[
+        (2026-10-14) A REAL MACHINE GUN: low damage per bullet, machine-gun fire rate (5 - 8 rounds a second). Sustained
+        damage per second against a lifeform (after the 70% and then 75% scaling): 7.9 -> 14 -> 17.9 -> 23.6 -> 26.5 (railgun, heavy).
+        mgDamage is per bullet at each level.
+    ]]
+    levels =
     {
-        [2] = { damage = 25, damageType = kDamageType.Light },
-        [3] = { damage = 30, damageType = kDamageType.Normal },
-        [4] = { damage = 65, damageType = kDamageType.Heavy, railgun = true },
+        -- (2026-10-14) Every damage value was 70% of the first machine-gun balance (3 / 4 / 45 / 3.5 / 70); then scaled by a
+        -- further 75% (Joshua) - 52.5% of that balance, the same as the H.E.L.L.
+        [0] = { mgRange = 12, mgInterval = 0.2,   mgDamage = 1.575 },
+        [1] = { mgRange = 20, mgInterval = 0.15,  mgDamage = 2.1 },
+        [2] = { mgRange = 20, mgInterval = 0.15,  mgDamage = 2.1, cannon = { damage = 23.625, damageType = kDamageType.Normal, interval = 6 } },
+        -- Autoloader: the machine gun's fire rate jumps to 10 rounds a second, 30 m, and the cannon reloads faster.
+        [3] = { mgRange = 30, mgInterval = 0.1, mgDamage = 1.8375, cannon = { damage = 23.625, damageType = kDamageType.Normal, interval = 4.5 } },
+        [4] = { mgRange = 30, mgInterval = 0.1, mgDamage = 1.8375, cannon = { damage = 36.75, damageType = kDamageType.Heavy, interval = 4.5, railgun = true } },
     },
 }
+ARCSpec.kVanguard.mgRange = ARCSpec.kVanguard.levels[4].mgRange   -- longest reach (tech data range circle)
 
 ARCSpec.kInferno =
 {
     -- pulses: how many 0.25 s pulses one burst lasts. igniteStacks: SetOnFire calls per pulse (the mod's fire system only
     -- lights a target once its burn stack reaches the burn rate - 5 per call against 8 per second for a player - so a lone
-    -- Pilot Flame call never lit anything; two do).
-    [0] = { range = 4,  interval = 3,   pulses = 1, damage = 0,  igniteStacks = 2 },
-    [1] = { range = 6,  interval = 2,   pulses = 1, damage = 20, igniteStacks = 0 },
-    [2] = { range = 10, interval = 2.5, pulses = 3, damage = 15, igniteStacks = 0 },
-    [3] = { range = 10, interval = 2.5, pulses = 3, damage = 18, igniteStacks = 1 },
-    [4] = { range = 14, interval = 2.5, pulses = 3, damage = 22, igniteStacks = 1 },
+    -- call never lit anything; two do). Every level sets targets on fire.
+    --[[
+        (2026-10-14) A REAL FLAMETHROWER. The old bursts (every 2 - 3 s) needed 5 - 12 s of uninterrupted flame to kill a
+        Skulk, which simply walked out of the short range - a level 2 H.E.L.L. could not solo one. Simulated against a
+        Skulk (67 HP, 10 AP) with the real fire rules (each SetOnFire call delays the burn by 1 s, so the burn only adds
+        damage between bursts), after the 70% scaling: 8 s -> 4.25 s -> 3.25 s -> 2.5 s -> 2.25 s from level 0 to 4.
+        Direct damage per second 10.5 -> 18.9 -> 25.2 -> 31.5 -> 35, the same ladder as the V.A.T., for a much shorter range plus the burn,
+        the splash and burning projectiles and clouds.
+    ]]
+    -- (2026-10-14) Every damage value was 70% of the flamethrower balance above (15 / 9 / 12 / 15 / 12.5); then scaled by
+    -- a further 75% (Joshua) - 52.5% of that balance. Direct damage per second now 7.9 -> 14.2 -> 18.9 -> 23.6 -> 26.3.
+    [0] = { range = 5,  interval = 1.0,  pulses = 1, damage = 7.875,  igniteStacks = 2 },
+    [1] = { range = 7,  interval = 1.0,  pulses = 3, damage = 4.725,  igniteStacks = 2 },
+    [2] = { range = 10, interval = 1.0,  pulses = 3, damage = 6.3,    igniteStacks = 2 },
+    [3] = { range = 12, interval = 1.0,  pulses = 3, damage = 7.875,  igniteStacks = 2 },
+    -- Level 4: a CONTINUOUS stream - a damage pulse every 0.25 s, no cooldown (4.5 x 4 = 18 damage per second, up from
+    -- level 3's 13.2). One ignite call per pulse is already 4 a second, enough to keep targets lit. Separately, EVERY
+    -- update it sweeps away every projectile and cloud in range it has a line of fire to (sweepHazards, UpdateInferno).
+    [4] = { range = 14, interval = 0.25, pulses = 1, damage = 6.5625, igniteStacks = 1, sweepHazards = true },
     pulseSpacing = 0.25,
     splash = 1.5,
 }
 
 ARCSpec.kHammer =
 {
-    hiveDamageScalar = 1.25,     -- upgrade 1
+    -- (2026-10-14) Level order: 1 armour, 2 radius, 3 damage + fire, 4 Hive damage.
+    damageTakenScalar = 0.75,    -- upgrade 1
     upgradedSplashRadius = 10,   -- upgrade 2 (normal ARC: ARC.kSplashRadius, 7)
-    damageTakenScalar = 0.75,    -- upgrade 3
-    payloadDamageScalar = 1.2,   -- upgrade 4, plus setting everything in the blast on fire
+    payloadDamageScalar = 1.2,   -- upgrade 3, plus setting everything in the blast on fire
+    hiveDamageScalar = 1.25,     -- upgrade 4
 }
+local kHammerArmourTier, kHammerRadiusTier, kHammerPayloadTier, kHammerHiveTier = 1, 2, 3, 4
 
 local kRetargetInterval = 0.25
 local kTierRefreshInterval = 1
@@ -122,6 +152,21 @@ end
 
 -- The commander's range circle: the tanks show the reach of the weapon they actually have.
 local baseGetVisualRadius = ARC.GetVisualRadius
+--[[
+    (2026-10-14) Kill feed: a specialised ARC's kills (its shells, machine gun, cannon, flame AND the fire it sets - the
+    fire's damage is dealt with the ARC as the doer) show "H.A.M.M.E.R." / "V.A.T." / "H.E.L.L." instead of the vanilla
+    ARC icon (CNBalance/GUI/GUIDeathMessagesExo.lua).
+]]
+local kSpecDeathIcons = { hammer = "ARCSpecHammer", vanguard = "ARCSpecVanguard", inferno = "ARCSpecInferno" }
+local baseGetDeathIconIndex = ARC.GetDeathIconIndex
+function ARC:GetDeathIconIndex()
+    local spec = ARCSpec.GetARCSpec(self)
+    local iconIndex = spec and kDeathMessageIcon and rawget(kDeathMessageIcon, kSpecDeathIcons[spec.key] or "")
+    if iconIndex then return iconIndex end
+    if baseGetDeathIconIndex then return baseGetDeathIconIndex(self) end
+    return kDeathMessageIcon.ARC
+end
+
 function ARC:GetVisualRadius()
 
     local spec = ARCSpec.GetARCSpec(self)
@@ -135,10 +180,8 @@ function ARC:GetVisualRadius()
     if spec == ARCSpec.kSpecs.inferno then
         return ARCSpec.kInferno[math.min(ARCSpec.GetUpgradeTier(self), 4)].range
     elseif spec == ARCSpec.kSpecs.vanguard then
-        if ARCSpec.GetUpgradeTier(self) >= 1 then
-            return ARCSpec.kVanguard.mgRange
-        end
-        return ARCSpec.kVanguard.mgBaseRange
+        local level = ARCSpec.kVanguard.levels[Clamp(ARCSpec.GetUpgradeTier(self), 0, 4)]
+        return math.max(level.mgRange, level.cannon and ARCSpec.kVanguard.cannonRange or 0)
     end
 
     if baseGetVisualRadius then
@@ -301,7 +344,7 @@ function ARC:ModifyDamageTaken(damageTable, attacker, doer, damageType, hitPoint
     if baseModifyDamageTaken then
         baseModifyDamageTaken(self, damageTable, attacker, doer, damageType, hitPoint, weapon)
     end
-    if ARCSpec.GetARCSpec(self) == ARCSpec.kSpecs.hammer and ARCSpec.GetUpgradeTier(self) >= 3 then
+    if ARCSpec.GetARCSpec(self) == ARCSpec.kSpecs.hammer and ARCSpec.GetUpgradeTier(self) >= kHammerArmourTier then
         damageTable.damage = damageTable.damage * ARCSpec.kHammer.damageTakenScalar
     end
 end
@@ -363,12 +406,22 @@ local function GetHasLineOfFire(self, target, fromPoint, toPoint)
     return trace.fraction == 1 or trace.entity == target
 end
 
+--[[
+    (2026-10-14) Camouflage: exactly the Sentry's rule (vanilla CloakTargetFilter, TargetCache.lua) - a fully cloaked
+    alien is never targeted, whatever the line of sight. Detection (Scan, Observatory) uncloaks it, which is what makes it
+    targetable again. Used for target search, the H.E.L.L.'s attack order and every pulse of a burst, so a target that
+    cloaks is dropped at once. (The flame's 1.5 m splash around a visible target is not targeting and still singes.)
+]]
+local function GetIsHiddenByCamo(target)
+    return HasMixin(target, "Cloakable") and target:GetIsCloaked()
+end
+
 -- Priority of a target for a weapon ("mg", "cannon" or "flame"), lower is better; nil if it may not be targeted at all.
 local function GetTargetPriority(self, target, weapon)
 
     if not GetIsAttackableEnemy(self, target) then return nil end
     if target:isa("Commander") then return nil end
-    if HasMixin(target, "Cloakable") and target:GetIsCloaked() and not GetIsTargetDetected(target) then return nil end
+    if GetIsHiddenByCamo(target) then return nil end
 
     local isPlayer = target:isa("Player")
 
@@ -459,8 +512,26 @@ end
         own rule (Flamethrower:BurnSporesAndUmbra), with the same effects.
 ]] ---------------------------------------------------------------------------------------------------------------------
 
-local kBombClasses = { "Bomb", "WhipBomb" }
+--[[
+    (2026-10-14) The H.E.L.L. burns exactly what the Marine and Exo flamethrowers burn (CNBalance/Weapons/Marine/
+    Flamethrower.lua): bile bombs, Whip bombs, Prowler Acid Spray (AcidMissile), Acid Rockets, Babbler pheromones, Spit and
+    dot markers in flight, and Umbra, Storm, Mucous, Enzyme and Vortex clouds as well as spores.
+]]
+local kBombClasses = { "Bomb", "WhipBomb", "AcidMissile", "AcidRocketBomb", "BabblerPheromone", "Spit", "DotMarker" }
 local kBombBurnRadius = 1.6
+local kCloudClasses -- { className, radius }, built on first use so every class is loaded
+local function GetCloudClasses()
+    if not kCloudClasses then
+        kCloudClasses = {}
+        for _, name in ipairs({ "CragUmbra", "StormCloud", "MucousMembrane", "EnzymeCloud", "Vortex" }) do
+            local cls = rawget(_G, name)
+            if cls and cls.kRadius then
+                kCloudClasses[#kCloudClasses + 1] = { name, cls.kRadius }
+            end
+        end
+    end
+    return kCloudClasses
+end
 
 local function GetSporeRadius(spore)
     return spore.GetDamageRadius and spore:GetDamageRadius() or kSporesDustCloudRadius
@@ -488,13 +559,27 @@ local function GetIsSporeBlocked(fromPoint, toPoint)
     return false
 end
 
+local function GetIsCloud(entity)
+    for _, entry in ipairs(GetCloudClasses()) do
+        if entity:isa(entry[1]) then return true end
+    end
+    return false
+end
+
 local function GetIsHazard(entity)
-    return entity ~= nil and (entity:isa("SporeCloud") or entity:isa("Bomb") or entity:isa("WhipBomb"))
+    if entity == nil then return false end
+    if entity:isa("SporeCloud") or GetIsCloud(entity) then return true end
+    for _, className in ipairs(kBombClasses) do
+        if entity:isa(className) then return true end
+    end
+    return false
 end
 
 local function BurnHazard(self, hazard)
     if hazard:isa("SporeCloud") then
         self:TriggerEffects("burn_spore", { effecthostcoords = Coords.GetTranslation(hazard:GetOrigin()) })
+    elseif GetIsCloud(hazard) then
+        self:TriggerEffects("burn_umbra", { effecthostcoords = Coords.GetTranslation(hazard:GetOrigin()) })
     else
         hazard:TriggerEffects("burn_bomb", { effecthostcoords = Coords.GetTranslation(hazard:GetOrigin()) })
     end
@@ -521,6 +606,14 @@ local function BurnHazardsAlongStream(self, fromPoint, toPoint)
         end
     end
 
+    for _, entry in ipairs(GetCloudClasses()) do
+        for _, cloud in ipairs(GetEntitiesWithinRange(entry[1], fromPoint, reach + entry[2])) do
+            if DistanceToSegment(cloud:GetOrigin(), fromPoint, toPoint) <= entry[2] then
+                burned[#burned + 1] = cloud
+            end
+        end
+    end
+
     for _, hazard in ipairs(burned) do
         BurnHazard(self, hazard)
     end
@@ -542,7 +635,14 @@ local function FindNearestHazard(self, classNames, range, eye)
     return best
 end
 
+--[[
+    (2026-10-14) V.A.T. and H.E.L.L. damage scales LINEARLY with the lifeforms' HP and AP: Siege2.0-TEH gives every
+    lifeform +20% (kSiegeAlienLifeformHPAPScalar = 1.2, its BalanceHealth.lua), so these weapons do +20% there too and
+    kill in the same time as in NS2.0-TEH. Mods without the scalar use 1. (H.A.M.M.E.R. shells are anti-structure and
+    do not use DoShot.)
+]]
 local function DoShot(self, damage, damageType, target, point, direction)
+    damage = damage * (kSiegeAlienLifeformHPAPScalar or 1)
     self.arcSpecShotDamageType = damageType
     self:DoDamage(damage, target, point, direction, nil, false, false)
     self.arcSpecShotDamageType = nil
@@ -578,10 +678,11 @@ end
 local function UpdateVanguard(self, tier, eye, now, deltaTime)
 
     local stats = ARCSpec.kVanguard
-    local mgRange = tier >= 1 and stats.mgRange or stats.mgBaseRange
-    local mgInterval = tier >= 1 and stats.mgInterval or stats.mgBaseInterval
+    local level = stats.levels[Clamp(tier, 0, 4)]
+    local mgRange = level.mgRange
+    local mgInterval = level.mgInterval
     local mgTarget = UpdateLock(self, "mg", mgRange, eye, now)
-    local cannonTarget = tier >= 2 and UpdateLock(self, "cannon", stats.cannonRange, eye, now) or nil
+    local cannonTarget = level.cannon and UpdateLock(self, "cannon", stats.cannonRange, eye, now) or nil
 
     -- A charging cannon stays on the target it is charging at; losing it cancels the shot.
     local chargeTarget = self.arcSpecChargeTarget and Shared.GetEntity(self.arcSpecChargeTarget) or nil
@@ -596,9 +697,14 @@ local function UpdateVanguard(self, tier, eye, now, deltaTime)
 
     -- A spore cloud on the line of fire blocks the shot until something burns it away.
     if mgTarget and now >= (self.arcSpecNextMG or 0) and not GetIsSporeBlocked(eye, GetAimPoint(mgTarget)) then
+        -- (2026-10-14) Machine-gun fire rate: every bullet due since the last update is fired (an ARC may update less
+        -- often than its fire interval), as one hit of their combined damage and one tracer - at most 4 at once.
+        local due = 1
+        local last = self.arcSpecNextMG or now
+        if now - last > mgInterval then due = math.min(4, 1 + math.floor((now - last) / mgInterval)) end
         self.arcSpecNextMG = now + mgInterval
         local point = GetAimPoint(mgTarget)
-        DoShot(self, stats.mgDamage, stats.mgDamageType, mgTarget, point, GetNormalizedVector(point - eye))
+        DoShot(self, (level.mgDamage or stats.mgDamage) * due, stats.mgDamageType, mgTarget, point, GetNormalizedVector(point - eye))
         ARCSpec.SendShot(self, ARCSpec.kShotKind.mg, point)
     end
 
@@ -612,9 +718,8 @@ local function UpdateVanguard(self, tier, eye, now, deltaTime)
         -- Fire, then the cooldown starts.
         self.arcSpecChargeEnd = nil
         self.arcSpecChargeTarget = nil
-        self.arcSpecNextCannon = now + stats.cannonInterval
-
-        local shell = stats.cannon[math.min(tier, 4)]
+        local shell = level.cannon
+        self.arcSpecNextCannon = now + (shell and shell.interval or 5)
         if shell then
             local point = GetAimPoint(chargeTarget)
             DoShot(self, shell.damage, shell.damageType, chargeTarget, point, GetNormalizedVector(point - eye))
@@ -640,7 +745,8 @@ local function GetForcedFlameTarget(self, range, eye)
     local order = self:GetCurrentOrder()
     if not order or order:GetType() ~= kTechId.Attack then return nil end
     local target = Shared.GetEntity(order:GetParam())
-    if target and GetIsAttackableEnemy(self, target) and GetIsInReach(self, target, range, eye) then
+    if target and GetIsAttackableEnemy(self, target) and not GetIsHiddenByCamo(target)
+            and GetIsInReach(self, target, range, eye) then
         return target
     end
     return nil
@@ -648,7 +754,8 @@ end
 
 local function BurnPulse(self, stats, target, eye)
 
-    if not GetIsAttackableEnemy(self, target) or not GetIsInReach(self, target, stats.range, eye) then
+    if not GetIsAttackableEnemy(self, target) or GetIsHiddenByCamo(target)
+            or not GetIsInReach(self, target, stats.range, eye) then
         return false
     end
 
@@ -688,9 +795,51 @@ local function BurnPulse(self, stats, target, eye)
 
 end
 
+--[[
+    (2026-10-14) H.E.L.L. level 4: burn EVERY projectile and cloud within range that it has a line of fire to, each
+    update (at most every kSweepInterval), independent of the damage stream. One flame visual per sweep that burned
+    something, towards the nearest, so the network cost stays at one message per sweep.
+]]
+local kSweepInterval = 0.05
+local function SweepHazards(self, range, eye, now)
+
+    if now < (self.arcSpecNextSweep or 0) then return end
+    self.arcSpecNextSweep = now + kSweepInterval
+
+    local classNames = { "SporeCloud" }
+    for _, className in ipairs(kBombClasses) do classNames[#classNames + 1] = className end
+    for _, entry in ipairs(GetCloudClasses()) do classNames[#classNames + 1] = entry[1] end
+
+    local burned, nearest, nearestDistance = {}, nil, nil
+    for _, className in ipairs(classNames) do
+        for _, hazard in ipairs(GetEntitiesWithinRange(className, eye, range)) do
+            local origin = hazard:GetOrigin()
+            if GetHasLineOfFire(self, hazard, eye, origin) then
+                burned[#burned + 1] = hazard
+                local distance = (origin - eye):GetLength()
+                if not nearestDistance or distance < nearestDistance then
+                    nearest, nearestDistance = origin, distance
+                end
+            end
+        end
+    end
+
+    if nearest then
+        ARCSpec.SendShot(self, ARCSpec.kShotKind.flame, nearest)
+    end
+    for _, hazard in ipairs(burned) do
+        BurnHazard(self, hazard)
+    end
+
+end
+
 local function UpdateInferno(self, tier, eye, now, deltaTime)
 
     local stats = ARCSpec.kInferno[math.min(tier, 4)]
+
+    if stats.sweepHazards then
+        SweepHazards(self, stats.range, eye, now)
+    end
     local burstReady = (self.arcSpecPulsesLeft or 0) == 0 and now >= (self.arcSpecNextBurst or 0)
 
     --[[
@@ -707,7 +856,9 @@ local function UpdateInferno(self, tier, eye, now, deltaTime)
             if lock and lock:isa("Player") then
                 target = lock
             else
-                target = FindNearestHazard(self, { "SporeCloud" }, stats.range, eye) or lock
+                local cloudNames = { "SporeCloud" }
+                for _, entry in ipairs(GetCloudClasses()) do cloudNames[#cloudNames + 1] = entry[1] end
+                target = FindNearestHazard(self, cloudNames, stats.range, eye) or lock
             end
         end
     else
@@ -791,8 +942,8 @@ function ARC:PerformAttack()
 
     local tier = ARCSpec.GetUpgradeTier(self)
     local stats = ARCSpec.kHammer
-    local radius = tier >= 2 and stats.upgradedSplashRadius or ARC.kSplashRadius
-    local damage = ARC.kAttackDamage * (tier >= 4 and stats.payloadDamageScalar or 1)
+    local radius = tier >= kHammerRadiusTier and stats.upgradedSplashRadius or ARC.kSplashRadius
+    local damage = ARC.kAttackDamage * (tier >= kHammerPayloadTier and stats.payloadDamageScalar or 1)
 
     local distToTarget = self.targetPosition and (self.targetPosition - self:GetOrigin()):GetLengthXZ()
 
@@ -806,7 +957,7 @@ function ARC:PerformAttack()
         -- Hives take the Hivebreaker bonus; everything else the normal shell.
         local hives, others = {}, {}
         for _, target in ipairs(hitEntities) do
-            if tier >= 1 and target:isa("Hive") then
+            if tier >= kHammerHiveTier and target:isa("Hive") then
                 hives[#hives + 1] = target
             else
                 others[#others + 1] = target
@@ -825,7 +976,7 @@ function ARC:PerformAttack()
                 target:TriggerEffects("arc_hit_secondary")
             end
 
-            if tier >= 4 and target:GetIsAlive() and GetAreEnemies(self, target) and HasMixin(target, "Fire") then
+            if tier >= kHammerPayloadTier and target:GetIsAlive() and GetAreEnemies(self, target) and HasMixin(target, "Fire") then
                 target:SetOnFire(owner, self)
             end
 

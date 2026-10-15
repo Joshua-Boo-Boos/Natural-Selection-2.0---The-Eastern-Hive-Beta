@@ -369,21 +369,32 @@ ModLoader.SetupFileHook("lua/EquipmentOutline.lua", "lua/CNBalance/EquipmentOutl
 ModLoader.SetupFileHook("lua/Voting.lua", "lua/CNBalance/GUI/PollWrap_Voting.lua", "post")
 ModLoader.SetupFileHook("lua/GUIVoteMenu.lua", "lua/CNBalance/GUI/PollWrap_VoteMenu.lua", "post")
 
--- ARC FACTORY SPECIALISATIONS (Hammerworks / Vanguard / Inferno). Registered last so each hook runs after the mod's own hook
--- on the same file. No new networked class or network variable - see lua/CNBalance/ARCSpec/ARCSpec_TechIds.lua.
-ModLoader.SetupFileHook("lua/TechTreeConstants.lua", "lua/CNBalance/ARCSpec/ARCSpec_TechIds.lua", "post")
-ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/ARCSpec/ARCSpec_TechData.lua", "post")
-ModLoader.SetupFileHook("lua/TechTree.lua", "lua/CNBalance/ARCSpec/ARCSpec_TechTree.lua", "post")
-ModLoader.SetupFileHook("lua/TechTreeButtons.lua", "lua/CNBalance/ARCSpec/ARCSpec_Buttons.lua", "post")
-ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/ARCSpec/ARCSpec_MarineTeam.lua", "post")
-ModLoader.SetupFileHook("lua/RoboticsFactory.lua", "lua/CNBalance/ARCSpec/ARCSpec_RoboticsFactory.lua", "post")
-ModLoader.SetupFileHook("lua/ARCVariantMixin.lua", "lua/CNBalance/ARCSpec/ARCSpec_Skins.lua", "post")
-ModLoader.SetupFileHook("lua/ARC.lua", "lua/CNBalance/ARCSpec/ARCSpec_ARC.lua", "post")
-ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/ARCSpec/ARCSpec_Shots.lua", "post")
-ModLoader.SetupFileHook("lua/RoboticsFactory.lua", "lua/CNBalance/ARCSpec/ARCSpec_FactorySkins.lua", "post")
-ModLoader.SetupFileHook("lua/GUIProduction.lua", "lua/CNBalance/ARCSpec/ARCSpec_Production.lua", "post")
-ModLoader.SetupFileHook("lua/Commander_MouseActions.lua", "lua/CNBalance/ARCSpec/ARCSpec_Selection.lua", "post")
-
 -- Alien-only Origin Form bot fetch vote and server-side enforcement.
 ModLoader.SetupFileHook("lua/Voting.lua", "lua/CNBalance/OriginGorgeVote.lua", "post")
 ModLoader.SetupFileHook("lua/AlienTeam.lua", "lua/CNBalance/OriginGorgeFetchGate.lua", "post")
+
+-- Bots: a room the bot location tracker never registered no longer crashes exploring bots (CommonActions.lua:334
+-- "attempt to index local 'locGroup'"). Server only. See LocationContentionFix.lua.
+ModLoader.SetupFileHook("lua/bots/LocationContention.lua", "lua/CNBalance/LocationContentionFix.lua", "post")
+
+-- BMAC character (design: NS2.0-TEH/BMAC_Character.md). A Marine in a vanilla BMAC skin is armour-only
+-- (+100 AP, Exo-style damage rules) and the selected skin is locked for the round. Registered LAST so
+-- each file wraps the final version of what it hooks (CNBalance's MarineVariantMixin, Marine,
+-- JetpackMarine, Exo, MedPack and NS2Gamerules hooks above). DamageTypes, Armory, Shockwave, Devour and
+-- Vortex are edited in place.
+ModLoader.SetupFileHook("lua/MarineVariantMixin.lua", "lua/CNBalance/BMAC/BMAC_Shared.lua", "post")
+ModLoader.SetupFileHook("lua/Marine.lua", "lua/CNBalance/BMAC/BMAC_Marine.lua", "post")
+ModLoader.SetupFileHook("lua/JetpackMarine.lua", "lua/CNBalance/BMAC/BMAC_JetpackMarine.lua", "post")
+ModLoader.SetupFileHook("lua/Exo.lua", "lua/CNBalance/BMAC/BMAC_Exo.lua", "post")
+ModLoader.SetupFileHook("lua/MedPack.lua", "lua/CNBalance/BMAC/BMAC_MedPack.lua", "post")
+ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/CNBalance/BMAC/BMAC_Gamerules.lua", "post")
+-- Maintained copy of vanilla GUIAdvancedHUDBars.lua (its layout values are file locals).
+ModLoader.SetupFileHook("lua/GUIAdvancedHUDBars.lua", "lua/CNBalance/GUI/GUIAdvancedHUDBars.lua", "replace")
+ModLoader.SetupFileHook("lua/Hud/Marine/GUIMarineStatus.lua", "lua/CNBalance/BMAC/BMAC_GUIMarineStatus.lua", "post")
+-- Unit-status bar/text over a BMAC: AP only, like an Exo (after CNBalance's Player_Client hook).
+ModLoader.SetupFileHook("lua/Player_Client.lua", "lua/CNBalance/BMAC/BMAC_UnitStatus.lua", "post")
+-- (2026-10-15) Per-round Marine choice: Biological / BMAC / Random, then a skin. The message (+ its server hook), the
+-- window trigger (client) and the Military Protocol re-skin (after the mod's MarineTeam hooks).
+ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/BMAC/BMAC_NetworkMessages.lua", "post")
+ModLoader.SetupFileHook("lua/Player_Client.lua", "lua/CNBalance/BMAC/BMAC_RoundChoice_Client.lua", "post")
+ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/BMAC/BMAC_MarineTeam.lua", "post")
