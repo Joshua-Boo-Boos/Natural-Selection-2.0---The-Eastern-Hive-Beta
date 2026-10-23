@@ -70,8 +70,13 @@ local kShadowStepClimbAccel = 14 * 0.8
 local kShadowStepClimbSpeed = 7 * 0.8
 local kShadowStepSpeedBonusPerCelerity = 0.66
 Vokex.kShadowStepDuration = 0.2
--- Combat Enhancer: back to the pre-nerf 0.4 (user 2026-10-13; the nerf had raised it to 0.45).
-local kShadowStepCooldown = 0.4
+--[[
+    The time before Shadow Step can be used again after a step ends is 0.15 s (user 2026-10-18; was 0.2 s - same as
+    Combat Enhancer). A step's end sets timeShadowStep to (end time - kShadowStepDuration), and GetHasShadowStepCooldown
+    waits until timeShadowStep + kShadowStepCooldown, so the gap after a step is kShadowStepCooldown - kShadowStepDuration.
+]]
+local kShadowStepReuseGap = 0.15
+local kShadowStepCooldown = Vokex.kShadowStepDuration + kShadowStepReuseGap
 
 local kMaxSpeed = 7.2
 

@@ -119,7 +119,8 @@ function AcidRocket:OnTag(tagName)
 
     PROFILE("AcidRocket:OnTag")
 
-    if self.primaryAttacking and tagName == "shoot" then
+    -- (2026-10-18) No rocket while Shadow Stepping or while its button is still held (ShadowStep.lua).
+    if self.primaryAttacking and tagName == "shoot" and not self:GetIsAttackBlockedByShadowStep() then
         local player = self:GetParent()
         -- (Skip a "shoot" tag straight after a rocket fired directly during a Shadow Step - see OnPrimaryAttack.)
         if player and Shared.GetTime() - (self.timeLastAcidRocket or 0) >= GetFireInterval() * 0.8 then
@@ -130,6 +131,12 @@ function AcidRocket:OnTag(tagName)
 end
 
 function AcidRocket:OnPrimaryAttack(player)
+
+    -- (2026-10-18) No Acid Rocket while Shadow Stepping or while its button is still held (ShadowStep.lua).
+    if self:GetIsAttackBlockedByShadowStep(player) then
+        self.primaryAttacking = false
+        return
+    end
 
     if player:GetEnergy() >= self:GetEnergyCost(player) then
 

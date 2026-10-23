@@ -61,7 +61,8 @@ end
 function VortexShadowStep:OnPrimaryAttack(player)
     local hasEnergy = player:GetEnergy() >= self:GetEnergyCost()
     local cooledDown = (not self.nextAttackTime) or (Shared.GetTime() >= self.nextAttackTime)
-    local shadowStepping = false --player:GetIsShadowStepping()
+    -- (2026-10-18) No Vortex while Shadow Stepping or while its button is still held (ShadowStep.lua).
+    local shadowStepping = self:GetIsAttackBlockedByShadowStep(player)
     if not shadowStepping and hasEnergy and cooledDown then
         self.primaryAttacking = true
 
@@ -149,6 +150,12 @@ function VortexShadowStep:OnTag(tagName)
         self.stabbing = true
 
     elseif tagName == "hit" and self.stabbing then
+
+        -- (2026-10-18) An attack begun just before a Shadow Step does no damage during it.
+        if self:GetIsAttackBlockedByShadowStep() then
+            self.stabbing = false
+            return
+        end
 
         -- (Skip a "hit" straight after a vortex cast directly during a Shadow Step - see OnPrimaryAttack.)
         if Shared.GetTime() - (self.timeLastVortexCast or 0) < kAttackAnimationLength * 0.8 then

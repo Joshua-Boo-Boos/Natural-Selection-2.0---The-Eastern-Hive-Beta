@@ -115,8 +115,23 @@ function ShadowStep:GetIsShadowStepping()
     
 end
 
+--[[
+    (2026-10-18) NO ATTACKING WHILE SHADOW STEPPING (same as Combat Enhancer). Swipe, Acid Rocket and Vortex cannot be
+    used while the Vokex is ethereal, AND not while the secondary attack (Shadow Step) button is still held - so after a
+    step the player has to let go of it before attacking (also when the step ended by running out of energy while still
+    held). Read from the networked ethereal flag and the move input itself (secondaryAttackLastFrame), so client
+    prediction and the server agree. Checked when an attack starts AND when its hit / shot tag lands, so an attack begun
+    just before a step does no damage during it.
+]]
+function ShadowStep:GetIsAttackBlockedByShadowStep(player)
+    player = player or self:GetParent()
+    if not player then return false end
+    return player.ethereal == true
+        or (player.GetSecondaryAttackLastFrame ~= nil and player:GetSecondaryAttackLastFrame() == true)
+end
+
 function ShadowStep:GetPrimaryAttackAllowed()
-    return true
+    return not self:GetIsAttackBlockedByShadowStep()
 end
 
 function ShadowStep:GetSecondaryEnergyCost()

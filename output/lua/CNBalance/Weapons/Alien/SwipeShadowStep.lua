@@ -64,7 +64,8 @@ end
 function SwipeShadowStep:OnPrimaryAttack(player)
     local hasEnergy = player:GetEnergy() >= self:GetEnergyCost()
     local cooledDown = (not self.nextAttackTime) or (Shared.GetTime() >= self.nextAttackTime)
-    local shadowStepping = false --player:GetIsShadowStepping()
+    -- (2026-10-18) No Swipe while Shadow Stepping or while its button is still held (ShadowStep.lua).
+    local shadowStepping = self:GetIsAttackBlockedByShadowStep(player)
     if not shadowStepping and hasEnergy and cooledDown then
         self.primaryAttacking = true
     else
@@ -99,7 +100,12 @@ end
 function SwipeShadowStep:OnTag(tagName)
 
     PROFILE("SwipeShadowStep:OnTag")
-    
+
+    -- (2026-10-18) An attack begun just before a Shadow Step does no damage during it.
+    if tagName == "hit" and self:GetIsAttackBlockedByShadowStep() then
+        return
+    end
+
     if tagName == "hit" then
     
          local stabWep = self:GetParent():GetWeapon(VortexShadowStep.kMapName)
