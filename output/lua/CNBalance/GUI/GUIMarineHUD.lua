@@ -73,7 +73,9 @@ function GUIMarineHUD:Initialize()
     self.militaryProtocol = CreateTechIcon(kTechId.MilitaryProtocol)
     self.lastMilitaryProtocol = nil
 
-    self.autoMedPack = GUIUtility_CreateRequestIcon(kTechId.MedPack, Vector(-52 - 32, -36, 0),kMarineTeamType)
+    -- (2026-10-27) The plain medpack picture (cell 92, via the "needs medpack" alert's techId): kTechId.MedPack now shows
+    -- the Commander's Medpack+ icon (CNBalance/TechTreeButtons.lua), and self-medication is still a normal medpack.
+    self.autoMedPack = GUIUtility_CreateRequestIcon(kTechId.MarineAlertNeedMedpack, Vector(-52 - 32, -36, 0),kMarineTeamType)
     self.autoAmmoPack = GUIUtility_CreateRequestIcon(kTechId.AmmoPack, Vector(52 - 32, -36, 0),kMarineTeamType)
     self.teamCountElements = {}
     table.insert(self.teamCountElements,CreateTeamCountElement(kTechId.Shotgun))

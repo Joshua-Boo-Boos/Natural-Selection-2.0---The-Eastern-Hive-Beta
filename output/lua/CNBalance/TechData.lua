@@ -1804,7 +1804,26 @@ function BuildTechData()
     table.insert(techData, { [kTechDataId] = kTechId.DualFlamethrowerExosuit,    [kTechDataDisplayName] = "Dual Flamethrower",  [kTechDataCostKey] = 55 })
     table.insert(techData, { [kTechDataId] = kTechId.MinigunClawExosuit,         [kTechDataDisplayName] = "Minigun Claw",       [kTechDataCostKey] = 35 })
     table.insert(techData, { [kTechDataId] = kTechId.RailgunClawExosuit,         [kTechDataDisplayName] = "Railgun Claw",       [kTechDataCostKey] = 35 })
-    table.insert(techData, { [kTechDataId] = kTechId.FlamethrowerClawExosuit,    [kTechDataDisplayName] = "Flamethrower Claw",  [kTechDataCostKey] = 35 })
+    -- (2026-10-27) Multi Medpack (CNBalance/MedPack.lua): a ground drop is only allowed when a Marine inside the ring
+    -- needs a medpack (a drop locked on a Marine always is) - MedPack_GetPlacementAllowed, called at placement time.
+    for _, entry in ipairs(techData) do
+        if entry[kTechDataId] == kTechId.MedPack then
+            entry[kTechDataBuildRequiresMethod] = function(...)
+                if MedPack_GetPlacementAllowed then return MedPack_GetPlacementAllowed(...) end
+                return true
+            end
+            -- (2026-10-28) No auto-lock onto Marines (vanilla AlignDroppack moved the drop to a targeted Marine's feet):
+            -- both modes heal everyone in their ring, so the drop goes on the floor right under the cursor.
+            entry[kTechDataOverrideCoordsMethod] = function(coords, techId, targetEntityId)
+                local origin = coords.origin
+                local trace = Shared.TraceRay(origin + Vector(0, 0.2, 0), origin - Vector(0, 15, 0),
+                    CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterAll())
+                if trace.fraction < 1 then coords.origin = trace.endPoint end
+                return coords
+            end
+        end
+    end
+    table.insert(techData, { [kTechDataId] = kTechId.FlamethrowerClawExosuit,    [kTechDataDisplayName] = "FlamethrowerClaw",  [kTechDataCostKey] = 35 })
 
     return techData
 end

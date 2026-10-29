@@ -53,8 +53,9 @@ end
 -- 2026-10-13: half the drain was far too little while held, even with Adrenaline).
 -- Siege: CE's exact values (6 / 32), not the formula - Siege's own Blink costs are lower (11 / 30, Balance.lua), and the
 -- Shadow Step should feel the same as in Combat Enhancer.
-local kStartShadowStepEnergyCost = 6
-local kShadowStepEnergyPerSecond = 32
+-- (2026-10-24) +20% energy cost: 6 -> 7.2 to start, 32 -> 38.4 a second held.
+local kStartShadowStepEnergyCost = 6 * 1.2
+local kShadowStepEnergyPerSecond = 32 * 1.2
 local kShadowStepEnergyGrace = 0.08
 
 local function DeductShadowStepEnergy(player, amount)

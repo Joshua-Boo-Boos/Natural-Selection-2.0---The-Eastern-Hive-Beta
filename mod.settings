@@ -1,10 +1,10 @@
 name        = "Natural Selection 2.0 - The Eastern Hive - Beta"
 source_dir  = "source"
 output_dir  = "output"
-description = [=[Ask for permission before taking ANY content from this mod. I reserve the right to remove this mod at ANY time.
+description = "Ask for permission before taking ANY content from this mod. I reserve the right to remove this mod at ANY time.
 
-This mod is the beta version of NS2.0-TEH.]=]
+This mod is the beta version of NS2.0-TEH."
 image       = "preview.jpg"
 tag_modtype = "Gameplay Tweak"
 tag_support = "Must be run on Server"
-publish_id = 3784657118
+publish_id = 3829057736

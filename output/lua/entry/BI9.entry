@@ -1,0 +1,6 @@
+-- Brazier Industries 9. Priority -1: processed after MotionTracker (0) and CNBalance (1), so MotionTracker's buy-menu
+-- machinery already exists, and before CNPerf (-100).
+modEntry = {
+    FileHooks = "lua/BI9/FileHooks.lua",
+    Priority = -1
+}

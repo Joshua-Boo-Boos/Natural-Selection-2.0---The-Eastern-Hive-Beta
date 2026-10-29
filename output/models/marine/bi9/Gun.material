@@ -1,0 +1,8 @@
+shader = "shaders/BI9_MetalSupport.surface_shader"
+albedoMap = "models/marine/bi9/Gun.dds"
+specularMap = "models/marine/bi9/Gun_spec.dds"
+normalMap = "models/marine/bi9/Gun_normal.dds"
+emissiveMap = "models/marine/bi9/Gun_emissive.dds"
+metalDiffuseSupport = 0.25
+steelMask = "models/marine/bi9/Gun_steel_mask.dds"
+brassMask = "models/marine/bi9/Gun_brass_mask.dds"

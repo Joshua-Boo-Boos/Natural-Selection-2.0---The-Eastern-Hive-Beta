@@ -1,0 +1,4 @@
+shader = "shaders/ViewModel.surface_shader"
+albedoMap = "models/marine/bi9/hands.dds"
+normalMap = "models/marine/bi9/hands_normal.dds"
+specularMap = "models/marine/bi9/hands_spec.dds"

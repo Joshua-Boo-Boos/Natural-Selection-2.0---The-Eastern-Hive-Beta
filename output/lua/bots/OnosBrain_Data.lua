@@ -190,6 +190,37 @@ local function SwitchToBoneShield(onos)
     return false
 end
 
+--[[
+    (2026-10-25) BOT ONOS DEVOUR. A bot Onos that has Devour (biomass 3) swallows the Marine it is attacking, instead
+    of Goring it, when the bite can actually work:
+      * Devour's stomach is empty and off cooldown (Devour:GetCanDevour) and the Onos has the bite's energy;
+      * the target is a living, enemy Marine or Jetpack Marine (the only things Devour swallows - never an Exo, and
+        in Beta never a BMAC), visible;
+      * it is within Devour's reach (kAttackRange 2 m in Devour.lua; a little slack for the capsule), so a bite is not
+        wasted from Gore range.
+    Otherwise - and whenever a Marine is already being digested - the Onos uses Gore as before, which also matters
+    because pressing attack with Devour still selected RELEASES the swallowed Marine. Everything else is TEH's own
+    Devour weapon (Combat/Devour.lua): bite and digestion damage, the devoured Marine's punches and Knife, energy,
+    Bounty - bots are not given any special values.
+]]
+local kBotDevourReach = 2.5
+local function GetIsBotDevourable(onos, target)
+    return target ~= nil and target.GetIsAlive and target:GetIsAlive()
+        and (target:isa("Marine") or target:isa("JetpackMarine")) and not target:isa("DevouredPlayer")
+        and GetAreEnemies(onos, target)
+        and (not target.GetIsVisible or target:GetIsVisible())
+        and not (GetIsBMACMarine and GetIsBMACMarine(target))
+end
+
+local function SwitchToDevourIfAble(onos, target, distance)
+    if not (onos and Devour and distance and distance <= kBotDevourReach) then return false end
+    local devour = onos:GetWeapon(Devour.kMapName)
+    if not (devour and devour.GetCanDevour and devour:GetCanDevour()) then return false end
+    if devour.GetEnergyCost and onos:GetEnergy() < devour:GetEnergyCost() then return false end
+    if not GetIsBotDevourable(onos, target) then return false end
+    return onos:SetActiveWeapon(Devour.kMapName, true)
+end
+
 local function PerformMove( alienPos, targetPos, bot, brain, move, inRetreat )
 
     local postIgnore, targetDist, targetMove, entranceTunel = HandleAlienTunnelMove( alienPos, targetPos, bot, brain, move )
@@ -259,7 +290,10 @@ local function PerformAttackEntity( eyePos, bestTarget, bot, brain, move )
     local distance = GetDistanceToTouch(eyePos, bestTarget)
     if distance < 4 then
 
-        SwitchToGore(onosPlayer, brain) 
+        -- Devour the Marine when the bite can work (see SwitchToDevourIfAble), otherwise Gore.
+        if not SwitchToDevourIfAble(onosPlayer, bestTarget, distance) then
+            SwitchToGore(onosPlayer, brain)
+        end
         -- jitter view target a little bit
         -- local jitter = Vector( math.random(), math.random(), math.random() ) * 0.1
         bot:GetMotion():SetDesiredViewTarget( bestTarget:GetEngagementPoint() )

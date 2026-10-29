@@ -45,6 +45,10 @@ function MarineTeam:InitTechTree()
 
     self.techTree:AddBuyNode(kTechId.SubMachineGun,               kTechId.None,                kTechId.None)
     self.techTree:AddBuyNode(kTechId.Revolver,                    kTechId.None,                kTechId.None)
+    if rawget(kTechId, "bi9") then
+        -- Brazier Industries 9 (lua/BI9/): a free, permanent secondary, no prerequisite, like the Revolver.
+        self.techTree:AddBuyNode(kTechId.bi9,                     kTechId.None,                kTechId.None)
+    end
     self.techTree:AddBuyNode(kTechId.Knife,                       kTechId.None,                kTechId.None)
 
     self.techTree:AddBuildNode(kTechId.SentryBattery,             kTechId.RoboticsFactory,      kTechId.None)

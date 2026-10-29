@@ -24,7 +24,7 @@ if Client then
 
 				if mapname == Rifle.kMapName or mapname == HeavyMachineGun.kMapName or mapname == LightMachineGun.kMapName or mapname == Cannon.kMapName then
 					index = 0
-				elseif mapname == Pistol.kMapName or mapname == Revolver.kMapName then
+				elseif mapname == Pistol.kMapName or mapname == Revolver.kMapName or (bi9 and mapname == bi9.kMapName) then
 					index = 1
 				elseif mapname == Shotgun.kMapName or mapname == SubMachineGun.kMapName then
 					index = 3

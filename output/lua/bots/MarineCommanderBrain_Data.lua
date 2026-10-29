@@ -26,7 +26,9 @@ local function MarineComPlanCall(fnName, ...)
     return unpack(results, 2)
 end
 
-local kMarineComBrainTypes = enum({
+-- (2026-10-29) GLOBAL, not local: UWE Hotfix 344's post hook on this file reads kMarineComBrainTypes to weight its
+-- Observatory-scan fix; as a local it errored on load ("attempt to index global 'kMarineComBrainTypes'").
+kMarineComBrainTypes = enum({
 
     "EveryoneIsDead_DoNothing", -- No ips or players :(
 

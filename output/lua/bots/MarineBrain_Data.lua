@@ -897,7 +897,13 @@ local kMarineBrainObjectiveActionTypesOrderScale = 100
 local kCombatEngineersBotMinBuildResources = 5
 local kCombatEngineersBotIgnoreDuration    = 25
 
+-- (2026-10-25) The three buy objectives come FIRST. They were below FollowOrders and TakeTerritory, which always
+-- have work in a long game, so late-game bots sat on 80-100 p-res and never went shopping. Each one only has a
+-- weight when the bot can afford something that is unlocked, so it is a single short trip, then back to work.
 local kMarineBrainObjectiveTypes = enum({
+    "BuyExo",
+    "BuyJetpack",
+    "BuyWeapons",
     "FollowOrders",
     "RespondToThreat",
     "TakeTerritory",
@@ -910,9 +916,6 @@ local kMarineBrainObjectiveTypes = enum({
     "BuildStructure",
     "PlaceMines",
     "GotoCommPing",
-    "BuyExo",
-    "BuyWeapons",
-    "BuyJetpack",
     "BuyHandGrenades",
     "PressureEnemyNaturals",
     "BuyMines",
@@ -922,6 +925,64 @@ local kMarineBrainObjectiveTypes = enum({
 })
 
 local MarineObjectiveWeights = MakeBotActionWeights(kMarineBrainObjectiveTypes, kMarineBrainObjectiveActionTypesOrderScale)
+
+-- (2026-10-25) What Exo a bot buys at the Prototype Lab: any unlocked, affordable combo from the TEH buy window
+-- (CNBalance/PrototypeTechData.lua kPrototypeExoCombos), weighted towards Miniguns; Railgun combos only with the
+-- Gauss lab (the buy code requires it) and while the team's railgun allowance is not used up. Experimental upgrades
+-- are added while affordable once researched. Returns the bundle { base, upgrades... } or nil.
+local function ChooseBotExoPurchase(marine, resources, allowRailguns)
+
+    local function Cost(techId)
+        return GetPrototypeCost and GetPrototypeCost(techId) or LookupTechData(techId, kTechDataCostKey, 0)
+    end
+
+    if not kPrototypeExoCombos then
+        local id = kTechId.DualMinigunExosuit
+        return resources >= Cost(id) and { id } or nil
+    end
+
+    local options =
+    {
+        { kTechId.DualMinigunExosuit, 4 },
+        { kTechId.MinigunClawExosuit, 3 },
+        { kTechId.DualFlamethrowerExosuit, 2 },
+        { kTechId.FlamethrowerClawExosuit, 2 },
+    }
+    if allowRailguns and GetHasTech(marine, kTechId.CannonPrototypeLab) then
+        options[#options + 1] = { kTechId.DualRailgunExosuit, 2 }
+        options[#options + 1] = { kTechId.RailgunClawExosuit, 1 }
+    end
+
+    local pool, total = {}, 0
+    for _, option in ipairs(options) do
+        if option[1] and kPrototypeExoCombos[option[1]] and resources >= Cost(option[1]) then
+            pool[#pool + 1] = option
+            total = total + option[2]
+        end
+    end
+    if total <= 0 then return nil end
+
+    local roll, base = math.random() * total, nil
+    for _, option in ipairs(pool) do
+        roll = roll - option[2]
+        if roll <= 0 then base = option[1] break end
+    end
+    base = base or pool[#pool][1]
+
+    local bundle, spent = { base }, Cost(base)
+    local experimental = kPrototypeExperimentalForTrack and kPrototypeExperimentalForTrack.exo
+    if experimental and kPrototypeUpgradesForTrack and GetHasTech(marine, experimental) then
+        for _, upgrade in ipairs(kPrototypeUpgradesForTrack.exo or {}) do
+            local cost = Cost(upgrade)
+            if resources - spent >= cost then
+                bundle[#bundle + 1] = upgrade
+                spent = spent + cost
+            end
+        end
+    end
+    return bundle
+
+end
 
 local function GetMarineObjectiveBaselineWeight( actionId )
     assert(kMarineBrainObjectiveTypes[kMarineBrainObjectiveTypes[actionId]], "Error: Invalid MarineBrain action-id passed")
@@ -1682,7 +1743,8 @@ local kExecBuyTechId = function(move, bot, brain, marine, action)
         bot:GetMotion():SetDesiredMoveTarget( nil )
         
         -- Log("[%s] Attempting to Buy [%s]", marine, kTechId[buyId])  --string version
-        marine:ProcessBuyAction({ buyId })
+        -- buyIds: a Prototype Lab bundle (Exo combo + experimental upgrades), bought in one go like the buy window.
+        marine:ProcessBuyAction(action.buyIds or { buyId })
         SwitchToPrimary(marine)
 
         -- this is a hack because you can't buy an exo if there's a jetpack at your feet
@@ -2312,7 +2374,8 @@ kMarineBrainObjectiveActions =
 
         local techTree = GetTechTree(marine:GetTeamNumber())
 
-        if not techTree:GetIsTechAvailable(kTechId.DualMinigunExosuit) then
+        -- The same gate the TEH buy code uses (PrototypeBuyServer.lua: the Exosuit lab speciality).
+        if not GetHasTech(marine, kTechId.ExosuitPrototypeLab) then
             return kNilAction
         end
 
@@ -2331,21 +2394,24 @@ kMarineBrainObjectiveActions =
             totalRailgunsAllowed = 0
         end
 
-        local shouldBuyExo = totalExosAllowed > 0 and
-            totalExosAllowed > 0 and
+        local canHaveExo = totalExosAllowed > 0 and
             not marine:isa("JetpackMarine") and
-            not HasGoodWeapon(marine) and
-            resources >= LookupTechData(kTechId.DualMinigunExosuit, kTechDataCostKey) and
             totalExosAllowed - exoCounts.total > 0
 
-        if not shouldBuyExo then
+        if not canHaveExo then
             return kNilAction
         end
 
-        local buyId = kTechId.DualMinigunExosuit
-        if totalRailgunsAllowed > 0 and techTree:GetIsTechAvailable(kTechId.DualRailgunExosuit) and math.random() > 0.5 then
-            buyId = kTechId.DualRailgunExosuit -- Don't need many railguns, miniguns much more useful
+        -- A bot that already has a good weapon only trades it in for a full (dual) Exo's worth of p-res.
+        if HasGoodWeapon(marine) and resources < LookupTechData(kTechId.DualMinigunExosuit, kTechDataCostKey) then
+            return kNilAction
         end
+
+        local buyIds = ChooseBotExoPurchase(marine, resources, totalRailgunsAllowed > 0)
+        if not buyIds then
+            return kNilAction
+        end
+        local buyId = buyIds[1]
 
         local data = sdb:Get("nearestProto")
         local proto = data.proto
@@ -2367,6 +2433,7 @@ kMarineBrainObjectiveActions =
             weight = weight,
             structure = proto,
             buyId = buyId,
+            buyIds = buyIds,
             limit = (totalExosAllowed - exoCounts.total),
             validate = kValidateBuyTechId,
             perform = kExecBuyTechId
@@ -2452,12 +2519,13 @@ kMarineBrainObjectiveActions =
 
             -- Find all the weapons available for purchase.
             local availableWeapons = { }
+            -- (2026-10-25) No Cannon here: in TEH it is a Prototype Lab item and the Armory refuses it - BuyJetpack
+            -- buys it at the Prototype Lab instead.
             local weapons = enum({
                 kTechId.HeavyMachineGun,
                 kTechId.Shotgun,
                 kTechId.Flamethrower,
                 kTechId.GrenadeLauncher,
-                kTechId.Cannon,
             })
 
             local weaponTechs = 
@@ -2521,13 +2589,6 @@ kMarineBrainObjectiveActions =
 
                 end
                 
-                -- If saving for the Jetpack + Gauss Cannon combo, buy the Cannon
-                -- (the Prototype Lab weapon) as the chosen weapon when affordable.
-                if bot.wantsCannon and availableWeapons[kTechId.Cannon]
-                        and resources >= LookupTechData(kTechId.Cannon, kTechDataCostKey) then
-                    canAffordWeaponTechId = kTechId.Cannon
-                end
-
                 --BOT-TODO Revise below, and use some kind of lookup table via TeamBrain (or similar) which marks what all other Marines have, try to bias towards to fill "gaps"
                 if not canAffordWeaponTechId then
                     for _, techId in ipairs(availableWeapons) do
@@ -2587,20 +2648,34 @@ kMarineBrainObjectiveActions =
         local jpCap = math.max(1, math.floor(jpTotalPlayers / 3))
         local jpCount = #GetEntitiesForTeam("JetpackMarine", marine:GetTeamNumber())
 
-        if proto and protoDist and not marine:isa("JetpackMarine") and techTree:GetIsTechAvailable(kTechId.JetpackTech, true) and resources >= LookupTechData(kTechId.Jetpack, kTechDataCostKey) and jpCount < jpCap then
+        -- (2026-10-25) The TEH buy code's gate is the Jetpack lab speciality (PrototypeBuyServer.lua).
+        local buyId = kTechId.Jetpack
+        if proto and protoDist and not marine:isa("JetpackMarine") and GetHasTech(marine, kTechId.JetpackPrototypeLab) and resources >= LookupTechData(kTechId.Jetpack, kTechDataCostKey) and jpCount < jpCap then
             weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyJetpack )
 
             if bot.wantsJetpack then
                 weight = weight + 5 -- gimme gimme gimme
             end
         end
-        
-        return 
-        { 
-            name = name, 
+
+        -- (2026-10-25) Gauss Cannon, also a Prototype Lab item (it cannot be bought at an Armory in TEH): for a bot
+        -- with a plain primary (Rifle / no good weapon) once the Gauss lab is up, without eating into Exo savings.
+        if weight == 0 and proto and protoDist and Cannon and not marine:GetWeapon(Cannon.kMapName)
+                and GetHasTech(marine, kTechId.CannonPrototypeLab) and not HasGoodWeapon(marine) then
+            local cannonCost = (GetPrototypeCost and GetPrototypeCost(kTechId.Cannon)) or LookupTechData(kTechId.Cannon, kTechDataCostKey, 25)
+            local reserve = bot.wantsExo and LookupTechData(kTechId.DualMinigunExosuit, kTechDataCostKey) or 0
+            if resources >= cannonCost + reserve then
+                buyId = kTechId.Cannon
+                weight = GetMarineObjectiveBaselineWeight( kMarineBrainObjectiveTypes.BuyJetpack )
+            end
+        end
+
+        return
+        {
+            name = name,
             weight = weight,
             structure = proto,
-            buyId = kTechId.Jetpack,
+            buyId = buyId,
             validate = kValidateBuyTechId,
             perform = kExecBuyTechId
         }
@@ -3519,7 +3594,9 @@ kMarineBrainActions =
 
         if health < 1 then
             local meds = GetEntitiesWithinRangeAreVisible( "MedPack", marinePos, 12, true )     --BOT-FIXME Change to NOT use Vis check, it's expensive
-            bestDist, bestMed = GetNearestFiltered( marine, meds )
+            -- (2026-10-28) skip Area Heal fields the bot is already inside, and used-up multi-meds (CNBalance/MedPack.lua)
+            bestDist, bestMed = GetNearestFiltered( marine, meds,
+                function(med) return MedPack_BotShouldSeek == nil or MedPack_BotShouldSeek(marine, med) end )
 
             if bestMed ~= nil then
                 weight = GetMarineActionBaselineWeight( kMarineBrainActionTypes.FindMedpack )

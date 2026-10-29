@@ -877,6 +877,44 @@ function PlayerUI_GetHasTech(techId)
     return GetHasTech(Client.GetLocalPlayer(),techId)
 end
 
+--[[
+    (2026-10-25) THE SECONDARY WEAPON BUTTONS. Three free, permanent secondaries: Pistol, Revolver and - when lua/BI9/
+    is loaded - the Brazier Industries 9. The Armory offers the ones you do not already have: the first in the
+    secondary slot of the top-left group, the second as an extra button (lua/BI9/GUIMarineBuyMenu.lua places it).
+    Which one you have is read from the weapon in HUD slot 2 itself (isa), not its tech id: an appended tech id is not
+    guaranteed to reach the client correctly. Holding none of the three (a Motion Tracker in that slot, or nothing),
+    the Revolver and the BI9 are offered.
+]]
+local function GetArmorySecondaryChoices()
+
+    local choices = { kTechId.Pistol, kTechId.Revolver }
+    local classes = { "Pistol", "Revolver" }
+    if rawget(kTechId, "bi9") and bi9 then
+        table.insert(choices, kTechId.bi9)
+        table.insert(classes, "bi9")
+    end
+
+    local player = Client.GetLocalPlayer()
+    local slotWeapon = player and player.GetWeaponInHUDSlot and player:GetWeaponInHUDSlot(2)
+
+    local offered = {}
+    local ownsOne = false
+    for i = 1, #choices do
+        if slotWeapon and slotWeapon:isa(classes[i]) then
+            ownsOne = true
+        else
+            table.insert(offered, choices[i])
+        end
+    end
+
+    if not ownsOne and #offered > 2 then
+        table.remove(offered, 1)
+    end
+
+    return offered[1] or kTechId.Pistol, offered[2]
+
+end
+
 function GUIMarineBuyMenu:CreateArmoryUI()
 
     local paddingX = 105 -- Start of content from left side of background.
@@ -911,7 +949,9 @@ function GUIMarineBuyMenu:CreateArmoryUI()
     self.background:AddChild(weaponGroupTopLeft)
 ---------------
     local primaryTech =  PlayerUI_GetHasItem(kTechId.Rifle) and kTechId.SubMachineGun or kTechId.Rifle
-    local secondaryTech = PlayerUI_GetHasItem(kTechId.Pistol) and kTechId.Revolver or kTechId.Pistol
+    -- The two secondaries you do not have (see GetArmorySecondaryChoices); the second one's button is lua/BI9/'s.
+    local secondaryTech, extraSecondaryTech = GetArmorySecondaryChoices()
+    self.extraSecondaryTech = extraSecondaryTech
     self:_InitializeWeaponGroup(weaponGroupTopLeft, x2ButtonPositions,
     {
         primaryTech,
@@ -1441,8 +1481,9 @@ function GUIMarineBuyMenu:_UpdateRealTimeElements(buttonTable, techId, techAvail
 
     if teamInfo and techMapName then
         local netVarName = TeamInfo_GetUserTrackerNetvarName(techMapName)
-        local numUsers = teamInfo[netVarName]
-        assert(numUsers, string.format("Netvar %s does not exist in MarineTeamInfo!", netVarName))
+        -- A weapon without a user-count netvar (the BIHK: no new netvars, the engine's limit is tight) counts as 0.
+        -- This used to assert, which stopped the button loop and froze every button after it.
+        local numUsers = teamInfo[netVarName] or 0
         local hasPlayers = numUsers > 0
         
         local tooManyPlayers = hasPlayers and buttonTable.PlayersRestriction and numUsers >= math.floor(teamInfo:GetPlayerCount() * buttonTable.PlayersRestriction) 

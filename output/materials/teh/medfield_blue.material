@@ -1,0 +1,4 @@
+shader = "shaders/TEHMedFieldTint.surface_shader"
+tintR = 0.1
+tintG = 0.4
+tintB = 1.0

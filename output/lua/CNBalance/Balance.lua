@@ -491,7 +491,7 @@ kVokexUpgradeCost = 5
 
 -- Held Shadow Step (ported from Combat Enhancer, 2026-10-13): 6 to start, then 32 a second while held
 -- (CNBalance/Weapons/Alien/ShadowStep.lua). Was 14 for the old single dash.
-kVokexShadowStepEnergyCost = 6 -- 14 -- 13
+kVokexShadowStepEnergyCost = 6 * 1.2 -- (2026-10-24) +20% -- 6 -- 14 -- 13
 kSwipeShadowStepDamage = 40
 kVokexGestateTime = 25
 kVokexEggCost = 80
@@ -619,7 +619,7 @@ kAdvancedMarineSupportResearchCost = 20
 kAdvancedMarineSupportResearchTime = 90
 kAmmoPackCost = 1
 kAmmoPackCooldown = 0
-kMedPackCost = 1
+kMedPackCost = 1   -- (2026-10-27) per medpack: Multi Medpack - on a Marine one medpack, on the ground 1 each for every hurt Marine within 5 m (CNBalance/MedPack.lua)
 kMedPackCooldown = 0
 
 kCatPackCost = 1

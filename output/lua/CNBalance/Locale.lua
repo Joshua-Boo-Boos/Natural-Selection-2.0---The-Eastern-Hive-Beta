@@ -619,4 +619,13 @@ kLocales["COMMANDERERROR_MINE_LIMIT_REACHED"] = "Too many marine comm placed min
 kLocales["COMMANDERERROR_MINE_ON_INFESTATION"] = "No marine comm mines on infestation!"
 kLocales["COMMANDERERROR_WHIP_LIMIT_REACHED"] = "Too many commander whips!"
 -- BMAC character (CNBalance/BMAC/BMAC_MedPack.lua): a BMAC gets armour instead of health.
-kLocales["MED_PACK_TOOLTIP"] = "Restores 50 player health (25 armor for a BMAC)"
+-- (2026-10-27) Multi Medpack (CNBalance/MedPack.lua): on a Marine, a normal medpack; on the ground, one for each hurt Marine nearby.
+kLocales["MED_PACK"] = "Multi Medpack"
+kLocales["MED_PACK_TOOLTIP"] = "A medpack each for every hurt Marine within 4.5m of where you drop it, up to 12m above (no Exos); with no Marine in the ring, a medpack is left on the ground to pick up. 1 res per medpack. Stays selected after each drop. Tap middle mouse: switch to Area Heal anytime. Hold 0.3s: ping."
+-- (2026-10-28) The medpack's two modes (CNBalance/MedPackModeUI.lua swaps MED_PACK / MED_PACK_TOOLTIP to these).
+kLocales["TEH_MEDMODE_MULTI_NAME"] = "Multi Medpack"
+kLocales["TEH_MEDMODE_MULTI_TOOLTIP"] = kLocales["MED_PACK_TOOLTIP"]
+kLocales["TEH_MEDMODE_AREA_NAME"] = "Area Heal"
+kLocales["TEH_MEDMODE_AREA_TOOLTIP"] = "A healing field: every hurt Marine within 4.5m, up to 12m above, heals 8 HP a second for 5 seconds (no Exos). 2 res. Stays selected after each drop. Tap middle mouse: switch to Multi Medpack anytime. Hold 0.3s: ping."
+kLocales["COMMANDERERROR_MEDFIELD_RES"] = "Area Heal needs 2 team res!"
+kLocales["COMMANDERERROR_MULTIMED_NOBODY"] = "No Marine in the ring needs a medpack!"

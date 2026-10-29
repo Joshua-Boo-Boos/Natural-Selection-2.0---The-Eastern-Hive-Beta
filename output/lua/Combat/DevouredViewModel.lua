@@ -191,7 +191,7 @@ function DevouredViewModel:OnTag(tagName)
 		if tagName == "attack_left_end" or tagName == "attack_right_end" then
 			local onos = Shared.GetEntity(parent:GetDevouringOnosId())
 			local coords = self:GetParent():GetViewCoords().origin + Vector(0,-40,0.6)
-			if onos then
+			if onos and onos:isa("Onos") then   -- (2026-10-28) stale id can point at a non-Onos entity
 				self:DoDamage(kDevourPunchDamage, onos, coords, nil, "none")
 				parent:DeductHealth(kPunchSelfDamage, onos, self , true)
                 --[[if Server then

@@ -89,6 +89,9 @@ if Server then
                 self.secondaryRespawn = Pistol.kMapName
             elseif techId == kTechId.Revolver then
                 self.secondaryRespawn = Revolver.kMapName
+            elseif bi9 and techId == rawget(kTechId, "bi9") then
+                -- Brazier Industries 9 (lua/BI9/): a free, permanent secondary like the Revolver.
+                self.secondaryRespawn = bi9.kMapName
             end
 
             if techId == kTechId.Axe then

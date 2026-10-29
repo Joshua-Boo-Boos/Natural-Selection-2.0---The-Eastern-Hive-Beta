@@ -228,6 +228,8 @@ for _, name in ipairs({"CragHive", "ShadeHive", "ShiftHive"}) do
 end
 function B.FirstHiveFetch(team, techId)
     if not kHiveTechIds[techId] or not team:IsOriginForm() or team:GetCommander() then return false end
+    -- (2026-10-23) No bot fetches at all - not even for the first Hive - unless the Bot Biomass Fetch vote passed.
+    if not (OriginGorgeBotFetchAllowed and OriginGorgeBotFetchAllowed()) then return false end
     for _, hive in ipairs(GetEntitiesForTeam("Hive", team:GetTeamNumber())) do
         if hive:GetIsAlive() then return false end
     end

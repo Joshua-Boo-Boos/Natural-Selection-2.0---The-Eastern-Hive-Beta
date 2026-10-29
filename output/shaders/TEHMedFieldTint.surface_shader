@@ -1,0 +1,30 @@
+<shader>
+
+	<inputs>
+		<input name="tintR" type="float">0.1</input>
+		<input name="tintG" type="float">0.4</input>
+		<input name="tintB" type="float">1.0</input>
+	</inputs>
+
+	<params>
+		<param name="wsNormal">true</param>
+		<param name="vsNormal">true</param>
+		<param name="twoSided">false</param>
+	</params>
+
+	<code>
+	<![CDATA[
+		// N2TEH-B medpack field (CNBalance/MedPack.lua): the sentry battery mesh it places is tinted the blue of the
+		// Infiltrators Ready Room Team Deathmatch (the same shader as shaders/InfiltratorsTeamTint.surface_shader).
+		// Added on the client with AddMaterial.
+		void MaterialShader(in Material_Input input, inout Material material)
+		{
+			float3 tint = float3(tintR, tintG, tintB);
+			material.wsOffset = input.wsNormal * 0.004;
+			float rim = 1.0 - max(-input.vsNormal.z, 0);
+			material.emissive = tint * (0.6 + rim * 0.8);
+		}
+	]]>
+	</code>
+
+</shader>

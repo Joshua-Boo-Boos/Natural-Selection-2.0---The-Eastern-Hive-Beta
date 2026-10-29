@@ -42,7 +42,7 @@ end
 
 if Server then
 
-    local ignoredWeapons = set { "Pistol", "Rifle" , "SubMachineGun" ,"LightMachineGun" , "Revolver"}
+    local ignoredWeapons = set { "Pistol", "Rifle" , "SubMachineGun" ,"LightMachineGun" , "Revolver", "bi9"}
     function Weapon:StartExpiration()
 
         self.weaponWorldStateTime = Shared.GetTime()

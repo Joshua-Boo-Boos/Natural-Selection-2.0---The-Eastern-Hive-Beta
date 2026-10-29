@@ -32,6 +32,14 @@ ModLoader.SetupFileHook("lua/Chat.lua", "lua/CNBalance/CombatEngineers_Chat.lua"
 -- "Com Eng" tab in Options -> Mods. ModsMenuData.lua is the file vanilla explicitly invites mods to
 -- post-hook to add their own options category.
 ModLoader.SetupFileHook("lua/menu2/NavBar/Screens/Options/Mods/ModsMenuData.lua", "lua/CNBalance/CombatEngineers_ModsMenuData.lua", "post")
+-- The guide window (CNBalance/GUI/GUITEHGuide.lua): !guide / "guide" console command, the "Guide" key (default 0) and its
+-- "NS2.0-TEH" tab in Options -> Mods. Client only; no network messages or classes.
+ModLoader.SetupFileHook("lua/Chat.lua", "lua/CNBalance/TEHGuide_Client.lua", "post")
+ModLoader.SetupFileHook("lua/BindingsDialog.lua", "lua/CNBalance/TEHGuide_Bindings.lua", "post")
+ModLoader.SetupFileHook("lua/InputHandler.lua", "lua/CNBalance/TEHGuide_InputHandler.lua", "post")
+ModLoader.SetupFileHook("lua/menu2/NavBar/Screens/Options/Mods/ModsMenuData.lua", "lua/CNBalance/TEHGuide_ModsMenuData.lua", "post")
+-- Server: registers !guide with Shine so it shows, with help text, in the chat box's command auto-complete.
+ModLoader.SetupFileHook("lua/NetworkMessages_Server.lua", "lua/CNBalance/TEHGuide_Server.lua", "post")
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/TechData.lua", "post")
 -- Prototype Lab overhaul (buy-window subset). Load after the mod TechData hook.
 ModLoader.SetupFileHook("lua/TechData.lua", "lua/CNBalance/PrototypeTechData.lua", "post")
@@ -114,6 +122,10 @@ ModLoader.SetupFileHook("lua/BabblerOwnerMixin.lua", "lua/CNBalance/Mixin/Babble
 ModLoader.SetupFileHook("lua/RegenerationMixin.lua", "lua/CNBalance/Mixin/RegenerationMixin.lua", "post")
 ModLoader.SetupFileHook("lua/BiomassHealthMixin.lua", "lua/CNBalance/Mixin/BiomassHealthMixin.lua", "replace")
 ModLoader.SetupFileHook("lua/RecycleMixin.lua", "lua/CNBalance/Mixin/RecycleMixin.lua", "post")
+-- (2026-10-28) [TEH Recycle Log] / [TEH Consume Log]: server-log-only record of who recycled / consumed what.
+-- Must stay AFTER the RecycleMixin post hook above so it wraps that version.
+ModLoader.SetupFileHook("lua/RecycleMixin.lua", "lua/CNBalance/TEHStructureLog.lua", "post")
+ModLoader.SetupFileHook("lua/ConsumeMixin.lua", "lua/CNBalance/TEHStructureLog.lua", "post")
 ModLoader.SetupFileHook("lua/GhostStructureMixin.lua", "lua/CNBalance/Mixin/GhostStructureMixin.lua", "post")
 ModLoader.SetupFileHook("lua/PhaseGateUserMixin.lua", "lua/CNBalance/Mixin/PhaseGateUserMixin.lua", "replace")
 
@@ -162,8 +174,16 @@ ModLoader.SetupFileHook("lua/MarineTeam.lua", "lua/CNBalance/CombatEngineers_Tea
 ModLoader.SetupFileHook("lua/MarineTeamInfo.lua", "lua/CNBalance/MarineTeamInfo.lua", "replace")
 
 ModLoader.SetupFileHook("lua/DropPack.lua", "lua/CNBalance/DropPack.lua", "post")
-ModLoader.SetupFileHook("lua/AmmoPack.lua", "lua/CNBalance/AmmoPack.lua", "post")
+-- (2026-10-28) Per-weapon dropped ammo bags disabled (network class limit - frees 10 classes, e.g. for
+-- ns2_craft's Craft2Door), as in S2TEH/D2TEH. The replacement keeps vanilla's commander AmmoPack with
+-- WeaponAmmoPack + every bag class commented out; CNBalance/AmmoPack.lua (the mod's 4 extra bags) is kept
+-- but no longer loaded. Dropped weapons keep their own reserve ammo instead - NoWeaponAmmoPacks.lua.
+ModLoader.SetupFileHook("lua/AmmoPack.lua", "lua/CNBalance/AmmoPack_NoWeaponPacks.lua", "replace")
+-- ModLoader.SetupFileHook("lua/AmmoPack.lua", "lua/CNBalance/AmmoPack.lua", "post")
+ModLoader.SetupFileHook("lua/Weapons/Marine/ClipWeapon.lua", "lua/CNBalance/NoWeaponAmmoPacks.lua", "post")
 ModLoader.SetupFileHook("lua/MedPack.lua", "lua/CNBalance/MedPack.lua", "post")
+-- (2026-10-27) The Commander bot places Med Fields sensibly (no overlaps, short chains, at most 3).
+ModLoader.SetupFileHook("lua/bots/CommanderBrain.lua", "lua/CNBalance/MedFieldBots.lua", "post")
 ModLoader.SetupFileHook("lua/Mine.lua", "lua/CNBalance/Mine.lua", "replace")
 
 --Strutcures
@@ -336,6 +356,9 @@ ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/CNBalance/CommMapTools_S
 ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/CNBalance/CommMapTools_Server.lua", "post")
 ModLoader.SetupFileHook("lua/NetworkMessages_Client.lua", "lua/CNBalance/CommMapTools_Client.lua", "post")
 ModLoader.SetupFileHook("lua/GUIMinimapFrame.lua", "lua/CNBalance/GUIMinimapFrame.lua", "post")
+-- (2026-10-28) Medpack mode switch (middle mouse, map closed) + its HUD line - must stay AFTER the hook above.
+ModLoader.SetupFileHook("lua/GUIMinimapFrame.lua", "lua/CNBalance/MedPackModeUI.lua", "post")
+ModLoader.SetupFileHook("lua/Commander_Ping.lua", "lua/CNBalance/MedPackModePing.lua", "post")
 
 -- Armory weapon storage. Split across four targets because load order BETWEEN hooks on different
 -- files is not guaranteed: the shared half rides NetworkMessages.lua (loaded early in every VM, so

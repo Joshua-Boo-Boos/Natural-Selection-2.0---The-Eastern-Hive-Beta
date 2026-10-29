@@ -76,6 +76,9 @@ function PlayerUI_GetInventoryTechIds()
             if weapon and weapon:isa("MotionTracker") then
                 inventoryItem.TechId = kTechId.MotionTracker
             end
+            if weapon and rawget(kTechId, "bi9") and weapon:isa("bi9") then
+                inventoryItem.TechId = kTechId.bi9
+            end
         end
     end
 

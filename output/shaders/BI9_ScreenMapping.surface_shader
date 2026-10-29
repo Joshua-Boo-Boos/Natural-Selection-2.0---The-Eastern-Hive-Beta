@@ -1,0 +1,36 @@
+<shader>
+ <inputs>
+  <input name="emissiveMap" type="texture" address="clamp" srgb="true" />
+ </inputs>
+ <code><![CDATA[
+ void MaterialShader(in Material_Input input, inout Material material)
+ {
+   float2 uv = input.texCoord;
+   // Pistol_View36: upper screen is a trapezoid split into two triangles.
+   // Convert its stretched rectangular UVs back to surface coordinates.
+   // Texture V runs downward, hence the tapered region is V <= 0.375.
+   float2 surfaceUV = uv;
+   float taper = saturate((0.375 - uv.y) / 0.375);
+   if (uv.y < 0.375)
+   {
+     if (uv.y <= 0.375 * (1.0 - uv.x))
+       surfaceUV.x = 0.5375 * uv.x + 0.23125 * taper;
+     else
+       surfaceUV.x = uv.x - 0.23125 * taper;
+   }
+   // Match texel scale across the width and unfolded screen height.
+   surfaceUV.y = 0.5 + (surfaceUV.y - 0.5) * 0.833;
+   float3 corrected = tex2D(emissiveMap, surfaceUV).rgb;
+   float3 original = tex2D(emissiveMap, uv).rgb;
+   // Keep the existing blue outline exactly at the mesh perimeter.
+   float edgeDistance = min(min(uv.x, 1.0-uv.x), min(uv.y, 1.0-uv.y));
+   float interior = smoothstep(0.035, 0.060, edgeDistance);
+   material.albedo = float3(0,0,0);
+   material.specular = float3(0,0,0);
+   material.gloss = 0;
+   material.tsNormal = float3(0,0,1);
+   material.emissive = lerp(original, corrected, interior);
+   material.id = 0;
+ }
+ ]]></code>
+</shader>

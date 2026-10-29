@@ -1,44 +1,37 @@
--- Separate Alien electorate, using the existing yes/no vote HUD and keys.
--- Never register this as a public StartVote type: Marines cannot start or answer it.
+-- Bot Biomass Fetch: a normal entry in the vote menu ("Bot Biomass Fetch").
+--
+-- (2026-10-28) ENABLED BY DEFAULT: every map starts with bot Gorges allowed to use Biomass Fetch whenever their plan
+-- calls for it (OriginGorgeBuilder.lua).
+--   * The vote DISABLES it, and can only be started BEFORE the round starts (pre-game / warm-up). Once passed, bot
+--     Gorges may not use Biomass Fetch for the rest of the map - every round - until the map changes (a map change
+--     reloads the server's Lua, so it is enabled again).
+--   * Starting it once a round has started, or after it has already passed, does not start a vote; the player is told
+--     why in chat.
+-- (Before 2026-10-28 it was the other way round: disabled by default, a vote enabled it for one round.)
+-- The helpers below (GetOriginGorgeState, OriginGorgeHasHumanAliens, OriginGorgeTeamMessage) are used by
+-- OriginGorgeBuilder.lua and OriginGorgeFetchGate.lua.
+
 if gOriginGorgeVoteLoaded then return end
 gOriginGorgeVoteLoaded = true
 
-Shared.RegisterNetworkMessage("OriginGorgeVote", {
-    voteId = "integer", expireTime = "time", client_index = "integer"
-})
-Shared.RegisterNetworkMessage("OriginGorgeVoteChoice", { voteId = "integer", choice = "boolean" })
-Shared.RegisterNetworkMessage("OriginGorgeVoteResults", {
-    voteId = "integer", yesVotes = "integer (0 to 255)", noVotes = "integer (0 to 255)",
-    requiredVotes = "integer (0 to 255)", state = "enum kVoteState"
-})
+local kVoteName = "VoteBotBiomassFetch"
+local kExecuteVoteDelay = 2
+
+RegisterVoteType(kVoteName, { })
 
 if Client then
-    local results
-    if kPollWrapVoteTypes then kPollWrapVoteTypes.OriginGorgeVote = true end
-    AddVoteStartListener("OriginGorgeVote", function()
-        results = nil
-        return "[Aliens - Origin Form]: Disallow bot Gorges to use Biomass Fetch?"
+
+    if kPollWrapVoteTypes then kPollWrapVoteTypes[kVoteName] = true end
+
+    AddVoteSetupCallback(function(voteMenu)
+        voteMenu:AddMainMenuOption("Bot Biomass Fetch", nil, function()
+            AttemptToStartVote(kVoteName, { })
+        end)
+        AddVoteStartListener(kVoteName, function()
+            return "Disable bot Gorges' Biomass Fetch for the rest of this map?"
+        end)
     end)
-    Client.HookNetworkMessage("OriginGorgeVoteResults", function(message)
-        if message.voteId == GetCurrentVoteId() then results = message end
-    end)
-    -- Vanilla predicts monotonically increasing tallies. This electorate can lose
-    -- a vote when its player leaves Aliens, so display the authoritative count.
-    local originalResults = GetVoteResults
-    function GetVoteResults()
-        if GetCurrentVoteId() >= 1000000000 then
-            return results and results.yesVotes or 0, results and results.noVotes or 0, results and results.requiredVotes or 0
-        end
-        return originalResults()
-    end
-    local originalSend = SendVoteChoice
-    function SendVoteChoice(choice)
-        if GetCurrentVoteId() >= 1000000000 then
-            Client.SendNetworkMessage("OriginGorgeVoteChoice", {voteId = GetCurrentVoteId(), choice = choice}, true)
-        else
-            originalSend(choice)
-        end
-    end
+
 end
 
 if not Server then return end
@@ -51,8 +44,7 @@ function OriginGorgeHasHumanAliens(team)
     return false
 end
 
--- CETeamAnnounce carries at most 220 characters. (2026-10-14) A longer line is cut at the last whole word with
--- "..." rather than mid-word, so it never reads as if the text simply stopped.
+-- CETeamAnnounce carries at most 220 characters. A longer line is cut at the last whole word with "...".
 local kTeamMessageMax = 220
 local function FitTeamMessage(message)
     if #message <= kTeamMessageMax then return message end
@@ -73,59 +65,25 @@ function OriginGorgeTeamMessage(team, message)
     end
 end
 
-local serial = 1000000000
-local active
-local originalAllowed = GetStartVoteAllowed
-function GetStartVoteAllowed(voteName, client)
-    if active then return kVoteCannotStartReason.VoteInProgress end
-    return originalAllowed(voteName, client)
+-- True once the vote has passed this map: bot Biomass Fetch is off until the map changes (the server's Lua reloads).
+local disabledForMap = false
+
+local function GetRoundStarted()
+    local rules = GetGamerules()
+    return rules ~= nil and rules:GetGameStarted()
 end
 
-local function Humans(team)
-    local result = {}
-    for _, player in ipairs(GetEntitiesForTeam("Player", team:GetTeamNumber())) do
-        local client = Server.GetOwner(player)
-        if client and not client:GetIsVirtual() then result[client:GetUserId()] = player end
-    end
-    return result
+-- Used by OriginGorgeBuilder.lua's first-Hive rule too: allowed unless the vote has disabled it for this map.
+function OriginGorgeBotFetchAllowed()
+    return not disabledForMap
 end
 
-local function SendElectorate(vote, name, data)
-    -- Include former teammates for completion, so a team switch clears their HUD too.
-    for _, player in ipairs(GetEntities("Player")) do
-        local client = Server.GetOwner(player)
-        if client and not client:GetIsVirtual() and vote.electorate[client:GetUserId()] then
-            if player:GetTeamNumber() == vote.team:GetTeamNumber() or name == "VoteComplete" then
-                Server.SendNetworkMessage(player, name, data, true)
-            else
-                Server.SendNetworkMessage(player, "VoteComplete", {voteId = vote.id}, true)
-            end
-        end
-    end
+local function ApplyToState(state, team)
+    state.voteFinished = true   -- nothing to wait for any more: the vote is optional
+    state.disallowed = disabledForMap
 end
 
-local function Finish(vote, passed)
-    vote.state.disallowed = passed
-    vote.state.voteFinished = true
-    -- (2026-10-14) Bot Gorges re-plan the moment the vote ends (OriginGorgeBuilder.lua), not on their next cycle.
-    vote.state.voteFinishedTime = Shared.GetTime()
-    SendElectorate(vote, "VoteComplete", {voteId = vote.id})
-    OriginGorgeTeamMessage(vote.team, passed
-        and "[Origin Form] Vote passed: bot Gorges cannot use Biomass Fetch this round."
-        or "[Origin Form] Biomass Fetch remains enabled for bot Gorges this round.")
-    active = nil
-end
-
-Server.HookNetworkMessage("OriginGorgeVoteChoice", function(client, message)
-    local player = client:GetControllingPlayer()
-    if active and Shared.GetTime() < active.expires and message.voteId == active.id
-        and not client:GetIsVirtual() and player and player:GetTeamNumber() == active.team:GetTeamNumber()
-        and active.electorate[client:GetUserId()] then
-        active.votes[client:GetUserId()] = message.choice
-    end
-end)
-
--- Team-owned state is shared by all Gorge brains and invalidated on every round.
+-- Team-owned state shared by all Gorge brains, invalidated every round.
 function GetOriginGorgeState(team)
     local rules = GetGamerules()
     if not rules or not rules:GetGameStarted() then return nil end
@@ -133,52 +91,51 @@ function GetOriginGorgeState(team)
     if not team.originGorgeState or team.originGorgeState.epoch ~= epoch then
         team.originGorgeState = {epoch = epoch, reservations = {}}
     end
-    return team.originGorgeState
+    -- Bot brains call this constantly; refresh at most once a second (OriginGorgeHasHumanAliens allocates).
+    local state = team.originGorgeState
+    local now = Shared.GetTime()
+    if not state.nextApply or now >= state.nextApply then
+        state.nextApply = now + 1
+        ApplyToState(state, team)
+    end
+    return state
 end
 
-local nextUpdate = 0
-Event.Hook("UpdateServer", function()
-    local now = Shared.GetTime()
-    if now < nextUpdate then return end
-    nextUpdate = now + 0.5
-    local rules = GetGamerules()
-    local team = rules and rules:GetTeam(kTeam2Index)
-    if not rules or not rules:GetGameStarted() or not team then
-        if active then SendElectorate(active, "VoteComplete", {voteId = active.id}); active = nil end
-        if team then team.originGorgeState = nil end
+local function Chat(target, text)
+    local message = BuildChatMessage(false, "Vote", -1, kTeamReadyRoom, kNeutralTeamType, text)
+    if target then
+        Server.SendNetworkMessage(target, "Chat", message, true)
+    else
+        Server.SendNetworkMessage("Chat", message, true)
+    end
+end
+
+-- Already disabled, or the round has started: do not start a vote, just say why in chat.
+Server.HookNetworkMessage(kVoteName, function(client, message)
+    if disabledForMap then
+        Chat(client, "Bot Biomass Fetch is already disabled for this map.")
         return
     end
-    local state = GetOriginGorgeState(team)
-    if active and (active.state ~= state or not team:IsOriginForm()) then
-        SendElectorate(active, "VoteComplete", {voteId = active.id})
-        active = nil
+    if GetRoundStarted() then
+        Chat(client, "Bot Biomass Fetch can only be voted off before the round starts.")
+        return
     end
-    if not team:IsOriginForm() then return end
-    if not state.voteFinished and not active and not team:GetCommander() then
-        local humans = Humans(team)
-        local count = 0
-        for _ in pairs(humans) do count = count + 1 end
-        if count == 0 then
-            state.voteFinished = true -- all-bot teams default to allowing fetch
-        elseif originalAllowed("OriginGorgeVote", nil) == kVoteCannotStartReason.VoteAllowedToStart then
-            serial = serial + 1
-            active = {id = serial, team = team, state = state, electorate = humans,
-                votes = {}, required = math.floor(count / 2) + 1, expires = now + 15}  -- (2026-10-14) 15-second vote
-            SendElectorate(active, "OriginGorgeVote", {voteId = serial, expireTime = active.expires, client_index = 0})
-        end
+    StartVote(kVoteName, client, message)
+end)
+
+SetVoteSuccessfulCallback(kVoteName, kExecuteVoteDelay, function()
+    if GetRoundStarted() then
+        Chat(nil, "Vote passed, but the round had already started: bot Biomass Fetch stays enabled.")
+        return
     end
-    if active then
-        local yes, no = 0, 0
-        local humans = Humans(team)
-        for id, choice in pairs(active.votes) do
-            if humans[id] then
-                if choice then yes = yes + 1 else no = no + 1 end
-            end
-        end
-        local passed = yes >= active.required
-        local done = passed or now >= active.expires
-        SendElectorate(active, "OriginGorgeVoteResults", {voteId = active.id, yesVotes = yes, noVotes = no,
-            requiredVotes = active.required, state = done and (passed and kVoteState.Passed or kVoteState.Failed) or kVoteState.InProgress})
-        if done then Finish(active, passed) end
+    disabledForMap = true
+    Chat(nil, "Vote passed: bot Gorges can't use Biomass Fetch for the rest of this map.")
+    local rules = GetGamerules()
+    local team = rules and rules:GetTeam(kTeam2Index)
+    local state = team and team.originGorgeState
+    if state then
+        ApplyToState(state, team)
+        -- Bot Gorges re-plan straight away (OriginGorgeBuilder.lua watches voteFinishedTime).
+        state.voteFinishedTime = Shared.GetTime()
     end
 end)

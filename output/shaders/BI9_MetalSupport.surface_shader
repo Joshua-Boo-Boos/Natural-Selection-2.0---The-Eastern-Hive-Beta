@@ -1,0 +1,68 @@
+<shader>
+	
+	<inputs>
+		<input name="albedoMap" type="texture" address="wrap" />
+		<input name="normalMap" type="texture" address="wrap" />
+		<input name="specularMap" type="texture" address="wrap" />
+		<input name="emissiveMap" type="texture" address="wrap" srgb="true"/>
+		<input name="brassMask" type="texture" address="wrap" />
+        <input name="steelMask" type="texture" address="wrap" />
+        <input name="highlight" type="float">0.0</input>
+<input name="metalDiffuseSupport" type="float">0.25</input>
+	</inputs>
+	
+	<code>
+	<![CDATA[
+		float3 DecodeNormal(const float4 texNormal)
+		{
+			float4 n = texNormal * 2 - 1;
+			//return float3(n.a, n.g, sqrt(1 - dot(n.ag, n.ag)) );
+			return n.xyz;
+		}
+		void MaterialShader(in Material_Input input, inout Material material)
+		{
+			float highlightId   = highlight;
+			
+			float4 specularGloss = tex2D(specularMap, input.texCoord);
+			
+			material.albedo 	= tex2D(albedoMap, input.texCoord).rgb;
+			// Legacy-renderer compensation for metallic exports with near-zero diffuse.
+            material.albedo = max(material.albedo, specularGloss.rgb * metalDiffuseSupport);
+            material.tsNormal 	= DecodeNormal( tex2D(normalMap, input.texCoord) );
+			material.specular	= specularGloss.rgb;
+			material.gloss		= specularGloss.a;
+			material.emissive   = tex2D(emissiveMap, input.texCoord).rgb;
+			
+			// Targeted neutral steel treatment. Texture exports remain unchanged.
+            float3 rawDiffuse = tex2D(albedoMap, input.texCoord).rgb;
+            float diffusePeak = max(rawDiffuse.r, max(rawDiffuse.g, rawDiffuse.b));
+            float specPeak = max(specularGloss.r, max(specularGloss.g, specularGloss.b));
+            float emissivePeak = max(material.emissive.r, max(material.emissive.g, material.emissive.b));
+            // Preserve bright lettering, low-specular decals, and emissive pixels.
+            float steelWeight = tex2D(steelMask, input.texCoord).r;
+            steelWeight *= smoothstep(0.12, 0.35, specPeak);
+            steelWeight *= 1.0 - smoothstep(0.08, 0.25, diffusePeak);
+            steelWeight *= 1.0 - step(0.001, emissivePeak);
+            float specLuma = dot(specularGloss.rgb, float3(0.2126, 0.7152, 0.0722));
+            float steelSpec = max(specLuma, 0.65);
+            float diffuseLuma = dot(material.albedo, float3(0.2126, 0.7152, 0.0722));
+            float steelDiffuse = max(diffuseLuma, steelSpec * 0.50);
+            material.albedo = lerp(material.albedo, float3(steelDiffuse, steelDiffuse, steelDiffuse), steelWeight);
+            material.specular = lerp(material.specular, float3(steelSpec, steelSpec, steelSpec), steelWeight);
+            material.gloss = lerp(material.gloss, max(material.gloss, 0.70), steelWeight);
+            // Brass adjustment applies only to the casing UVs, not projectiles.
+            float brassWeight = tex2D(brassMask, input.texCoord).r;
+            brassWeight *= 1.0 - step(0.001, emissivePeak);
+            float brassVariation = clamp(specLuma, 0.50, 1.0);
+            float3 brassSpec = float3(0.90, 0.64, 0.29) * brassVariation;
+            material.specular = lerp(material.specular, brassSpec, brassWeight);
+            material.albedo = lerp(material.albedo, brassSpec * 0.30, brassWeight);
+            material.gloss = lerp(material.gloss, max(material.gloss, 0.70), brassWeight);
+            material.id = 1*highlightId;    // for alien vision
+			
+		}
+	]]>		
+	</code>
+
+</shader>
+

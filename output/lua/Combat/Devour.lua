@@ -159,6 +159,8 @@ local function ClearPlayerNow(player)
 		local oldHealth = player:GetHealth()
 		local oldArmor = player:GetArmor()
         local onos = Shared.GetEntity(player:GetDevouringOnosId())
+        -- (2026-10-28) The id can be stale/0 (Onos gone) and point at a non-Onos entity (seen: a ParticleEffect).
+        if onos and not (onos:isa("Onos") and onos.GetIsAlive) then onos = nil end
         local onosAlive = onos and onos:GetIsAlive() or false
         if onos and onosAlive then
             local onosViewDirection = onos:GetViewCoords().zAxis
